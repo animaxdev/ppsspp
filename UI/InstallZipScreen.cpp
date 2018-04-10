@@ -92,7 +92,6 @@ void InstallZipScreen::update() {
 			doneView_->SetText(iz->T(err.c_str()));
 		} else if (installStarted_) {
 			doneView_->SetText(iz->T("Installed!"));
-			MainScreen::showHomebrewTab = true;
 		}
 	}
 	UIScreen::update();

@@ -489,7 +489,7 @@ rotateVBO:
 			prim = indexGen.Prim();
 		}
 
-		VERBOSE_LOG(G3D, "Flush prim %i! %i verts in one go", prim, vertexCount);
+		//VERBOSE_LOG(G3D, "Flush prim %i! %i verts in one go", prim, vertexCount);
 		bool hasColor = (lastVType_ & GE_VTYPE_COL_MASK) != GE_VTYPE_COL_NONE;
 		if (gstate.isModeThrough()) {
 			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && (hasColor || gstate.getMaterialAmbientA() == 255);
@@ -554,8 +554,8 @@ rotateVBO:
 
 		// TODO: Split up into multiple draw calls for GLES 2.0 where you can't guarantee support for more than 0x10000 verts.
 #if defined(MOBILE_DEVICE)
-		if (vertexCount > 0x10000 / 3)
-			vertexCount = 0x10000 / 3;
+		if (vertexCount > 0xFFFF)
+			vertexCount = 0xFFFF;
 #endif
 		SoftwareTransform(
 			prim, vertexCount,

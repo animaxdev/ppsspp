@@ -32,7 +32,7 @@ struct DispatchQueueItem {
 	EventParams params;
 };
 
-std::deque<DispatchQueueItem> g_dispatchQueue;
+static std::deque<DispatchQueueItem> g_dispatchQueue;
 
 void EventTriggered(Event *e, EventParams params) {
 	DispatchQueueItem item;
@@ -44,7 +44,7 @@ void EventTriggered(Event *e, EventParams params) {
 }
 
 void DispatchEvents() {
-	while (true) {
+	while (!g_dispatchQueue.empty()) {
 		DispatchQueueItem item;
 		{
 			std::unique_lock<std::mutex> guard(eventMutex_);

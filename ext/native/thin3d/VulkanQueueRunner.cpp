@@ -1112,10 +1112,12 @@ void VulkanQueueRunner::CopyReadbackBuffer(int width, int height, Draw::DataForm
 	} else if (srcFormat == destFormat) {
 		uint8_t *dst = pixels;
 		const uint8_t *src = (const uint8_t *)mappedData;
+		int lineSize = width * srcPixelSize;
+		int dstStep = pixelStride * srcPixelSize;
 		for (int y = 0; y < height; ++y) {
-			memcpy(dst, src, width * srcPixelSize);
-			src += width * srcPixelSize;
-			dst += pixelStride * srcPixelSize;
+			memcpy(dst, src, lineSize);
+			src += lineSize;
+			dst += dstStep;
 		}
 	} else if (destFormat == Draw::DataFormat::D32F) {
 		ConvertToD32F(pixels, (const uint8_t *)mappedData, pixelStride, width, width, height, srcFormat);

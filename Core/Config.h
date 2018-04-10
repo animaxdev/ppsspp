@@ -210,6 +210,7 @@ public:
 	int iBloomHack; //0 = off, 1 = safe, 2 = balanced, 3 = aggressive
 	bool bTimerHack;
 	bool bBlockTransferGPU;
+	bool bBlockInvalidateTexture;
 	bool bDisableSlowFramebufEffects;
 	bool bFragmentTestCache;
 	int iSplineBezierQuality; // 0 = low , 1 = Intermediate , 2 = High

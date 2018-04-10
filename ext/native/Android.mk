@@ -26,7 +26,6 @@ LOCAL_SRC_FILES :=\
     ext/libpng17/pngrtran.c \
     ext/libpng17/pngrutil.c \
     ext/libpng17/pngset.c \
-    ext/libpng17/pngtest.c \
     ext/libpng17/pngtrans.c \
     ext/libpng17/pngwio.c \
     ext/libpng17/pngwrite.c \
@@ -118,7 +117,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 else ifeq ($(TARGET_ARCH_ABI),armeabi)
 LOCAL_CFLAGS := $(LOCAL_CFLAGS) -DARM -DARMEABI -march=armv6
 else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
-LOCAL_CFLAGS := $(LOCAL_CFLAGS) -D_ARCH_64 -DARM64
+LOCAL_CFLAGS := $(LOCAL_CFLAGS) -D_ARCH_64 -DARM64 -DPNG_ARM_NEON_OPT=0
 else ifeq ($(TARGET_ARCH_ABI),x86)
 LOCAL_CFLAGS := $(LOCAL_CFLAGS) -D_M_IX86
 LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \

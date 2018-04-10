@@ -1488,7 +1488,7 @@ void TextureCacheCommon::ApplyTexture() {
 		}
 
 		if (nextNeedsRehash_) {
-			PROFILE_THIS_SCOPE("texhash");
+			//PROFILE_THIS_SCOPE("texhash");
 			// Update the hash on the texture.
 			int w = gstate.getTextureWidth(0);
 			int h = gstate.getTextureHeight(0);
