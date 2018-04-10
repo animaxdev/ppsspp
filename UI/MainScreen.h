@@ -26,7 +26,7 @@
 
 class GameBrowser : public UI::LinearLayout {
 public:
-	GameBrowser(std::string path, bool allowBrowsing, bool *gridStyle_, std::string lastText, std::string lastLink, int flags = 0, UI::LayoutParams *layoutParams = 0);
+	GameBrowser(std::string path, bool allowBrowsing, bool *gridStyle_, std::string lastText, std::string lastLink, UI::LayoutParams *layoutParams = 0);
 
 	UI::Event OnChoice;
 	UI::Event OnHoldChoice;
@@ -62,7 +62,6 @@ private:
 	bool allowBrowsing_;
 	std::string lastText_;
 	std::string lastLink_;
-	int flags_;
 	UI::Choice *homebrewStoreButton_;
 	std::string focusGamePath_;
 };
@@ -75,9 +74,6 @@ public:
 	~MainScreen();
 
 	bool isTopLevel() const override { return true; }
-
-	// Horrible hack to show the demos & homebrew tab after having installed a game from a zip file.
-	static bool showHomebrewTab;
 
 protected:
 	void CreateViews() override;

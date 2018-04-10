@@ -296,6 +296,10 @@ void GameInfo::ParseParamSFO() {
 	paramSFOLoaded = true;
 }
 
+std::string GameInfo::GetFilename() {
+	return File::GetFilename(filePath_);
+}
+
 std::string GameInfo::GetTitle() {
 	std::lock_guard<std::mutex> guard(lock);
 	return title;

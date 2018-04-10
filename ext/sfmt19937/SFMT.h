@@ -46,9 +46,7 @@ extern "C" {
 #elif defined(_MSC_VER) || defined(__BORLANDC__)
   typedef unsigned int uint32_t;
   typedef unsigned __int64 uint64_t;
-#if !defined(__cplusplus)
-	#define inline __inline
-#endif
+  //#define inline __inline
 #else
   #include <inttypes.h>
   #if defined(__GNUC__)
@@ -80,6 +78,15 @@ union W128_T {
     vector unsigned int s;
     uint32_t u[4];
     uint64_t u64[2];
+};
+#elif defined(HAVE_NEON)
+  #include <arm_neon.h>
+
+/** 128-bit data structure */
+union W128_T {
+    uint32_t u[4];
+    uint64_t u64[2];
+    uint32x4_t si;
 };
 #elif defined(HAVE_SSE2)
   #include <emmintrin.h>
@@ -249,7 +256,7 @@ inline static double sfmt_genrand_real3(sfmt_t * sfmt)
  */
 inline static double sfmt_to_res53(uint64_t v)
 {
-    return v * (1.0/18446744073709551616.0);
+    return (v >> 11) * (1.0/9007199254740992.0);
 }
 
 /**

@@ -543,9 +543,11 @@ static void DoFrameTiming(bool &throttle, bool &skipFrame, float timestep) {
 	}
 	curFrameTime = time_now_d();
 
+#ifndef MOBILE_DEVICE
 	if (g_Config.bLogFrameDrops) {
 		DoFrameDropLogging(scaledTimestep);
 	}
+#endif
 
 	// Auto-frameskip automatically if speed limit is set differently than the default.
 	bool useAutoFrameskip = g_Config.bAutoFrameSkip && g_Config.iRenderingMode != FB_NON_BUFFERED_MODE;
@@ -692,6 +694,7 @@ void __DisplayFlip(int cyclesLate) {
 	if (fbDirty || noRecentFlip || postEffectRequiresFlip) {
 		CalculateFPS();
 
+#ifndef MOBILE_DEVICE
 		// Let the user know if we're running slow, so they know to adjust settings.
 		// Sometimes users just think the sound emulation is broken.
 		static bool hasNotifiedSlow = false;
@@ -706,6 +709,7 @@ void __DisplayFlip(int cyclesLate) {
 #endif
 			hasNotifiedSlow = true;
 		}
+#endif
 
 		// Setting CORE_NEXTFRAME causes a swap.
 		const bool fbReallyDirty = gpu->FramebufferReallyDirty();

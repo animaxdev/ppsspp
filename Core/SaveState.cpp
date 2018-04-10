@@ -236,7 +236,7 @@ namespace SaveState
 		int baseUsage_;
 	};
 
-	static bool needsProcess = false;
+	bool g_NeedsProcess = false;
 	static std::vector<Operation> pending;
 	static std::mutex mutex;
 	static bool hasLoadedState = false;
@@ -287,7 +287,7 @@ namespace SaveState
 
 		// Don't actually run it until next frame.
 		// It's possible there might be a duplicate but it won't hurt us.
-		needsProcess = true;
+		g_NeedsProcess = true;
 		Core_UpdateSingleStep();
 	}
 
@@ -614,9 +614,7 @@ namespace SaveState
 			CheckRewindState();
 #endif
 
-		if (!needsProcess)
-			return;
-		needsProcess = false;
+		g_NeedsProcess = false;
 
 		if (!__KernelIsRunning())
 		{

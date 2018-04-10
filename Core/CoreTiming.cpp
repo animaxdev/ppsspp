@@ -581,14 +581,28 @@ void ForceCheck()
 
 void Advance()
 {
-	PROFILE_THIS_SCOPE("advance");
+	//PROFILE_THIS_SCOPE("advance");
 	int cyclesExecuted = slicelength - currentMIPS->downcount;
 	globalTimer += cyclesExecuted;
 	currentMIPS->downcount = slicelength;
 
 	if (Common::AtomicLoadAcquire(hasTsEvents))
 		MoveEvents();
+
+#ifndef MOBILE_DEVICE
 	ProcessFifoWaitEvents();
+#else
+	s64 tick = (s64)globalTimer + slicelength - currentMIPS->downcount;
+	while (first && first->time < tick)
+	{
+		Event* evt = first;
+		first = first->next;
+		event_types[evt->type].callback(evt->userdata, (int)(tick - evt->time));
+		// FreeEvent
+		evt->next = eventPool;
+		eventPool = evt;
+	}
+#endif
 
 	if (!first)
 	{

@@ -142,11 +142,7 @@ bool GameManager::InstallGame(std::string zipfile, bool deleteAfter) {
 	std::string pspGame = GetSysDirectory(DIRECTORY_GAME);
 	INFO_LOG(HLE, "Installing %s into %s", zipfile.c_str(), pspGame.c_str());
 	int error;
-#ifdef _WIN32
-	struct zip *z = zip_open(ConvertUTF8ToWString(zipfile).c_str(), 0, &error);
-#else
 	struct zip *z = zip_open(zipfile.c_str(), 0, &error);
-#endif
 	if (!z) {
 		ERROR_LOG(HLE, "Failed to open ZIP file %s, error code=%i", zipfile.c_str(), error);
 		return false;

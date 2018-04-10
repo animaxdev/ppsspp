@@ -930,12 +930,15 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 				downcount = 0;
 			}
 		}
-
+#ifndef MOBILE_DEVICE
 		if (useFastRunLoop) {
 			FastRunLoop(list);
 		} else {
 			SlowRunLoop(list);
 		}
+#else
+		FastRunLoop(list);
+#endif
 
 		{
 			downcount = list.stall == 0 ? 0x0FFFFFFF : (list.stall - list.pc) / 4;
@@ -986,9 +989,7 @@ void GPUCommon::FastRunLoop(DisplayList &list) {
 		} else {
 			uint64_t flags = info.flags;
 			if (flags & FLAG_FLUSHBEFOREONCHANGE) {
-				if (drawEngineCommon_->GetNumDrawCalls()) {
-					drawEngineCommon_->DispatchFlush();
-				}
+				drawEngineCommon_->DispatchFlush();
 			}
 			gstate.cmdmem[cmd] = op;
 			if (flags & (FLAG_EXECUTE | FLAG_EXECUTEONCHANGE)) {
@@ -1119,18 +1120,22 @@ void GPUCommon::ProcessDLQueue() {
 		//return;
 	}
 
-	for (int listIndex = GetNextListIndex(); listIndex != -1; listIndex = GetNextListIndex()) {
+	auto iter = dlQueue.begin();
+	while (iter != dlQueue.end()) {
+		int listIndex = *iter;
 		DisplayList &l = dls[listIndex];
-		DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
+		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
 		if (!InterpretList(l)) {
 			return;
-		} else {
+		}
+		else {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
 				dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), listIndex), dlQueue.end());
 			}
 		}
+		iter = dlQueue.begin();
 	}
 
 	currentList = nullptr;
@@ -1274,7 +1279,7 @@ void GPUCommon::Execute_End(u32 op, u32 diff) {
 			case PSP_GE_SIGNAL_HANDLER_CONTINUE:
 				// Resume the list right away, then call the handler.
 				currentList->signal = behaviour;
-				DEBUG_LOG(G3D, "Signal without wait. signal/end: %04x %04x", signal, enddata);
+				//DEBUG_LOG(G3D, "Signal without wait. signal/end: %04x %04x", signal, enddata);
 				break;
 			case PSP_GE_SIGNAL_HANDLER_PAUSE:
 				// Pause the list instead of ending at the next FINISH.
@@ -1500,10 +1505,12 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		return;
 	}
 
+#ifndef MOBILE_DEVICE
 	if (!Memory::IsValidAddress(gstate_c.vertexAddr)) {
 		ERROR_LOG_REPORT(G3D, "Bad vertex address %08x!", gstate_c.vertexAddr);
 		return;
 	}
+#endif
 
 	void *verts = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 	void *inds = 0;
@@ -1561,38 +1568,31 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		uint32_t data = *src;
 		switch (data >> 24) {
 		case GE_CMD_PRIM:
-		{
-			u32 count = data & 0xFFFF;
-			if (count == 0) {
-				// Ignore.
-				break;
-			}
+			count = data & 0xFFFF;
+			if (count != 0) {
+				prim = static_cast<GEPrimitiveType>((data >> 16) & 7);
 
-			GEPrimitiveType newPrim = static_cast<GEPrimitiveType>((data >> 16) & 7);
-			// TODO: more efficient updating of verts/inds
-			verts = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
-			inds = 0;
-			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
-				inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
-			}
+				// TODO: more efficient updating of verts/inds
+				verts = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
+				inds = 0;
+				if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
+					inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
+				}
 
-			drawEngineCommon_->SubmitPrim(verts, inds, newPrim, count, vertTypeID, &bytesRead);
-			AdvanceVerts(vertexType, count, bytesRead);
-			totalVertCount += count;
+				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, &bytesRead);
+				AdvanceVerts(vertexType, count, bytesRead);
+				totalVertCount += count;
+			}
 			break;
-		}
 		case GE_CMD_VERTEXTYPE:
-		{
-			uint32_t diff = data ^ vertexType;
 			// don't mask upper bits, vertexType is unmasked
-			if (diff & vtypeCheckMask) {
+			if ((data ^ vertexType) & vtypeCheckMask) {
 				goto bail;
 			} else {
 				vertexType = data;
 				vertTypeID = GetVertTypeID(vertexType, gstate.getUVGenMode());
 			}
 			break;
-		}
 		case GE_CMD_VADDR:
 			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
 			break;
@@ -1643,8 +1643,8 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			// All other commands might need a flush or something, stop this inner loop.
 			goto bail;
 		}
-		cmdCount++;
-		src++;
+		cmdCount += 1;
+		src += 1;
 	}
 
 bail:
@@ -1741,7 +1741,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 
 	void *control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 	void *indices = NULL;
-	if ((gstate.vertType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
+	u32 vertexType = gstate.vertType;
+	if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
 		if (!Memory::IsValidAddress(gstate_c.indexAddr)) {
 			ERROR_LOG_REPORT(G3D, "Bad index address %08x!", gstate_c.indexAddr);
 			return;
@@ -1749,8 +1750,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 		indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 	}
 
-	if (vertTypeIsSkinningEnabled(gstate.vertType)) {
-		DEBUG_LOG_REPORT(G3D, "Unusual bezier/spline vtype: %08x, morph: %d, bones: %d", gstate.vertType, (gstate.vertType & GE_VTYPE_MORPHCOUNT_MASK) >> GE_VTYPE_MORPHCOUNT_SHIFT, vertTypeGetNumBoneWeights(gstate.vertType));
+	if (vertTypeIsSkinningEnabled(vertexType)) {
+		DEBUG_LOG_REPORT(G3D, "Unusual bezier/spline vtype: %08x, morph: %d, bones: %d", vertexType, (vertexType & GE_VTYPE_MORPHCOUNT_MASK) >> GE_VTYPE_MORPHCOUNT_SHIFT, vertTypeGetNumBoneWeights(vertexType));
 	}
 
 	int sp_ucount = op & 0xFF;
@@ -1761,7 +1762,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	SetDrawType(DRAW_SPLINE, PatchPrimToPrim(patchPrim));
 	bool computeNormals = gstate.isLightingEnabled();
 	bool patchFacing = gstate.patchfacing & 1;
-	u32 vertType = gstate.vertType;
+	
 
 	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
 		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
@@ -1778,16 +1779,71 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	}
 
 	int bytesRead = 0;
+	int patchDivisionU = gstate.getPatchDivisionU();
+	int patchDivisionV = gstate.getPatchDivisionV();
 	UpdateUVScaleOffset();
-	drawEngineCommon_->SubmitSpline(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertType, &bytesRead);
-
-	if (gstate_c.spline)
-		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
-	gstate_c.spline = false;
+	drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 
 	// After drawing, we advance pointers - see SubmitPrim which does the same.
 	int count = sp_ucount * sp_vcount;
-	AdvanceVerts(gstate.vertType, count, bytesRead);
+	AdvanceVerts(vertexType, count, bytesRead);
+
+	// ACID2
+	int cmdCount = 0;
+	const u32 *src = (const u32 *)Memory::GetPointerUnchecked(currentList->pc + 4);
+	const u32 *stall = currentList->stall ? (const u32 *)Memory::GetPointerUnchecked(currentList->stall) : 0;
+	while (src != stall) {
+		uint32_t data = *src;
+		switch (data >> 24) {
+		case GE_CMD_SPLINE:
+			if (gstate_c.spline) {
+				gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
+			}
+			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
+			indices = 0;
+			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
+				indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
+			}
+			drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+			AdvanceVerts(vertexType, count, bytesRead);
+			break;
+		case GE_CMD_VERTEXTYPE:
+			// don't mask upper bits, vertexType is unmasked
+			if ((data ^ vertexType) & ~GE_VTYPE_WEIGHTCOUNT_MASK) {
+				goto bail;
+			}
+			else {
+				vertexType = data;
+			}
+			break;
+		case GE_CMD_VADDR:
+			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
+			break;
+		case GE_CMD_IADDR:
+			gstate_c.indexAddr = gstate_c.getRelativeAddress(op & 0x00FFFFFF);
+			break;
+		case GE_CMD_BASE:
+			gstate.cmdmem[GE_CMD_BASE] = data;
+			break;
+		default:
+			goto bail;
+		}
+		cmdCount += 1;
+		src += 1;
+	}
+
+bail:
+	gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
+
+	if (gstate_c.spline) {
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
+		gstate_c.spline = false;
+	}
+	// Skip over the commands we just read out manually.
+	if (cmdCount > 0) {
+		UpdatePC(currentList->pc, currentList->pc + cmdCount * 4);
+		currentList->pc += cmdCount * 4;
+	}
 }
 
 void GPUCommon::Execute_BoundingBox(u32 op, u32 diff) {
@@ -2219,7 +2275,7 @@ void GPUCommon::ExecuteOp(u32 op, u32 diff) {
 
 void GPUCommon::Execute_Unknown(u32 op, u32 diff) {
 	if ((op & 0xFFFFFF) != 0)
-		WARN_LOG_REPORT_ONCE(unknowncmd, G3D, "Unknown GE command : %08x ", op);
+		WARN_LOG_REPORT_ONCE(unknowncmd, G3D, "Unknown GE command : %08x, %d", op, op >> 24);
 }
 
 void GPUCommon::FastLoadBoneMatrix(u32 target) {
@@ -2375,7 +2431,9 @@ void GPUCommon::InterruptEnd(int listid) {
 		__GeTriggerWait(GPU_SYNC_LIST, listid);
 	}
 
-	ProcessDLQueue();
+	if (dlQueue.size() > 0) {
+		ProcessDLQueue();
+	}
 }
 
 // TODO: Maybe cleaner to keep this in GE and trigger the clear directly?
@@ -2520,7 +2578,8 @@ void GPUCommon::DoBlockTransfer(u32 skipDrawReason) {
 
 	int bpp = gstate.getTransferBpp();
 
-	DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
+#ifndef MOBILE_DEVICE
+	//DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
 
 	if (!Memory::IsValidAddress(srcBasePtr)) {
 		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad source transfer address %08x!", srcBasePtr);
@@ -2545,6 +2604,7 @@ void GPUCommon::DoBlockTransfer(u32 skipDrawReason) {
 		ERROR_LOG_REPORT(G3D, "Bottom-right corner of destination of block transfer is at an invalid address: %08x", srcLastAddr);
 		return;
 	}
+#endif
 
 	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
 	if (!framebufferManager_->NotifyBlockTransferBefore(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason)) {
@@ -2569,8 +2629,10 @@ void GPUCommon::DoBlockTransfer(u32 skipDrawReason) {
 			}
 		}
 
-		// Fixes Gran Turismo's funky text issue, since it overwrites the current texture.
-		textureCache_->Invalidate(dstBasePtr + (dstY * dstStride + dstX) * bpp, height * dstStride * bpp, GPU_INVALIDATE_HINT);
+		if (g_Config.bBlockInvalidateTexture) {
+			// Fixes Gran Turismo's funky text issue, since it overwrites the current texture.
+			textureCache_->Invalidate(dstBasePtr + (dstY * dstStride + dstX) * bpp, height * dstStride * bpp, GPU_INVALIDATE_HINT);
+		}
 		framebufferManager_->NotifyBlockTransferAfter(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
 	}
 

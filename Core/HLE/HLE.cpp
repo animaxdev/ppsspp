@@ -479,6 +479,7 @@ const HLEFunction *GetSyscallFuncPointer(MIPSOpcode op)
 	u32 callno = (op >> 6) & 0xFFFFF; //20 bits
 	int funcnum = callno & 0xFFF;
 	int modulenum = (callno & 0xFF000) >> 12;
+#ifndef MOBILE_DEVICE
 	if (funcnum == 0xfff) {
 		ERROR_LOG(HLE, "Unknown syscall: Module: %s (module: %d func: %d)", modulenum > (int)moduleDB.size() ? "(unknown)" : moduleDB[modulenum].name, modulenum, funcnum);
 		return NULL;
@@ -491,24 +492,19 @@ const HLEFunction *GetSyscallFuncPointer(MIPSOpcode op)
 		ERROR_LOG(HLE, "Syscall had bad function number %d in module %d - probably executing garbage", funcnum, modulenum);
 		return NULL;
 	}
+#endif
 	return &moduleDB[modulenum].funcTable[funcnum];
 }
 
-void *GetQuickSyscallFunc(MIPSOpcode op) {
-	if (coreCollectDebugStats)
-		return nullptr;
-
+void *GetQuickSyscallFunc(MIPSOpcode op)
+{
+#ifndef MOBILE_DEVICE
 	const HLEFunction *info = GetSyscallFuncPointer(op);
-	if (!info || !info->func)
-		return nullptr;
-	DEBUG_LOG(HLE, "Compiling syscall to %s", info->name);
-
-	// TODO: Do this with a flag?
-	if (op == idleOp)
-		return (void *)info->func;
-	if (info->flags != 0)
-		return (void *)&CallSyscallWithFlags;
-	return (void *)&CallSyscallWithoutFlags;
+#else
+	u32 callno = (op >> 6) & 0xFFFFF; //20 bits
+	const HLEFunction *info = &moduleDB[(callno & 0xFF000) >> 12].funcTable[callno & 0xFFF];
+#endif
+	return op != idleOp ? (void *)&CallSyscallWithFlags : (void *)info->func;
 }
 
 static double hleSteppingTime = 0.0;
@@ -519,7 +515,7 @@ void hleSetSteppingTime(double t)
 
 void CallSyscall(MIPSOpcode op)
 {
-	PROFILE_THIS_SCOPE("syscall");
+	//PROFILE_THIS_SCOPE("syscall");
 	double start = 0.0;  // need to initialize to fix the race condition where coreCollectDebugStats is enabled in the middle of this func.
 	if (coreCollectDebugStats) {
 		time_update();
