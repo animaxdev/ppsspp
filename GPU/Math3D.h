@@ -293,24 +293,24 @@ public:
 		return Vec2(x*other.x, y*other.y);
 	}
 
-	template<typename V>
-	Vec2 operator * (const V& f) const
+	
+	Vec2 operator * (const T& f) const
 	{
 		return Vec2(x*f,y*f);
 	}
-	template<typename V>
-	void operator *= (const V& f)
+	
+	void operator *= (const T& f)
 	{
 		x*=f; y*=f;
 	}
 
-	template<typename V>
-	Vec2 operator / (const V& f) const
+	
+	Vec2 operator / (const T& f) const
 	{
 		return Vec2(x/f,y/f);
 	}
-	template<typename V>
-	void operator /= (const V& f)
+	
+	void operator /= (const T& f)
 	{
 		*this = *this / f;
 	}
@@ -450,24 +450,24 @@ public:
 		return Vec3(x*other.x, y*other.y, z*other.z);
 	}
 
-	template<typename V>
-	Vec3 operator * (const V& f) const
+	
+	Vec3 operator * (const T& f) const
 	{
 		return Vec3(x*f,y*f,z*f);
 	}
-	template<typename V>
-	void operator *= (const V& f)
+	
+	void operator *= (const T& f)
 	{
 		x*=f; y*=f; z*=f;
 	}
 
-	template<typename V>
-	Vec3 operator / (const V& f) const
+
+	Vec3 operator / (const T& f) const
 	{
 		return Vec3(x/f,y/f,z/f);
 	}
-	template<typename V>
-	void operator /= (const V& f)
+	
+	void operator /= (const T& f)
 	{
 		*this = *this / f;
 	}
@@ -647,23 +647,23 @@ public:
 	{
 		return Vec4(x | other.x, y | other.y, z | other.z, w | other.w);
 	}
-	template<typename V>
-	Vec4 operator * (const V& f) const
+	
+	Vec4 operator * (const T& f) const
 	{
 		return Vec4(x*f,y*f,z*f,w*f);
 	}
-	template<typename V>
-	void operator *= (const V& f)
+	
+	void operator *= (const T& f)
 	{
 		x*=f; y*=f; z*=f; w*=f;
 	}
-	template<typename V>
-	Vec4 operator / (const V& f) const
+
+	Vec4 operator / (const T& f) const
 	{
 		return Vec4(x/f,y/f,z/f,w/f);
 	}
-	template<typename V>
-	void operator /= (const V& f)
+	
+	void operator /= (const T& f)
 	{
 		*this = *this / f;
 	}
@@ -850,6 +850,15 @@ inline Vec3<T> Cross(const Vec3<T>& a, const Vec3<T>& b)
 	return Vec3<T>(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
+template<>
+inline Vec3<float> Cross(const Vec3<float>& a, const Vec3<float>& b)
+{
+#if defined(_M_SSE)
+	return SSECrossProduct(a.vec, b.vec);
+#else
+	return Vec3<float>(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
+#endif
+}
 
 ////////////////////////////////////////////////////////////
 // Vec4
@@ -1099,6 +1108,17 @@ inline Vec3<float> Vec3<float>::operator * (const Vec3 &other) const
 }
 
 
+template<>
+inline void Vec3<float>::operator *= (const float& f)
+{
+#if defined(_M_SSE)
+	__m128 a = _mm_set_ps1(f);
+	vec = _mm_mul_ps(vec, a);
+#else
+	x *= f; y *= f; z *= f;
+#endif
+}
+
 
 template<>
 inline float Vec3<float>::Length() const
@@ -1140,7 +1160,15 @@ inline float Vec3<float>::Distance2To(Vec3<float> &other)
 template<>
 inline Vec3<float> Vec3<float>::Normalized() const
 {
+#if defined(_M_SSE)
+	__m128 normalize = SSENormalizeMultiplier(vec);
+	return _mm_mul_ps(vec, normalize);
+#elif PPSSPP_ARCH(ARM_NEON)
+	simd4f invlen = simd4f_rsqrt(simd4f_dot4(vec, vec));
+	return simd4f_mul(vec, invlen);
+#else
 	return (*this) / Length();
+#endif
 }
 
 template<>
