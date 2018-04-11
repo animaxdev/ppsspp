@@ -578,7 +578,7 @@ void TextureCacheCommon::HandleTextureChange(TexCacheEntry *const entry, const c
 	cacheSizeEstimate_ -= EstimateTexMemoryUsage(entry);
 	entry->numInvalidated++;
 	gpuStats.numTextureInvalidations++;
-	DEBUG_LOG(G3D, "Texture different or overwritten, reloading at %08x: %s", entry->addr, reason);
+	//DEBUG_LOG(G3D, "Texture different or overwritten, reloading at %08x: %s", entry->addr, reason);
 	if (doDelete) {
 		InvalidateLastTexture();
 		ReleaseTexture(entry, true);
@@ -736,7 +736,7 @@ bool TextureCacheCommon::AttachFramebuffer(TexCacheEntry *entry, u32 address, Vi
 
 	// If they match exactly, it's non-CLUT and from the top left.
 	if (exactMatch) {
-		DEBUG_LOG(G3D, "Render to texture detected at %08x!", address);
+		//DEBUG_LOG(G3D, "Render to texture detected at %08x!", address);
 		if (framebuffer->fb_stride != entry->bufw) {
 			WARN_LOG_REPORT_ONCE(diffStrides1, G3D, "Render to texture with different strides %d != %d", entry->bufw, framebuffer->fb_stride);
 		}

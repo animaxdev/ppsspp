@@ -2044,7 +2044,7 @@ void FramebufferManagerCommon::PackFramebufferSync_(VirtualFramebuffer *vfb, int
 
 	// We always need to convert from the framebuffer native format.
 	// Right now that's always 8888.
-	DEBUG_LOG(G3D, "Reading framebuffer to mem, fb_address = %08x", fb_address);
+	//DEBUG_LOG(G3D, "Reading framebuffer to mem, fb_address = %08x", fb_address);
 
 	draw_->CopyFramebufferToMemorySync(vfb->fbo, Draw::FB_COLOR_BIT, x, y, w, h, destFormat, destPtr, vfb->fb_stride);
 

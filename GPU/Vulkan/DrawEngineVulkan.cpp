@@ -770,7 +770,7 @@ void DrawEngineVulkan::DoFlush() {
 			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && ((hasColor && (gstate.materialupdate & 1)) || gstate.getMaterialAmbientA() == 255) && (!gstate.isLightingEnabled() || gstate.getAmbientA() == 255);
 		}
 
-		PROFILE_THIS_SCOPE("updatestate");
+		
 		if (textureNeedsApply) {
 			textureCache_->ApplyTexture();
 			textureCache_->GetVulkanHandles(imageView, sampler);
@@ -781,6 +781,7 @@ void DrawEngineVulkan::DoFlush() {
 		}
 
 		if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
+			//PROFILE_THIS_SCOPE("f2");
 			shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, true);  // usehwtransform
 			_dbg_assert_msg_(G3D, vshader->UseHWTransform(), "Bad vshader");
 
@@ -815,13 +816,12 @@ void DrawEngineVulkan::DoFlush() {
 		dirtyUniforms_ |= shaderManager_->UpdateUniforms();
 		UpdateUBOs(frame);
 
-		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
+		
 		{
-		PROFILE_THIS_SCOPE("renderman_q");
+		PROFILE_THIS_SCOPE("render_q");
+		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
 
-		const uint32_t dynamicUBOOffsets[3] = {
-			baseUBOOffset, lightUBOOffset, boneUBOOffset,
-		};
+		const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
 
 		int stride = dec_->GetDecVtxFmt().stride;
 

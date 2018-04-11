@@ -288,22 +288,6 @@ static void _SplinePatchLowQuality(u8 *&dest, u16 *indices, int &count, const Sp
 
 }
 
-static inline void AccumulateWeighted(Vec3f &out, const Vec3f &in, const Vec4f &w) {
-#ifdef _M_SSE
-	out.vec = _mm_add_ps(out.vec, _mm_mul_ps(_mm_loadu_ps(in.AsArray()), w.vec));
-#else
-	out += in * w.x;
-#endif
-}
-
-static inline void AccumulateWeighted(Vec4f &out, const Vec4f &in, const Vec4f &w) {
-#ifdef _M_SSE
-	out.vec = _mm_add_ps(out.vec, _mm_mul_ps(in.vec, w.vec));
-#else
-	out += in * w;
-#endif
-}
-
 
 static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const SplinePatchLocal &spatch, u32 origVertType, int quality, int maxVertices) {
 	// Full (mostly) correct tessellation of spline patches.
@@ -312,9 +296,6 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 	bool origNrm = (origVertType & GE_VTYPE_NRM_MASK) != 0;
 	bool origCol = (origVertType & GE_VTYPE_COL_MASK) != 0;
 	bool origTc = (origVertType & GE_VTYPE_TC_MASK) != 0;
-#ifdef _M_SSE
-	bool useSSE4 = cpu_info.bSSE4_1;
-#endif
 
 	float *knot_u = new float[spatch.count_u + 4];
 	float *knot_v = new float[spatch.count_v + 4];
@@ -412,7 +393,6 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 					float f = u_spline * v_spline;
 
 					if (f > 0.0f) {
-						Vec4f fv(f);
 						int idx = spatch.count_u * (iv + jj) + (iu + ii);
 						/*
 						if (idx >= max_idx) {
@@ -422,17 +402,20 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 							Crash();
 						}*/
 						SimpleVertex *a = spatch.points[idx];
-						AccumulateWeighted(vert_pos, a->pos, fv);
+						
+						// Accumulate Weighted
+						vert_pos += Vec3f(a->pos) * f;
 						if (origTc) {
 							vert->uv[0] += a->uv[0] * f;
 							vert->uv[1] += a->uv[1] * f;
 						}
 						if (origCol) {
-							Vec4f a_color = Vec4f::FromRGBA(a->color_32);
-							AccumulateWeighted(vert_color, a_color, fv);
+							// Accumulate Weighted
+							vert_color += Vec4f::FromRGBA(a->color_32) * f;
 						}
 						if (origNrm) {
-							AccumulateWeighted(vert_nrm, a->nrm, fv);
+							// Accumulate Weighted
+							vert_nrm += Vec3f(a->nrm) * f;
 						}
 					}
 				}
@@ -456,10 +439,6 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 
 	// Hacky normal generation through central difference.
 	if (computeNormals && !origNrm) {
-#ifdef _M_SSE
-		const __m128 facing = spatch.patchFacing ? _mm_set_ps1(-1.0f) : _mm_set_ps1(1.0f);
-#endif
-
 		for (int v = 0; v < patch_div_t + 1; v++) {
 			Vec3f vl_pos = vertices[v * (patch_div_s + 1)].pos;
 			Vec3f vc_pos = vertices[v * (patch_div_s + 1)].pos;
@@ -471,19 +450,6 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 
 				const Vec3f vr_pos = vertices[v * (patch_div_s + 1) + r].pos;
 
-#ifdef _M_SSE
-				const __m128 right = _mm_sub_ps(vr_pos.vec, vl_pos.vec);
-
-				const Vec3f vb_pos = vertices[b * (patch_div_s + 1) + u].pos;
-				const Vec3f vt_pos = vertices[t * (patch_div_s + 1) + u].pos;
-				const __m128 down = _mm_sub_ps(vb_pos.vec, vt_pos.vec);
-
-				const __m128 crossed = SSECrossProduct(right, down);
-				const __m128 normalize = SSENormalizeMultiplier(crossed);
-
-				Vec3f finalNrm = _mm_mul_ps(normalize, _mm_mul_ps(crossed, facing));
-				vertices[v * (patch_div_s + 1) + u].nrm = finalNrm;
-#else
 				const Vec3f right = vr_pos - vl_pos;
 				const Vec3f down = vertices[b * (patch_div_s + 1) + u].pos - vertices[t * (patch_div_s + 1) + u].pos;
 
@@ -492,7 +458,6 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 					norm *= -1.0f;
 				}
 				vertices[v * (patch_div_s + 1) + u].nrm = norm;
-#endif
 
 				// Rotate for the next one to the right.
 				vl_pos = vc_pos;

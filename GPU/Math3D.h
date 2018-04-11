@@ -605,7 +605,6 @@ public:
 
 	// Only implemented for T=int and T=float
 	static Vec4 FromRGBA(unsigned int rgba);
-	static Vec4 FromRGBA(const u8 *rgba);
 	unsigned int ToRGBA() const;
 	void ToRGBA(u8 *rgba) const;
 
@@ -935,12 +934,6 @@ inline Vec4<float> Vec4<float>::FromRGBA(unsigned int rgba)
 #endif
 }
 
-template<typename T>
-inline Vec4<T> Vec4<T>::FromRGBA(const u8 *rgba)
-{
-	return Vec4<T>::FromRGBA(*(unsigned int *)rgba);
-}
-
 template<>
 inline Vec4<int> Vec4<int>::FromRGBA(unsigned int rgba)
 {
@@ -1107,6 +1100,18 @@ inline Vec3<float> Vec3<float>::operator * (const Vec3 &other) const
 #endif
 }
 
+template<>
+inline Vec3<float> Vec3<float>::operator * (const float& f) const
+{
+#if defined(_M_SSE)
+	__m128 a = _mm_set_ps1(f);
+	return _mm_mul_ps(vec, a);
+#elif PPSSPP_ARCH(ARM_NEON)
+	return simd4f_mul(vec, simd4f_splat(f));
+#else
+	return Vec3(x*f, y*f, z*f);
+#endif
+}
 
 template<>
 inline void Vec3<float>::operator *= (const float& f)
@@ -1114,11 +1119,24 @@ inline void Vec3<float>::operator *= (const float& f)
 #if defined(_M_SSE)
 	__m128 a = _mm_set_ps1(f);
 	vec = _mm_mul_ps(vec, a);
+#elif PPSSPP_ARCH(ARM_NEON)
+	vec = simd4f_mul(vec, simd4f_splat(f));
 #else
 	x *= f; y *= f; z *= f;
 #endif
 }
 
+template<>
+inline Vec3<float> Vec3<float>::operator / (const float& f) const
+{
+#if defined(_M_SSE)
+	return _mm_div_ps(vec, _mm_set_ps1(f));
+#elif PPSSPP_ARCH(ARM_NEON)
+	return simd4f_div(vec, simd4f_splat(f));
+#else
+	return Vec3(x / f, y / f, z / f, w / f);
+#endif
+}
 
 template<>
 inline float Vec3<float>::Length() const
@@ -1245,6 +1263,19 @@ inline Vec4<float> Vec4<float>::operator * (const Vec4 &other) const
 #endif
 }
 
+template<>
+inline Vec4<float> Vec4<float>::operator / (const float& f) const
+{
+#if defined(_M_SSE)
+	return _mm_div_ps(vec, _mm_set_ps1(f));
+#elif PPSSPP_ARCH(ARM_NEON)
+	return simd4f_div(vec, simd4f_splat(f));
+#else
+	return Vec4(x / f, y / f, z / f, w / f);
+#endif
+}
+
+
 #if defined(_M_SSE) || defined(HAVE_NEON)
 template<>
 inline Vec4<float>::Vec4(const float v)
@@ -1342,14 +1373,13 @@ inline void Vec3ByMatrix44(float vecOut[4], const float v[3], const float m[16])
 	vecOut[3] = v[0] * m[3] + v[1] * m[7] + v[2] * m[11] + m[15];
 }
 
-inline void Vec4ByMatrix44(float vecOut[4], const float v[4], const float m[16])
+/*inline void Vec4ByMatrix44(float vecOut[4], const float v[4], const float m[16])
 {
 	vecOut[0] = v[0] * m[0] + v[1] * m[4] + v[2] * m[8] + v[3] * m[12];
 	vecOut[1] = v[0] * m[1] + v[1] * m[5] + v[2] * m[9] + v[3] * m[13];
 	vecOut[2] = v[0] * m[2] + v[1] * m[6] + v[2] * m[10] + v[3] * m[14];
 	vecOut[3] = v[0] * m[3] + v[1] * m[7] + v[2] * m[11] + v[3] * m[15];
-}
-
+}*/
 
 inline void Norm3ByMatrix43(float vecOut[3], const float v[3], const float m[12])
 {
@@ -1429,11 +1459,6 @@ inline void Transpose4x4(float out[16], const float in[16]) {
 			out[i * 4 + j] = in[j * 4 + i];
 		}
 	}
-}
-
-inline float Vec3Dot(const float v1[3], const float v2[3])
-{
-	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
 }
 
 

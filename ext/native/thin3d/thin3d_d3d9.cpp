@@ -15,6 +15,7 @@
 #define new DBG_NEW
 #endif
 
+#include "GPU/Math3D.h"
 #include "base/logging.h"
 #include "math/lin/matrix4x4.h"
 #include "thin3d/thin3d.h"
@@ -838,13 +839,6 @@ Buffer *D3D9Context::CreateBuffer(size_t size, uint32_t usageFlags) {
 	return new D3D9Buffer(device_, size, usageFlags);
 }
 
-inline void Transpose4x4(float out[16], const float in[16]) {
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			out[i * 4 + j] = in[j * 4 + i];
-		}
-	}
-}
 
 void D3D9Context::UpdateDynamicUniformBuffer(const void *ub, size_t size) {
 	if (size != curPipeline_->dynamicUniforms.uniformBufferSize)
