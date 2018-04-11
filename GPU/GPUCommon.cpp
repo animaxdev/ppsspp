@@ -70,7 +70,7 @@ const CommonCommandTableEntry commonCommandTable[] = {
 	{ GE_CMD_CLEARMODE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_BLEND_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_RASTER_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE },
 	{ GE_CMD_TEXTUREMAPENABLE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE },
 	{ GE_CMD_FOGENABLE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE},
-	{ GE_CMD_TEXMODE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS | DIRTY_FRAGMENTSHADER_STATE },
+	{ GE_CMD_TEXMODE, 0, DIRTY_TEXTURE_PARAMS | DIRTY_FRAGMENTSHADER_STATE },
 	{ GE_CMD_TEXSHADELS, FLAG_FLUSHBEFOREONCHANGE, DIRTY_VERTEXSHADER_STATE },
 	{ GE_CMD_SHADEMODE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE },
 	{ GE_CMD_TEXFUNC, FLAG_FLUSHBEFOREONCHANGE, DIRTY_FRAGMENTSHADER_STATE },
@@ -1297,7 +1297,7 @@ void GPUCommon::Execute_End(u32 op, u32 diff) {
 				// However, this is likely a bug in how GE signal interrupts are handled.
 				trigger = false;
 				currentList->signal = behaviour;
-				DEBUG_LOG(G3D, "Signal with Sync. signal/end: %04x %04x", signal, enddata);
+				//DEBUG_LOG(G3D, "Signal with Sync. signal/end: %04x %04x", signal, enddata);
 				break;
 			case PSP_GE_SIGNAL_JUMP:
 				{
@@ -1819,9 +1819,6 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 			break;
 		case GE_CMD_VADDR:
 			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
-			break;
-		case GE_CMD_IADDR:
-			gstate_c.indexAddr = gstate_c.getRelativeAddress(op & 0x00FFFFFF);
 			break;
 		case GE_CMD_BASE:
 			gstate.cmdmem[GE_CMD_BASE] = data;

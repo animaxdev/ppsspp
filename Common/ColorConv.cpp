@@ -214,7 +214,7 @@ void ConvertRGBA8888ToRGBA5551(u16 *dst, const u32 *src, u32 numPixels) {
 	const int32_t *srcp = (const int32_t *)src;
 	int16_t *dstp = (int16_t *)dst;
 
-	u32 chunks = numPixels & 0xFFFFFFF8;
+	u32 chunks = numPixels & ~7;
 
 	for (u32 i = 0; i < chunks; i += 8) {
 		int32x4_t c1 = vld1q_s32(&srcp[i + 0]);
