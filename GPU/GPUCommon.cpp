@@ -1805,6 +1805,10 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
 				indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 			}
+			if (gstate_c.vertexAddr == 0x0840b600) {
+				INFO_LOG(BOOT, "gstate_c.vertexAddr = %08x", gstate_c.vertexAddr);
+			}
+				
 			drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
