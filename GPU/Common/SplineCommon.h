@@ -65,6 +65,3 @@ enum SplineQuality {
 	MEDIUM_QUALITY = 1,
 	HIGH_QUALITY = 2,
 };
-
-void TessellateSplinePatch(u8 *&dest, u16 *indices, int &count, const SplinePatchLocal &spatch, u32 origVertType, int maxVertices);
-void TessellateBezierPatch(u8 *&dest, u16 *&indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType, int maxVertices);

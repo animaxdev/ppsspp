@@ -184,8 +184,9 @@ static void spline_knot(int n, int type, float *knot) {
 }
 
 // Prepare mesh of one patch for "Instanced Tessellation".
-static void TessellateSplinePatchHardware(u8 *&dest, u16 *indices, int &count, const SplinePatchLocal &spatch) {
-	SimpleVertex *&vertices = (SimpleVertex*&)dest;
+static int TessellateSplinePatchHardware(u8 *dest, u16 *indices, const SplinePatchLocal &spatch) {
+	int count = 0;
+	SimpleVertex *vertices = (SimpleVertex*)dest;
 
 	float inv_u = 1.0f / (float)spatch.tess_u;
 	float inv_v = 1.0f / (float)spatch.tess_v;
@@ -216,12 +217,14 @@ static void TessellateSplinePatchHardware(u8 *&dest, u16 *indices, int &count, c
 			count += 6;
 		}
 	}
+
+	return count;
 }
 
-static void _SplinePatchLowQuality(u8 *&dest, u16 *indices, int &count, const SplinePatchLocal &spatch, u32 origVertType) {
+static int _SplinePatchLowQuality(u8 *dest, u16 *indices, const SplinePatchLocal &spatch, u32 origVertType) {
 	// Fast and easy way - just draw the control points, generate some very basic normal vector substitutes.
 	// Very inaccurate but okay for Loco Roco. Maybe should keep it as an option because it's fast.
-
+	int count = 0;
 	const int tile_min_u = (spatch.type_u & START_OPEN) ? 0 : 1;
 	const int tile_min_v = (spatch.type_v & START_OPEN) ? 0 : 1;
 	const int tile_max_u = (spatch.type_u & END_OPEN) ? spatch.count_u - 1 : spatch.count_u - 2;
@@ -285,14 +288,14 @@ static void _SplinePatchLowQuality(u8 *&dest, u16 *indices, int &count, const Sp
 			count += 6;
 		}
 	}
-
+	return count;
 }
 
 
-static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const SplinePatchLocal &spatch, u32 origVertType, int quality, int maxVertices) {
+static int SplinePatchFullQuality(u8 *dest, u16 *indices, const SplinePatchLocal &spatch, u32 origVertType, int quality, int maxVertices) {
 	// Full (mostly) correct tessellation of spline patches.
 	// Not very fast.
-
+	int count = 0;
 	bool origNrm = (origVertType & GE_VTYPE_NRM_MASK) != 0;
 	bool origCol = (origVertType & GE_VTYPE_COL_MASK) != 0;
 	bool origTc = (origVertType & GE_VTYPE_TC_MASK) != 0;
@@ -325,7 +328,7 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 	if (patch_div_t < 1) patch_div_t = 1;
 
 	// First compute all the vertices and put them in an array
-	SimpleVertex *&vertices = (SimpleVertex*&)dest;
+	SimpleVertex *vertices = (SimpleVertex*)dest;
 
 	float tu_width = (float)spatch.count_u - 3.0f;
 	float tv_height = (float)spatch.count_v - 3.0f;
@@ -479,9 +482,11 @@ static void SplinePatchFullQuality(u8 *&dest, u16 *indices, int &count, const Sp
 			count += 6;
 		}
 	}
+
+	return count;
 }
 
-static void _BezierPatchLowQuality(u8 *&dest, u16 *&indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType) {
+static void _BezierPatchLowQuality(u8 *dest, u16 *indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType) {
 	const float third = 1.0f / 3.0f;
 	// Fast and easy way - just draw the control points, generate some very basic normal vector subsitutes.
 	// Very inaccurate though but okay for Loco Roco. Maybe should keep it as an option.
@@ -743,7 +748,6 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 	vertType = NormalizeVertices((u8 *)simplified_control_points, temp_buffer, (u8 *)control_points, index_lower_bound, index_upper_bound, vertType);
 
 	VertexDecoder *vdecoder = GetVertexDecoder(vertType);
-
 	int vertexSize = vdecoder->VertexSize();
 	if (vertexSize != sizeof(SimpleVertex)) {
 		ERROR_LOG(G3D, "Something went really wrong, vertex size: %i vs %i", vertexSize, (int)sizeof(SimpleVertex));
@@ -758,8 +762,147 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 	}
 
 	int count = 0;
+	SplinePatchLocal patch;
+	patch.tess_u = tess_u;
+	patch.tess_v = tess_v;
+	patch.type_u = type_u;
+	patch.type_v = type_v;
+	patch.count_u = count_u;
+	patch.count_v = count_v;
+	patch.points = points;
+	patch.computeNormals = computeNormals;
+	patch.primType = prim_type;
+	patch.patchFacing = patchFacing;
 
-	u8 *dest = splineBuffer;
+	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
+		float *pos = (float*)(decoded + 65536 * 18); // Size 4 float
+		float *tex = pos + count_u * count_v * 4; // Size 4 float
+		float *col = tex + count_u * count_v * 4; // Size 4 float
+		const bool hasColor = (origVertType & GE_VTYPE_COL_MASK) != 0;
+		const bool hasTexCoords = (origVertType & GE_VTYPE_TC_MASK) != 0;
+
+		int posStride, texStride, colStride;
+		tessDataTransfer->PrepareBuffers(pos, tex, col, posStride, texStride, colStride, count_u * count_v, hasColor, hasTexCoords);
+		float *p = pos;
+		float *t = tex;
+		float *c = col;
+		for (int idx = 0; idx < count_u * count_v; idx++) {
+			memcpy(p, points[idx]->pos.AsArray(), 3 * sizeof(float));
+			p += posStride;
+			if (hasTexCoords) {
+				memcpy(t, points[idx]->uv, 2 * sizeof(float));
+				t += texStride;
+			}
+			if (hasColor) {
+				memcpy(c, Vec4f::FromRGBA(points[idx]->color_32).AsArray(), 4 * sizeof(float));
+				c += colStride;
+			}
+		}
+		if (!hasColor)
+			memcpy(col, Vec4f::FromRGBA(points[0]->color_32).AsArray(), 4 * sizeof(float));
+
+		tessDataTransfer->SendDataToShader(pos, tex, col, count_u * count_v, hasColor, hasTexCoords);
+		count = TessellateSplinePatchHardware(splineBuffer, quadIndices_, patch);
+		numPatches = (count_u - 3) * (count_v - 3);
+	} else {
+		int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
+		switch (g_Config.iSplineBezierQuality) {
+		case LOW_QUALITY:
+			count = _SplinePatchLowQuality(splineBuffer, quadIndices_, patch, origVertType);
+			break;
+		case MEDIUM_QUALITY:
+			count = SplinePatchFullQuality(splineBuffer, quadIndices_, patch, origVertType, 2, maxVertexCount);
+			break;
+		case HIGH_QUALITY:
+			count = SplinePatchFullQuality(splineBuffer, quadIndices_, patch, origVertType, 1, maxVertexCount);
+			break;
+		}
+	}
+	delete[] points;
+
+	UVScale prevUVScale;
+	if ((origVertType & GE_VTYPE_TC_MASK) != 0) {
+		// We scaled during Normalize already so let's turn it off when drawing.
+		prevUVScale = gstate_c.uv;
+		gstate_c.uv.uScale = 1.0f;
+		gstate_c.uv.vScale = 1.0f;
+		gstate_c.uv.uOff = 0.0f;
+		gstate_c.uv.vOff = 0.0f;
+	}
+
+	u32 vertTypeWithIndex16 = (vertType & ~GE_VTYPE_IDX_MASK) | GE_VTYPE_IDX_16BIT;
+	uint32_t vertTypeID = GetVertTypeID(vertTypeWithIndex16, gstate.getUVGenMode());
+
+	int generatedBytesRead;
+	DispatchSubmitPrim(splineBuffer, quadIndices_, primType[prim_type], count, vertTypeID, &generatedBytesRead);
+	DispatchFlush();
+
+	if ((origVertType & GE_VTYPE_TC_MASK) != 0) {
+		gstate_c.uv = prevUVScale;
+	}
+}
+
+void DrawEngineCommon::SubmitSplineBatch(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, int type_u, int type_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead) {
+	PROFILE_THIS_SCOPE("spline");
+	//DispatchFlush();
+
+	u16 index_lower_bound = 0;
+	u16 index_upper_bound = count_u * count_v - 1;
+	IndexConverter idxConv(vertType, indices);
+	if (indices)
+		GetIndexBounds(indices, count_u * count_v, vertType, &index_lower_bound, &index_upper_bound);
+
+	VertexDecoder *origVDecoder = GetVertexDecoder((vertType & 0xFFFFFF) | (gstate.getUVGenMode() << 24));
+	*bytesRead = count_u * count_v * origVDecoder->VertexSize();
+
+	// Real hardware seems to draw nothing when given < 4 either U or V.
+	if (count_u < 4 || count_v < 4) {
+		return;
+	}
+
+	// Simplify away bones and morph before proceeding
+	SimpleVertex *simplified_control_points = (SimpleVertex *)(decoded + 65536 * 12);
+	u8 *temp_buffer = decoded + 65536 * 18;
+
+	u32 origVertType = vertType;
+	vertType = NormalizeVertices((u8 *)simplified_control_points, temp_buffer, (u8 *)control_points, index_lower_bound, index_upper_bound, vertType);
+
+	VertexDecoder *vdecoder = GetVertexDecoder(vertType);
+
+	int vertexSize = vdecoder->VertexSize();
+	if (vertexSize != sizeof(SimpleVertex)) {
+		ERROR_LOG(G3D, "Something went really wrong, vertex size: %i vs %i", vertexSize, (int)sizeof(SimpleVertex));
+	}
+
+	// TODO: Do something less idiotic to manage this buffer
+	SimpleVertex **points = new SimpleVertex *[count_u * count_v];
+
+	// Make an array of pointers to the control points, to get rid of indices.
+	for (int idx = 0; idx < count_u * count_v; idx++) {
+		points[idx] = simplified_control_points + (indices ? idxConv.convert(idx) : idx);
+	}
+
+
+	int count = 0;
+	int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
+
+	if (batchBuffer == nullptr) {
+		batchBuffer = splineBuffer;
+		batchUsedSize = 0;
+		batchPrimType = prim_type;
+		batchVertType = vertType;
+		batchOrigVertType = origVertType;
+	}
+	else if (batchPrimType != prim_type || batchVertType != vertType || batchOrigVertType != origVertType || batchUsedSize > 1000) {
+		SubmitSplineEnd();
+
+		batchBuffer = splineBuffer;
+		batchUsedSize = 0;
+		batchPrimType = prim_type;
+		batchVertType = vertType;
+		batchOrigVertType = origVertType;
+	}
+
 
 	SplinePatchLocal patch;
 	patch.tess_u = tess_u;
@@ -801,28 +944,37 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 			memcpy(col, Vec4f::FromRGBA(points[0]->color_32).AsArray(), 4 * sizeof(float));
 
 		tessDataTransfer->SendDataToShader(pos, tex, col, count_u * count_v, hasColor, hasTexCoords);
-		TessellateSplinePatchHardware(dest, quadIndices_, count, patch);
+		count = TessellateSplinePatchHardware(batchBuffer, quadIndices_ + batchUsedSize, patch);
 		numPatches = (count_u - 3) * (count_v - 3);
-	} else {
-		int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
+	}
+	else {
+		//int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
 		switch (g_Config.iSplineBezierQuality) {
 		case LOW_QUALITY:
-			_SplinePatchLowQuality(dest, quadIndices_, count, patch, origVertType);
+			count = _SplinePatchLowQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType);
 			break;
 		case MEDIUM_QUALITY:
-			SplinePatchFullQuality(dest, quadIndices_, count, patch, origVertType, 2, maxVertexCount);
+			count = SplinePatchFullQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType, 2, maxVertexCount);
 			break;
 		case HIGH_QUALITY:
-			SplinePatchFullQuality(dest, quadIndices_, count, patch, origVertType, 1, maxVertexCount);
+			count = SplinePatchFullQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType, 1, maxVertexCount);
 			break;
 		}
 	}
 	delete[] points;
 
-	u32 vertTypeWithIndex16 = (vertType & ~GE_VTYPE_IDX_MASK) | GE_VTYPE_IDX_16BIT;
+
+	batchBuffer += count * vertexSize;
+	batchUsedSize += count;
+}
+
+void DrawEngineCommon::SubmitSplineEnd() {
+	if (batchUsedSize == 0) {
+		return;
+	}
 
 	UVScale prevUVScale;
-	if ((origVertType & GE_VTYPE_TC_MASK) != 0) {
+	if ((batchOrigVertType & GE_VTYPE_TC_MASK) != 0) {
 		// We scaled during Normalize already so let's turn it off when drawing.
 		prevUVScale = gstate_c.uv;
 		gstate_c.uv.uScale = 1.0f;
@@ -831,14 +983,27 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 		gstate_c.uv.vOff = 0.0f;
 	}
 
+	int count = batchUsedSize;
+	u32 vertTypeWithIndex16 = (batchVertType & ~GE_VTYPE_IDX_MASK) | GE_VTYPE_IDX_16BIT;
 	uint32_t vertTypeID = GetVertTypeID(vertTypeWithIndex16, gstate.getUVGenMode());
 
-	int generatedBytesRead;
-	DispatchSubmitPrim(splineBuffer, quadIndices_, primType[prim_type], count, vertTypeID, &generatedBytesRead);
+	int generatedBytesRead = 0;
+	u8* desc = splineBuffer;
+	u16* indices = quadIndices_;
 
+	/*while(count > 0) {
+		DispatchSubmitPrim(desc, indices, primType[batchPrimType], 384, vertTypeID, &generatedBytesRead);
+		DispatchFlush();
+		desc += 384 * 36;
+		indices += 384;
+		count -= 384;
+	}*/
+	DispatchSubmitPrim(desc, indices, primType[batchPrimType], count, vertTypeID, &generatedBytesRead);
 	DispatchFlush();
 
-	if ((origVertType & GE_VTYPE_TC_MASK) != 0) {
+	batchBuffer = nullptr;
+
+	if ((batchOrigVertType & GE_VTYPE_TC_MASK) != 0) {
 		gstate_c.uv = prevUVScale;
 	}
 }

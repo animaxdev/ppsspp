@@ -76,6 +76,9 @@ public:
 	void SubmitSpline(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, int type_u, int type_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead);
 	void SubmitBezier(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead);
 
+	void SubmitSplineBatch(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, int type_u, int type_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead);
+	void SubmitSplineEnd();
+
 	std::vector<std::string> DebugGetVertexLoaderIDs();
 	std::string DebugGetVertexLoaderString(std::string id, DebugShaderStringType stringType);
 
@@ -122,6 +125,12 @@ protected:
 	u8 *decoded = nullptr;
 	u16 *decIndex = nullptr;
 	u8 *splineBuffer = nullptr;
+
+	u8 *batchBuffer = nullptr;
+	int batchUsedSize;
+	GEPatchPrimType batchPrimType;
+	u32 batchVertType;
+	u32 batchOrigVertType;
 
 	// Cached vertex decoders
 	u32 lastVType_ = -1;
