@@ -11,7 +11,7 @@ enum : uint64_t {
 	DIRTY_WORLDMATRIX | DIRTY_PROJTHROUGHMATRIX | DIRTY_VIEWMATRIX | DIRTY_TEXMATRIX | DIRTY_ALPHACOLORREF |
 	DIRTY_PROJMATRIX | DIRTY_FOGCOLOR | DIRTY_FOGCOEF | DIRTY_TEXENV | DIRTY_STENCILREPLACEVALUE |
 	DIRTY_ALPHACOLORMASK | DIRTY_SHADERBLEND | DIRTY_UVSCALEOFFSET | DIRTY_TEXCLAMP | DIRTY_DEPTHRANGE | DIRTY_MATAMBIENTALPHA |
-	DIRTY_BEZIERSPLINE,
+	DIRTY_BEZIERSPLINE | DIRTY_DEPAL,
 	DIRTY_LIGHT_UNIFORMS =
 	DIRTY_LIGHT0 | DIRTY_LIGHT1 | DIRTY_LIGHT2 | DIRTY_LIGHT3 |
 	DIRTY_MATDIFFUSE | DIRTY_MATSPECULAR | DIRTY_MATEMISSIVE | DIRTY_AMBIENT,
@@ -30,7 +30,8 @@ struct UB_VS_FS_Base {
 	float depthRange[4];
 	float fogCoef[2];	float stencil; float pad0;
 	float matAmbient[4];
-	int spline_count_u; int spline_count_v; int spline_type_u; int spline_type_v;
+	uint32_t spline_counts; uint32_t depal_mask_shift_off_fmt;  // 4 params packed into one.
+	int pad2; int pad3;
 	// Fragment data
 	float fogColor[4];
 	float texEnvColor[4];
@@ -53,10 +54,10 @@ R"(  mat4 proj_mtx;
   vec2 fogcoef;
   float stencilReplace;
   vec4 matambientalpha;
-  int spline_count_u;
-  int spline_count_v;
-  int spline_type_u;
-  int spline_type_v;
+  uint spline_counts;
+  uint depal_mask_shift_off_fmt;
+  int pad2;
+  int pad3;
   vec3 fogcolor;
   vec3 texenv;
   ivec4 alphacolorref;
@@ -79,10 +80,10 @@ R"(  float4x4 u_proj;
   float2 u_fogcoef;
   float u_stencilReplaceValue;
   float4 u_matambientalpha;
-  int u_spline_count_u;
-  int u_spline_count_v;
-  int u_spline_type_u;
-  int u_spline_type_v;
+  uint u_spline_counts;
+  uint u_depal_mask_shift_off_fmt;
+  int pad2;
+  int pad3;
   float3 u_fogcolor;
   float3 u_texenv;
   uint4 u_alphacolorref;
