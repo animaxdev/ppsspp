@@ -502,53 +502,28 @@ handleELF:
 
 		case IdentifiedFileType::PPSSPP_SAVESTATE:
 		{
-			info_->SetTitle(SaveState::GetTitle(gamePath_));
-			INFO_LOG(BOOT, "Get game info: %s", gamePath_.c_str());
-			// Let's use the screenshot as an icon, too.
-			auto gameInfo = g_gameInfoCache->GetInfoBySavePath(gamePath_);
-			if (gameInfo != nullptr) {
-				SequentialHandleAllocator handles;
-				// Let's assume it's an ISO.
-				// TODO: This will currently read in the whole directory tree. Not really necessary for just a
-				// few files.
-				auto fl = gameInfo->GetFileLoader();
-				if (!fl) {
-					info_->working = false;
-					return;  // Happens with UWP currently, TODO...
-				}
-				BlockDevice *bd = constructBlockDevice(fl.get());
-				if (!bd) {
-					info_->working = false;
-					return;  // nothing to do here..
-				}
-				ISOFileSystem umd(&handles, bd);
-
-				// Fall back to unknown icon if ISO is broken/is a homebrew ISO, override is allowed though
-				if (!ReadFileToString(&umd, "/PSP_GAME/ICON0.PNG", &info_->icon.data, &info_->lock)) {
-					std::string screenshot_jpg = GetSysDirectory(DIRECTORY_SCREENSHOT) + info_->id + "_00000.jpg";
-					std::string screenshot_png = GetSysDirectory(DIRECTORY_SCREENSHOT) + info_->id + "_00000.png";
-					// Try using png/jpg screenshots first
-					if (File::Exists(screenshot_png))
-						readFileToString(false, screenshot_png.c_str(), info_->icon.data);
-					else if (File::Exists(screenshot_jpg))
-						readFileToString(false, screenshot_jpg.c_str(), info_->icon.data);
-					else {
-						DEBUG_LOG(LOADER, "Loading unknown.png because no icon was found");
-						ReadVFSToString("unknown.png", &info_->icon.data, &info_->lock);
-					}
-				}
-				info_->icon.dataLoaded = true;
+			size_t begin = gamePath_.find_last_of('/');
+			if (begin == std::string::npos) {
+				begin = 0;
 			}
 			else {
-				std::string screenshotPath = ReplaceAll(gamePath_, ".ppst", ".jpg");
-				if (File::Exists(screenshotPath)) {
-					std::lock_guard<std::mutex> guard(info_->lock);
-					if (readFileToString(false, screenshotPath.c_str(), info_->icon.data)) {
-						info_->icon.dataLoaded = true;
-					}
-					else {
-						ERROR_LOG(G3D, "Error loading screenshot data: '%s'", screenshotPath.c_str());
-					}
+				begin += 1;
+			}
+			size_t end = gamePath_.find_first_of('_', begin);
+			if (end == std::string::npos) {
+				end = gamePath_.size();
+			}
+			info_->id = gamePath_.substr(begin, end - begin);
+			info_->SetTitle(SaveState::GetTitle(gamePath_));
+			// Let's use the screenshot as an icon, too.
+			std::string screenshotPath = ReplaceAll(gamePath_, ".ppst", ".jpg");
+			if (File::Exists(screenshotPath)) {
+				std::lock_guard<std::mutex> guard(info_->lock);
+				if (readFileToString(false, screenshotPath.c_str(), info_->icon.data)) {
+					info_->icon.dataLoaded = true;
+				}
+				else {
+					ERROR_LOG(G3D, "Error loading screenshot data: '%s'", screenshotPath.c_str());
 				}
 			}
 			break;
@@ -849,26 +824,3 @@ void GameInfoCache::SetupTexture(std::shared_ptr<GameInfo> &info, Draw::DrawCont
 	}
 }
 
-
-std::shared_ptr<GameInfo> GameInfoCache::GetInfoBySavePath(const std::string &path) {
-	size_t begin = path.find_last_of('/');
-	if (begin == std::string::npos) {
-		begin = 0;
-	}
-	else {
-		begin += 1;
-	}
-
-	size_t end = path.find_first_of('_', begin);
-	if (end == std::string::npos) {
-		end = path.size();
-	}
-
-	std::string gameId = path.substr(begin, end - begin);
-	for (auto iter = info_.begin(), last = info_.end(); iter != last; ++iter) {
-		if (iter->second->id.compare(gameId) == 0) {
-			return iter->second;
-		}
-	}
-	return nullptr;
-}

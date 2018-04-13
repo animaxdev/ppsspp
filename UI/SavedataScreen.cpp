@@ -97,13 +97,14 @@ public:
 			content->Add(new Spacer(3.0));
 		} else {
 			std::string image_path = ReplaceAll(savePath_, ".ppst", ".jpg");
+			std::string save_info = ginfo->id + ", " + GetFileDateAsString(savePath_);
 			if (File::Exists(image_path)) {
 				PrioritizedWorkQueue *wq = g_gameInfoCache->WorkQueue();
 				toprow->Add(new AsyncImageFileView(image_path, IS_DEFAULT, wq, new LinearLayoutParams(480, 272, Margins(10, 0))));
 			} else {
 				toprow->Add(new TextView(sa->T("No screenshot"), new LinearLayoutParams(Margins(10, 5))))->SetTextColor(textStyle.fgColor);
 			}
-			content->Add(new TextView(GetFileDateAsString(savePath_), 0, true, new LinearLayoutParams(Margins(10, 5))))->SetTextColor(textStyle.fgColor);
+			content->Add(new TextView(save_info, 0, true, new LinearLayoutParams(Margins(10, 5))))->SetTextColor(textStyle.fgColor);
 		}
 
 		I18NCategory *di = GetI18NCategory("Dialog");
@@ -140,6 +141,7 @@ private:
 	std::string savePath_;
 	std::string title_;
 	std::string subtitle_;
+	std::string filedate_;
 };
 
 UI::EventReturn SavedataPopupScreen::OnDeleteButtonClick(UI::EventParams &e) {
@@ -245,9 +247,14 @@ void SavedataButton::Draw(UIContext &dc) {
 	if (!currentTitle.empty()) {
 		title_ = CleanSaveString(currentTitle);
 	}
+
+	if (filedate_.empty()) {
+		filedate_ = GetFileDateAsString(savePath_);
+	}
+
 	if (subtitle_.empty() && ginfo->gameSize > 0) {
 		std::string savedata_title = ginfo->paramSFO.GetValueString("SAVEDATA_TITLE");
-		subtitle_ = CleanSaveString(savedata_title) + StringFromFormat(" (%d kB)", ginfo->gameSize / 1024);
+		subtitle_ = CleanSaveString(savedata_title) + StringFromFormat(" (%s, %d kB)", filedate_.c_str(), ginfo->gameSize / 1024);
 	}
 
 	dc.MeasureText(dc.GetFontStyle(), 1.0f, 1.0f, title_.c_str(), &tw, &th, 0);

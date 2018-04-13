@@ -176,8 +176,6 @@ public:
 	void CancelAll();
 	void WaitUntilDone(std::shared_ptr<GameInfo> &info);
 
-	std::shared_ptr<GameInfo> GetInfoBySavePath(const std::string &savePath);
-
 private:
 	void Init();
 	void Shutdown();

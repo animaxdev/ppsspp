@@ -896,8 +896,6 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 		start = time_now_d();
 	}
 
-	if (list.state == PSP_GE_DL_STATE_PAUSED)
-		return false;
 	currentList = &list;
 
 	if (!list.started && list.context.IsValid()) {
@@ -1122,8 +1120,7 @@ void GPUCommon::ProcessDLQueue() {
 
 	auto iter = dlQueue.begin();
 	while (iter != dlQueue.end()) {
-		int listIndex = *iter;
-		DisplayList &l = dls[listIndex];
+		DisplayList &l = dls[*iter];
 		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
 		if (!InterpretList(l)) {
 			return;
@@ -1132,10 +1129,11 @@ void GPUCommon::ProcessDLQueue() {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
-				dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), listIndex), dlQueue.end());
+				//dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), listIndex), dlQueue.end());
+				dlQueue.erase(iter);
+				iter = dlQueue.begin();
 			}
 		}
-		iter = dlQueue.begin();
 	}
 
 	currentList = nullptr;
@@ -1783,7 +1781,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	int patchDivisionU = gstate.getPatchDivisionU();
 	int patchDivisionV = gstate.getPatchDivisionV();
 	UpdateUVScaleOffset();
-	drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+	drawEngineCommon_->SubmitSplineBatch(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 
 	// After drawing, we advance pointers - see SubmitPrim which does the same.
 	int count = sp_ucount * sp_vcount;
@@ -1805,11 +1803,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
 				indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 			}
-			if (gstate_c.vertexAddr == 0x0840b600) {
-				INFO_LOG(BOOT, "gstate_c.vertexAddr = %08x", gstate_c.vertexAddr);
-			}
-				
-			drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+			
+			drawEngineCommon_->SubmitSplineBatch(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
 		case GE_CMD_VERTEXTYPE:
@@ -1835,6 +1830,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	}
 
 bail:
+	drawEngineCommon_->SubmitSplineEnd();
 	gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
 
 	if (gstate_c.spline) {
