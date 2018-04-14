@@ -160,6 +160,7 @@ std::vector<std::string> GameInfo::GetSaveDataDirectories() {
 	return directories;
 }
 
+
 u64 GameInfo::GetSaveDataSizeInBytes() {
 	if (fileType == IdentifiedFileType::PSP_SAVEDATA_DIRECTORY || fileType == IdentifiedFileType::PPSSPP_SAVESTATE) {
 		return 0;
@@ -294,6 +295,10 @@ void GameInfo::ParseParamSFO() {
 	}
 
 	paramSFOLoaded = true;
+}
+
+std::string GameInfo::GetFilename() {
+	return File::GetFilename(filePath_);
 }
 
 std::string GameInfo::GetTitle() {
@@ -497,16 +502,27 @@ handleELF:
 
 		case IdentifiedFileType::PPSSPP_SAVESTATE:
 		{
+			size_t begin = gamePath_.find_last_of('/');
+			if (begin == std::string::npos) {
+				begin = 0;
+			}
+			else {
+				begin += 1;
+			}
+			size_t end = gamePath_.find_first_of('_', begin);
+			if (end == std::string::npos) {
+				end = gamePath_.size();
+			}
+			info_->id = gamePath_.substr(begin, end - begin);
 			info_->SetTitle(SaveState::GetTitle(gamePath_));
-
-			std::lock_guard<std::mutex> guard(info_->lock);
-
 			// Let's use the screenshot as an icon, too.
 			std::string screenshotPath = ReplaceAll(gamePath_, ".ppst", ".jpg");
 			if (File::Exists(screenshotPath)) {
+				std::lock_guard<std::mutex> guard(info_->lock);
 				if (readFileToString(false, screenshotPath.c_str(), info_->icon.data)) {
 					info_->icon.dataLoaded = true;
-				} else {
+				}
+				else {
 					ERROR_LOG(G3D, "Error loading screenshot data: '%s'", screenshotPath.c_str());
 				}
 			}
@@ -807,3 +823,4 @@ void GameInfoCache::SetupTexture(std::shared_ptr<GameInfo> &info, Draw::DrawCont
 		}
 	}
 }
+

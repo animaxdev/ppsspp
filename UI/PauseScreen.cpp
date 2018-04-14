@@ -202,9 +202,12 @@ SaveSlotView::SaveSlotView(const std::string &gameFilename, int slot, UI::Layout
 
 	I18NCategory *pa = GetI18NCategory("Pause");
 
-	LinearLayout *buttons = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-	buttons->SetSpacing(2.0);
-	Add(buttons);
+	LinearLayout *layout = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+	Add(layout);
+
+	LinearLayout *buttons = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+	buttons->SetSpacing(20.0);
+	layout->Add(buttons);
 
 	saveStateButton_ = buttons->Add(new Button(pa->T("Save State"), new LinearLayoutParams(0.0, G_VCENTER)));
 	saveStateButton_->OnClick.Handle(this, &SaveSlotView::OnSaveState);
@@ -219,8 +222,8 @@ SaveSlotView::SaveSlotView(const std::string &gameFilename, int slot, UI::Layout
 		std::vector<std::string> dateStrs;
 		SplitString(dateStr, ' ', dateStrs);
 		if (!dateStrs.empty() && !dateStrs[0].empty()) {
-			LinearLayout *strs = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-			Add(strs);
+			LinearLayout *strs = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+			layout->Add(strs);
 			for (size_t i = 0; i < dateStrs.size(); i++) {
 				strs->Add(new TextView(dateStrs[i], new LinearLayoutParams(0.0, G_VCENTER)))->SetShadow(true);
 			}

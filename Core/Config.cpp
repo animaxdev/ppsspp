@@ -341,13 +341,13 @@ struct ConfigSectionSettings {
 static ConfigSetting generalSettings[] = {
 	ConfigSetting("FirstRun", &g_Config.bFirstRun, true),
 	ConfigSetting("RunCount", &g_Config.iRunCount, 0),
-	ConfigSetting("Enable Logging", &g_Config.bEnableLogging, true),
+	ConfigSetting("Enable Logging", &g_Config.bEnableLogging, false),
 	ConfigSetting("AutoRun", &g_Config.bAutoRun, true),
 	ConfigSetting("Browse", &g_Config.bBrowse, false),
 	ConfigSetting("IgnoreBadMemAccess", &g_Config.bIgnoreBadMemAccess, true, true),
 	ConfigSetting("CurrentDirectory", &g_Config.currentDirectory, ""),
 	ConfigSetting("ShowDebuggerOnLoad", &g_Config.bShowDebuggerOnLoad, false),
-	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, true),
+	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, false),
 	ConfigSetting("Language", &g_Config.sLanguageIni, &DefaultLangRegion),
 	ConfigSetting("ForceLagSync", &g_Config.bForceLagSync, false, true, true),
 
@@ -546,7 +546,7 @@ static ConfigSetting graphicsSettings[] = {
 	ConfigSetting("SustainedPerformanceMode", &g_Config.bSustainedPerformanceMode, false, true, true),
 
 	ReportedConfigSetting("TrueColor", &g_Config.bTrueColor, true, true, true),
-	ReportedConfigSetting("ReplaceTextures", &g_Config.bReplaceTextures, true, true, true),
+	ReportedConfigSetting("ReplaceTextures", &g_Config.bReplaceTextures, false, true, true),
 	ReportedConfigSetting("SaveNewTextures", &g_Config.bSaveNewTextures, false, true, true),
 
 	ReportedConfigSetting("TexScalingLevel", &g_Config.iTexScalingLevel, 1, true, true),
@@ -1374,6 +1374,9 @@ bool Config::saveGameConfig(const std::string &pGameId) {
 
 bool Config::loadGameConfig(const std::string &pGameId) {
 	std::string iniFileNameFull = getGameConfigFile(pGameId);
+
+	// fix GT
+	bBlockInvalidateTexture = pGameId.compare("UCAS40265") == 0;
 
 	if (!hasGameConfig(pGameId)) {
 		INFO_LOG(LOADER, "Failed to read %s. No game-specific settings found, using global defaults.", iniFileNameFull.c_str());

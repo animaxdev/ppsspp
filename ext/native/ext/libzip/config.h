@@ -1,103 +1,97 @@
-/* Config header for Android */
-/* Define to 1 if you have the declaration of `tzname', and to 0 if you don't.
-   */
-/* #undef HAVE_DECL_TZNAME */
-
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#define HAVE_DLFCN_H 0
-
-/* Define to 1 if you have the `fseeko' function. */
-#define HAVE_FSEEKO 0
-
-/* Define to 1 if you have the `ftello' function. */
-#define HAVE_FTELLO 0
-
-/* Define to 1 if you have the <inttypes.h> header file. */
-#define HAVE_INTTYPES_H 0
-
-/* Define to 1 if you have the `z' library (-lz). */
-#define HAVE_LIBZ 1
-
-/* Define to 1 if you have the <memory.h> header file. */
-#define HAVE_MEMORY_H 0
-
-/* Define to 1 if you have the `mkstemp' function. */
-#ifndef _WIN32
-#define HAVE_MKSTEMP 1
+#ifndef HAD_CONFIG_H
+#define HAD_CONFIG_H
+#ifndef _HAD_ZIPCONF_H
+#include "zipconf.h"
 #endif
 
-/* Define to 1 if you have the `MoveFileExA' function. */
+/* BEGIN DEFINES */
+#define HAVE___PROGNAME
+#define HAVE__CHMOD
+#define HAVE__CLOSE
+#define HAVE__DUP
+#define HAVE__FDOPEN
+#define HAVE__FILENO
+#define HAVE__OPEN
+#define HAVE__SETMODE
+
+#define HAVE__STRDUP
+#define HAVE__STRICMP
+#define HAVE__STRTOI64
+#define HAVE__STRTOUI64
+#define HAVE__UMASK
+#define HAVE__UNLINK
+//#define HAVE_CLONEFILE
+#define HAVE_FILENO
+#define HAVE_FSEEKO
+#define HAVE_FTELLO
+#define HAVE_GETPROGNAME
+//#define HAVE_LIBBZ2
+#define HAVE_OPEN
+
+#define HAVE_SETMODE
+#define HAVE_SNPRINTF
+#define HAVE_SSIZE_T_LIBZIP
+
+#define HAVE_STRDUP
+#define HAVE_STRICMP
+#define HAVE_STRTOLL
+#define HAVE_STRTOULL
+
+#define HAVE_STDBOOL_H
+
+
+
 #ifdef _WIN32
-#define HAVE_MOVEFILEEXA 1
+#define HAVE_MOVEFILEEXA
 #endif
 
-/* Define to 1 if you have the <stdint.h> header file. */
-#define HAVE_STDINT_H 1
-
-/* Define to 1 if you have the <stdlib.h> header file. */
-#define HAVE_STDLIB_H 1
-
-/* Define to 1 if you have the <strings.h> header file. */
 #ifndef _WIN32
-#define HAVE_STRINGS_H 1
+#define HAVE_STRINGS_H
+#define HAVE_STRCASECMP
+#define HAVE_MKSTEMP
+#define HAVE_STRUCT_TM_TM_ZONE
+#define HAVE_UNISTD_H
+#define HAVE__SNPRINTF
 #endif
 
-/* Define to 1 if you have the <string.h> header file. */
-#define HAVE_STRING_H 1
+#define __INT8_LIBZIP ${__INT8_LIBZIP}
+#define INT8_T_LIBZIP ${INT8_T_LIBZIP}
+#define UINT8_T_LIBZIP ${UINT8_T_LIBZIP}
+#define __INT16_LIBZIP ${__INT16_LIBZIP}
+#define INT16_T_LIBZIP ${INT16_T_LIBZIP}
+#define UINT16_T_LIBZIP ${UINT16_T_LIBZIP}
+#define __INT32_LIBZIP ${__INT32_LIBZIP}
+#define INT32_T_LIBZIP ${INT32_T_LIBZIP}
+#define UINT32_T_LIBZIP ${UINT32_T_LIBZIP}
+#define __INT64_LIBZIP ${__INT64_LIBZIP}
+#define INT64_T_LIBZIP ${INT64_T_LIBZIP}
+#define UINT64_T_LIBZIP ${UINT64_T_LIBZIP}
+#define SIZEOF_OFF_T 8
+#define SIZE_T_LIBZIP ${SIZE_T_LIBZIP}
+#define SSIZE_T_LIBZIP ${SSIZE_T_LIBZIP}
 
-/* Define to 1 if `tm_zone' is a member of `struct tm'. */
-// #define HAVE_STRUCT_TM_TM_ZONE 0
+#define HAVE_DIRENT_H
+#define HAVE_FTS_H
+#define HAVE_NDIR_H
+#define HAVE_SYS_DIR_H
+#define HAVE_SYS_NDIR_H
+#define WORDS_BIGENDIAN
+#define HAVE_SHARED
 
-/* Define to 1 if you have the <sys/stat.h> header file. */
-#define HAVE_SYS_STAT_H 1
-
-/* Define to 1 if you have the <sys/types.h> header file. */
-#define HAVE_SYS_TYPES_H 1
-
-/* Define to 1 if your `struct tm' has `tm_zone'. Deprecated, use
-   `HAVE_STRUCT_TM_TM_ZONE' instead. */
-#define HAVE_TM_ZONE 1
-
-/* Define to 1 if you don't have `tm_zone' but do have the external array
-   `tzname'. */
-/* #undef HAVE_TZNAME */
-
-/* Define to 1 if you have the <unistd.h> header file. */
-#define HAVE_UNISTD_H 1
-
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#define LT_OBJDIR ".libs/"
-
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-/* #undef NO_MINUS_C_MINUS_O */
-
-/* Name of package */
+/* END DEFINES */
 #define PACKAGE "libzip"
+#define VERSION "1.4.0"
 
-/* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "libzip@nih.at"
+#ifndef HAVE_SSIZE_T_LIBZIP
+#  if SIZE_T_LIBZIP == INT_LIBZIP
+typedef int ssize_t;
+#  elif SIZE_T_LIBZIP == LONG_LIBZIP
+typedef long ssize_t;
+#  elif SIZE_T_LIBZIP == LONG_LONG_LIBZIP
+typedef long long ssize_t;
+#  else
+#error no suitable type for ssize_t found
+#  endif
+#endif
 
-/* Define to the full name of this package. */
-#define PACKAGE_NAME "libzip"
-
-/* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libzip 0.9.3"
-
-/* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "libzip"
-
-/* Define to the home page for this package. */
-#define PACKAGE_URL ""
-
-/* Define to the version of this package. */
-#define PACKAGE_VERSION "0.9.3"
-
-/* Define to 1 if you have the ANSI C header files. */
-#define STDC_HEADERS 1
-
-/* Define to 1 if your <sys/time.h> declares `struct tm'. */
-/* #undef TM_IN_SYS_TIME */
-
-/* Version number of package */
-#define VERSION "0.9.3"
+#endif /* HAD_CONFIG_H */

@@ -1,5 +1,7 @@
 APP_STL := c++_static
-APP_PLATFORM := android-9
-APP_ABI := arm64-v8a armeabi-v7a x86 x86_64
-APP_GNUSTL_CPP_FEATURES := exceptions
+APP_PLATFORM := android-24
+APP_ABI := arm64-v8a
+APP_CFLAGS := -DANDROID_ARM_NEON -DHAVE_NEON
+APP_CPPFLAGS := -DANDROID_ARM_NEON -DHAVE_NEON
 NDK_TOOLCHAIN_VERSION := clang
+NDK_TOOLCHAIN := aarch64-linux-android-clang

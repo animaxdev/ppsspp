@@ -163,7 +163,7 @@ static void __SasDisableThread() {
 }
 
 static void sasMixFinish(u64 userdata, int cycleslate) {
-	PROFILE_THIS_SCOPE("mixer");
+	//PROFILE_THIS_SCOPE("mixer");
 
 	u32 error;
 	SceUID threadID = (SceUID)userdata;
@@ -288,7 +288,7 @@ static int delaySasResult(int result) {
 
 // Runs the mixer
 static u32 _sceSasCore(u32 core, u32 outAddr) {
-	PROFILE_THIS_SCOPE("mixer");
+	//PROFILE_THIS_SCOPE("mixer");
 
 	if (!Memory::IsValidAddress(outAddr)) {
 		return hleReportError(SCESAS, ERROR_SAS_INVALID_PARAMETER, "invalid address");
@@ -304,7 +304,7 @@ static u32 _sceSasCore(u32 core, u32 outAddr) {
 
 // Another way of running the mixer, the inoutAddr should be both input and output
 static u32 _sceSasCoreWithMix(u32 core, u32 inoutAddr, int leftVolume, int rightVolume) {
-	PROFILE_THIS_SCOPE("mixer");
+	//PROFILE_THIS_SCOPE("mixer");
 
 	if (!Memory::IsValidAddress(inoutAddr)) {
 		return hleReportError(SCESAS, ERROR_SAS_INVALID_PARAMETER, "invalid address");

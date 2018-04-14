@@ -1,6 +1,6 @@
 /*
-  zip_free.c -- free struct zip
-  Copyright (C) 1999-2007 Dieter Baron and Thomas Klausner
+  zip_random_unix.c -- fill the user's buffer with random stuff (Unix version)
+  Copyright (C) 2016-2017 Dieter Baron and Thomas Klausner
 
   This file is part of libzip, a library to manipulate ZIP archives.
   The authors can be contacted at <libzip@nih.at>
@@ -31,51 +31,25 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
-#include <stdlib.h>
-
 #include "zipint.h"
 
-
+#include <fcntl.h>
+#include <unistd.h>
 
-/* _zip_free:
-   frees the space allocated to a zipfile struct, and closes the
-   corresponding file. */
-
-void
-_zip_free(struct zip *za)
+bool
+zip_random(zip_uint8_t *buffer, zip_uint16_t length)
 {
-    int i;
+    int fd;
 
-    if (za == NULL)
-	return;
-
-    if (za->zn)
-	free(za->zn);
-
-    if (za->zp)
-	fclose(za->zp);
-
-    _zip_cdir_free(za->cdir);
-
-    if (za->entry) {
-	for (i=0; i<za->nentry; i++) {
-	    _zip_entry_free(za->entry+i);
-	}
-	free(za->entry);
+    if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
+	return false;
     }
 
-    for (i=0; i<za->nfile; i++) {
-	if (za->file[i]->error.zip_err == ZIP_ER_OK) {
-	    _zip_error_set(&za->file[i]->error, ZIP_ER_ZIPCLOSED, 0);
-	    za->file[i]->za = NULL;
-	}
+    if (read(fd, buffer, length) != length) {
+	close(fd);
+	return false;
     }
 
-    free(za->file);
-    
-    free(za);
-
-    return;
+    close(fd);
+    return true;
 }

@@ -21,21 +21,15 @@ android {
 			storeFile file("debug.keystore")
 		}
 
-		// Set these in a system global (or project local, but not checked in) gradle.properties .
-		if (project.hasProperty("RELEASE_STORE_FILE")) {
-			release {
-				storeFile file(RELEASE_STORE_FILE)
-				storePassword RELEASE_STORE_PASSWORD
-				keyAlias RELEASE_KEY_ALIAS
-				keyPassword RELEASE_KEY_PASSWORD
-			}
-		} else {
-			release {
-			}
+		release {
+			keyAlias 'bboo-release-key'
+			keyPassword 'zhangwei'
+			storeFile file('D:/Android/android-sign-key/bboo-release-key.jks')
+			storePassword 'zhangwei'
 		}
 	}
-	compileSdkVersion 26
-	buildToolsVersion '27.0.0'
+	compileSdkVersion 27
+	buildToolsVersion '27.0.3'
 	defaultConfig {
 		applicationId 'org.ppsspp.ppsspp'
 		if (androidGitVersion.name() != "unknown" && androidGitVersion.code() >= 14000000) {
@@ -50,14 +44,11 @@ android {
 		new File("versionname.txt").write(androidGitVersion.name())
 		new File("versioncode.txt").write(androidGitVersion.code().toString())
 
-		minSdkVersion 9
-		targetSdkVersion 26
+		minSdkVersion 24
+		targetSdkVersion 27
 		if (project.hasProperty("ANDROID_VERSION_CODE") && project.hasProperty("ANDROID_VERSION_NAME")) {
 			versionCode ANDROID_VERSION_CODE
 			versionName ANDROID_VERSION_NAME
-		}
-		ndk {
-			abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
 		}
 		signingConfig signingConfigs.debug
 	}
@@ -77,11 +68,7 @@ android {
 			signingConfig signingConfigs.release
 		}
 	}
-	externalNativeBuild {
-		cmake {
-			path '../CMakeLists.txt'
-		}
-	}
+
 	sourceSets {
 		main {
 			manifest.srcFile 'AndroidManifest.xml'
@@ -92,7 +79,8 @@ android {
 			assets.srcDirs = [
 					'../assets',
 			]
-			jni.srcDirs = ['..']
+			//jni.srcDirs = ['..']
+			jniLibs.srcDirs = ['libs']
 		}
 		gold {
 			res.srcDirs = ['gold/res']
@@ -102,33 +90,10 @@ android {
 		normal {
 			applicationId 'org.ppsspp.ppsspp'
 			dimension "variant"
-			externalNativeBuild {
-				cmake {
-					// Available arguments listed at https://developer.android.com/ndk/guides/cmake.html
-					arguments '-DANDROID=true',
-							'-DANDROID_PLATFORM=android-15',
-							'-DANDROID_TOOLCHAIN=clang',
-							'-DANDROID_CPP_FEATURES=',
-							'-DANDROID_STL=c++_static',
-							'-DANDROID_ARM_NEON=TRUE'
-				}
-			}
 		}
 		gold {
 			applicationId 'org.ppsspp.ppssppgold'
 			dimension "variant"
-			externalNativeBuild {
-				cmake {
-					// Available arguments listed at https://developer.android.com/ndk/guides/cmake.html
-					arguments '-DANDROID=true',
-							'-DANDROID_PLATFORM=android-15',
-							'-DANDROID_TOOLCHAIN=clang',
-							'-DANDROID_CPP_FEATURES=',
-							'-DANDROID_STL=c++_static',
-							'-DANDROID_ARM_NEON=TRUE',
-							'-DGOLD=TRUE'
-				}
-			}
 		}
 	}
 }

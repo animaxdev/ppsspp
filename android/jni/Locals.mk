@@ -15,7 +15,7 @@ LOCAL_C_INCLUDES := \
   $(LOCAL_PATH)/$(NATIVE)/ext/libzip \
   $(LOCAL_PATH)/$(NATIVE) \
   $(LOCAL_PATH)
-
+  
 LOCAL_STATIC_LIBRARIES := native libzip glslang-build
 LOCAL_LDLIBS := -lz -landroid -lGLESv2 -lOpenSLES -lEGL -ldl -llog -latomic
 ifneq ($(NDK_DEBUG),1)

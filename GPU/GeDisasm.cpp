@@ -179,7 +179,8 @@ void GeDisassembleOp(u32 pc, u32 op, u32 prev, char *buffer, int bufsize) {
 		{
 			u32 retval = pc + 4;
 			u32 target = gstate_c.getRelativeAddress(op & 0xFFFFFF);
-			snprintf(buffer, bufsize, "CALL: %08x to %08x, ret=%08x", pc, target, retval);
+			u32 base = gstate_c.getRelativeAddress(0);
+			snprintf(buffer, bufsize, "CALL: %08x to %08x(%08x), ret=%08x", pc, target, target - base, retval);
 		}
 		break;
 

@@ -252,7 +252,7 @@ bool TranslateShader(std::string *dest, ShaderLanguage destLang, TranslatedShade
 	{
 		spirv_cross::CompilerHLSL hlsl(spirv);
 		spirv_cross::CompilerHLSL::Options options{};
-		options.fixup_clipspace = true;
+		//options.fixup_clipspace = true;
 		options.shader_model = 30;
 		hlsl.set_options(options);
 		*dest = hlsl.compile();
@@ -270,7 +270,7 @@ bool TranslateShader(std::string *dest, ShaderLanguage destLang, TranslatedShade
 			i++;
 		}
 		spirv_cross::CompilerHLSL::Options options{};
-		options.fixup_clipspace = true;
+		//options.fixup_clipspace = true;
 		options.shader_model = 50;
 		hlsl.set_options(options);
 		std::string raw = hlsl.compile();

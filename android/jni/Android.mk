@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-#TARGET_PLATFORM := android-8
+#TARGET_PLATFORM := android-24
 
 NATIVE := ../../ext/native
 SRC := ../..
@@ -189,6 +189,7 @@ EXEC_AND_LIB_FILES := \
   $(SRC)/ext/sfmt19937/SFMT.c \
   $(SRC)/ext/snappy/snappy-c.cpp \
   $(SRC)/ext/snappy/snappy.cpp \
+  $(SRC)/ext/snappy/snappy-sinksource.cpp \
   $(SRC)/ext/udis86/decode.c \
   $(SRC)/ext/udis86/itab.c \
   $(SRC)/ext/udis86/syn-att.c \
@@ -480,7 +481,8 @@ ifeq ($(UNITTEST),1)
 	$(SRC)/ext/armips/Archs/ARM/Arm.cpp \
 	$(SRC)/ext/armips/Archs/ARM/ArmOpcodes.cpp \
 	$(SRC)/ext/armips/Archs/ARM/ArmParser.cpp \
-	$(SRC)/ext/armips/Archs/ARM/ArmRelocator.cpp \
+	$(SRC)/ext/armips/Archs/ARM/ArmElfRelocator.cpp \
+	$(SRC)/ext/armips/Archs/ARM/ArmExpressionFunctions.cpp \
 	$(SRC)/ext/armips/Archs/ARM/CArmInstruction.cpp \
 	$(SRC)/ext/armips/Archs/ARM/CThumbInstruction.cpp \
 	$(SRC)/ext/armips/Archs/ARM/Pool.cpp \
@@ -488,6 +490,8 @@ ifeq ($(UNITTEST),1)
 	$(SRC)/ext/armips/Archs/MIPS/CMipsInstruction.cpp \
 	$(SRC)/ext/armips/Archs/MIPS/Mips.cpp \
 	$(SRC)/ext/armips/Archs/MIPS/MipsElfFile.cpp \
+	$(SRC)/ext/armips/Archs/MIPS/MipsElfRelocator.cpp 
+	$(SRC)/ext/armips/Archs/MIPS/MipsExpressionFunctions.cpp 
 	$(SRC)/ext/armips/Archs/MIPS/MipsMacros.cpp \
 	$(SRC)/ext/armips/Archs/MIPS/MipsOpcodes.cpp \
 	$(SRC)/ext/armips/Archs/MIPS/MipsParser.cpp \

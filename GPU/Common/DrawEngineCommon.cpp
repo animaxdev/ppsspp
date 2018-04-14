@@ -430,16 +430,16 @@ u32 DrawEngineCommon::NormalizeVertices(u8 *outPtr, u8 *bufPtr, const u8 *inPtr,
 			float weights[8];
 			reader.ReadWeights(weights);
 			// Skinning
-			Vec3Packedf psum(0, 0, 0);
-			Vec3Packedf nsum(0, 0, 0);
+			Vec3f psum(0, 0, 0);
+			Vec3f nsum(0, 0, 0);
 			for (int w = 0; w < numBoneWeights; w++) {
 				if (weights[w] != 0.0f) {
 					Vec3ByMatrix43(bpos, pos, gstate.boneMatrix + w * 12);
-					Vec3Packedf tpos(bpos);
+					Vec3f tpos(bpos);
 					psum += tpos * weights[w];
 
 					Norm3ByMatrix43(bnrm, nrm, gstate.boneMatrix + w * 12);
-					Vec3Packedf tnorm(bnrm);
+					Vec3f tnorm(bnrm);
 					nsum += tnorm * weights[w];
 				}
 			}

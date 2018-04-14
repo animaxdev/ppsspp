@@ -23,6 +23,8 @@
 
 #ifdef _M_SSE
 #include <emmintrin.h>
+#elif PPSSPP_ARCH(ARM_NEON)
+#include <arm_neon.h>
 #endif
 
 #if _M_SSE >= 0x401
@@ -204,6 +206,38 @@ void ConvertRGBA8888ToRGBA5551(u16 *dst, const u32 *src, u32 numPixels) {
 	}
 	// The remainder starts right after those done via SSE.
 	u32 i = sseChunks * 4;
+#elif PPSSPP_ARCH(ARM_NEON)
+	const int32x4_t maskAG = vdupq_n_s32(0x8000F800);
+	const int32x4_t maskRB = vdupq_n_s32(0x00F800F8);
+	const int32x4_t mask = vdupq_n_s32(0x0000FFFF);
+
+	const int32_t *srcp = (const int32_t *)src;
+	int16_t *dstp = (int16_t *)dst;
+
+	u32 chunks = numPixels & ~7;
+
+	for (u32 i = 0; i < chunks; i += 8) {
+		int32x4_t c1 = vld1q_s32(&srcp[i + 0]);
+		int32x4_t c2 = vld1q_s32(&srcp[i + 4]);
+		int32x4_t ag, rb;
+
+		ag = vandq_s32(c1, maskAG);
+		ag = vorrq_s32(vshrq_n_s32(ag, 16), vshrq_n_s32(ag, 6));
+		rb = vandq_s32(c1, maskRB);
+		rb = vorrq_s32(vshrq_n_s32(rb, 3), vshrq_n_s32(rb, 9));
+		c1 = vandq_s32(vorrq_s32(ag, rb), mask);
+
+		ag = vandq_s32(c2, maskAG);
+		ag = vorrq_s32(vshrq_n_s32(ag, 16), vshrq_n_s32(ag, 6));
+		rb = vandq_s32(c2, maskRB);
+		rb = vorrq_s32(vshrq_n_s32(rb, 3), vshrq_n_s32(rb, 9));
+		c2 = vandq_s32(vorrq_s32(ag, rb), mask);
+
+		vst1_s16(dstp + i, vqmovun_s32(c1));
+		vst1_s16(dstp + i + 4, vqmovun_s32(c2));
+	}
+	// The remainder starts right after those done via SSE.
+	u32 i = chunks;
 #else
 	u32 i = 0;
 #endif
@@ -246,6 +280,38 @@ void ConvertBGRA8888ToRGBA5551(u16 *dst, const u32 *src, u32 numPixels) {
 	}
 	// The remainder starts right after those done via SSE.
 	u32 i = sseChunks * 4;
+#elif PPSSPP_ARCH(ARM_NEON)
+	const int32x4_t maskAG = vdupq_n_s32(0x8000F800);
+	const int32x4_t maskRB = vdupq_n_s32(0x00F800F8);
+	const int32x4_t mask = vdupq_n_s32(0x0000FFFF);
+
+	const int32_t *srcp = (const int32_t *)src;
+	int16_t *dstp = (int16_t *)dst;
+
+	u32 chunks = numPixels & 0xFFFFFFF8;
+
+	for (u32 i = 0; i < chunks; i += 8) {
+		int32x4_t c1 = vld1q_s32(&srcp[i + 0]);
+		int32x4_t c2 = vld1q_s32(&srcp[i + 4]);
+		int32x4_t ag, rb;
+
+		ag = vandq_s32(c1, maskAG);
+		ag = vorrq_s32(vshrq_n_s32(ag, 16), vshrq_n_s32(ag, 6));
+		rb = vandq_s32(c1, maskRB);
+		rb = vorrq_s32(vshrq_n_s32(rb, 19), vshrq_n_s32(rb, 7));
+		c1 = vandq_s32(vorrq_s32(ag, rb), mask);
+
+		ag = vandq_s32(c2, maskAG);
+		ag = vorrq_s32(vshrq_n_s32(ag, 16), vshrq_n_s32(ag, 6));
+		rb = vandq_s32(c2, maskRB);
+		rb = vorrq_s32(vshrq_n_s32(rb, 19), vshrq_n_s32(rb, 7));
+		c2 = vandq_s32(vorrq_s32(ag, rb), mask);
+
+		vst1_s16(dstp + i, vqmovun_s32(c1));
+		vst1_s16(dstp + i + 4, vqmovun_s32(c2));
+	}
+	// The remainder starts right after those done via SSE.
+	u32 i = chunks;
 #else
 	u32 i = 0;
 #endif
