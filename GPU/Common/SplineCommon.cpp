@@ -184,8 +184,8 @@ static void spline_knot(int n, int type, float *knot) {
 }
 
 // Prepare mesh of one patch for "Instanced Tessellation".
-static int TessellateSplinePatchHardware(u8 *dest, u16 *indices, const SplinePatchLocal &spatch) {
-	int count = 0;
+static void TessellateSplinePatchHardware(u8 *&dest, u16 *&indices, int &indexCount, const SplinePatchLocal &spatch) {
+	int startIndex = indexCount;
 	SimpleVertex *vertices = (SimpleVertex*)dest;
 
 	float inv_u = 1.0f / (float)spatch.tess_u;
@@ -208,23 +208,24 @@ static int TessellateSplinePatchHardware(u8 *dest, u16 *indices, const SplinePat
 	// Combine the vertices into triangles.
 	for (int tile_v = 0; tile_v < spatch.tess_v; ++tile_v) {
 		for (int tile_u = 0; tile_u < spatch.tess_u; ++tile_u) {
-			int idx0 = tile_v * (spatch.tess_u + 1) + tile_u;
-			int idx1 = tile_v * (spatch.tess_u + 1) + tile_u + 1;
-			int idx2 = (tile_v + 1) * (spatch.tess_u + 1) + tile_u;
-			int idx3 = (tile_v + 1) * (spatch.tess_u + 1) + tile_u + 1;
+			int idx0 = tile_v * (spatch.tess_u + 1) + tile_u + startIndex;
+			int idx1 = tile_v * (spatch.tess_u + 1) + tile_u + 1 + startIndex;
+			int idx2 = (tile_v + 1) * (spatch.tess_u + 1) + tile_u + startIndex;
+			int idx3 = (tile_v + 1) * (spatch.tess_u + 1) + tile_u + 1 + startIndex;
 
 			CopyQuadIndex(indices, spatch.primType, idx0, idx1, idx2, idx3);
-			count += 6;
+			indexCount += 6;
 		}
 	}
 
-	return count;
+	dest += (indexCount - startIndex) * sizeof(SimpleVertex);
 }
 
-static int _SplinePatchLowQuality(u8 *dest, u16 *indices, const SplinePatchLocal &spatch, u32 origVertType) {
+static void _SplinePatchLowQuality(u8 *&dest, u16 *&indices, int &indexCount, const SplinePatchLocal &spatch, u32 origVertType) {
 	// Fast and easy way - just draw the control points, generate some very basic normal vector substitutes.
 	// Very inaccurate but okay for Loco Roco. Maybe should keep it as an option because it's fast.
-	int count = 0;
+	int startIndex = indexCount;
+	u8 * vertices = dest;
 	const int tile_min_u = (spatch.type_u & START_OPEN) ? 0 : 1;
 	const int tile_min_v = (spatch.type_v & START_OPEN) ? 0 : 1;
 	const int tile_max_u = (spatch.type_u & END_OPEN) ? spatch.count_u - 1 : spatch.count_u - 2;
@@ -277,25 +278,26 @@ static int _SplinePatchLowQuality(u8 *dest, u16 *indices, const SplinePatchLocal
 				v3.nrm = norm;
 			}
 
-			int idx0 = i * 4 + 0;
-			int idx1 = i * 4 + 1;
-			int idx2 = i * 4 + 2;
-			int idx3 = i * 4 + 3;
+			int idx0 = i * 4 + 0 + startIndex;
+			int idx1 = i * 4 + 1 + startIndex;
+			int idx2 = i * 4 + 2 + startIndex;
+			int idx3 = i * 4 + 3 + startIndex;
 			i++;
 
-			CopyQuad(dest, &v0, &v1, &v2, &v3);
+			CopyQuad(vertices, &v0, &v1, &v2, &v3);
 			CopyQuadIndex(indices, prim_type, idx0, idx1, idx2, idx3);
-			count += 6;
+			indexCount += 6;
 		}
 	}
-	return count;
+
+	dest += (indexCount - startIndex) * sizeof(SimpleVertex);
 }
 
 
-static int SplinePatchFullQuality(u8 *dest, u16 *indices, const SplinePatchLocal &spatch, u32 origVertType, int quality, int maxVertices) {
+static void SplinePatchFullQuality(u8 *&dest, u16 *&indices, int &indexCount, const SplinePatchLocal &spatch, u32 origVertType, int quality, int maxVertices) {
 	// Full (mostly) correct tessellation of spline patches.
 	// Not very fast.
-	int count = 0;
+	int startIndex = indexCount;
 	bool origNrm = (origVertType & GE_VTYPE_NRM_MASK) != 0;
 	bool origCol = (origVertType & GE_VTYPE_COL_MASK) != 0;
 	bool origTc = (origVertType & GE_VTYPE_TC_MASK) != 0;
@@ -473,17 +475,17 @@ static int SplinePatchFullQuality(u8 *dest, u16 *indices, const SplinePatchLocal
 	// Tessellate.
 	for (int tile_v = 0; tile_v < patch_div_t; ++tile_v) {
 		for (int tile_u = 0; tile_u < patch_div_s; ++tile_u) {
-			int idx0 = tile_v * (patch_div_s + 1) + tile_u;
-			int idx1 = tile_v * (patch_div_s + 1) + tile_u + 1;
-			int idx2 = (tile_v + 1) * (patch_div_s + 1) + tile_u;
-			int idx3 = (tile_v + 1) * (patch_div_s + 1) + tile_u + 1;
+			int idx0 = tile_v * (patch_div_s + 1) + tile_u + startIndex;
+			int idx1 = tile_v * (patch_div_s + 1) + tile_u + 1 + startIndex;
+			int idx2 = (tile_v + 1) * (patch_div_s + 1) + tile_u + startIndex;
+			int idx3 = (tile_v + 1) * (patch_div_s + 1) + tile_u + 1 + startIndex;
 
 			CopyQuadIndex(indices, prim_type, idx0, idx1, idx2, idx3);
-			count += 6;
+			indexCount += 6;
 		}
 	}
 
-	return count;
+	dest += (indexCount - startIndex) * sizeof(SimpleVertex);
 }
 
 static void _BezierPatchLowQuality(u8 *dest, u16 *indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType) {
@@ -761,7 +763,10 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 		points[idx] = simplified_control_points + (indices ? idxConv.convert(idx) : idx);
 	}
 
-	int count = 0;
+	int indexCount = 0;
+	u8* splineVerts = splineBuffer;
+	u16* splineIndices = quadIndices_;
+
 	SplinePatchLocal patch;
 	patch.tess_u = tess_u;
 	patch.tess_v = tess_v;
@@ -802,19 +807,19 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 			memcpy(col, Vec4f::FromRGBA(points[0]->color_32).AsArray(), 4 * sizeof(float));
 
 		tessDataTransfer->SendDataToShader(pos, tex, col, count_u * count_v, hasColor, hasTexCoords);
-		count = TessellateSplinePatchHardware(splineBuffer, quadIndices_, patch);
+		TessellateSplinePatchHardware(splineVerts, splineIndices, indexCount, patch);
 		numPatches = (count_u - 3) * (count_v - 3);
 	} else {
 		int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
 		switch (g_Config.iSplineBezierQuality) {
 		case LOW_QUALITY:
-			count = _SplinePatchLowQuality(splineBuffer, quadIndices_, patch, origVertType);
+			_SplinePatchLowQuality(splineVerts, splineIndices, indexCount, patch, origVertType);
 			break;
 		case MEDIUM_QUALITY:
-			count = SplinePatchFullQuality(splineBuffer, quadIndices_, patch, origVertType, 2, maxVertexCount);
+			SplinePatchFullQuality(splineVerts, splineIndices, indexCount, patch, origVertType, 2, maxVertexCount);
 			break;
 		case HIGH_QUALITY:
-			count = SplinePatchFullQuality(splineBuffer, quadIndices_, patch, origVertType, 1, maxVertexCount);
+			SplinePatchFullQuality(splineVerts, splineIndices, indexCount, patch, origVertType, 1, maxVertexCount);
 			break;
 		}
 	}
@@ -834,7 +839,7 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 	uint32_t vertTypeID = GetVertTypeID(vertTypeWithIndex16, gstate.getUVGenMode());
 
 	int generatedBytesRead;
-	DispatchSubmitPrim(splineBuffer, quadIndices_, primType[prim_type], count, vertTypeID, &generatedBytesRead);
+	DispatchSubmitPrim(splineBuffer, quadIndices_, primType[prim_type], indexCount, vertTypeID, &generatedBytesRead);
 	DispatchFlush();
 
 	if ((origVertType & GE_VTYPE_TC_MASK) != 0) {
@@ -882,27 +887,26 @@ void DrawEngineCommon::SubmitSplineBatch(const void *control_points, const void 
 		points[idx] = simplified_control_points + (indices ? idxConv.convert(idx) : idx);
 	}
 
-
-	int count = 0;
 	int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
 
 	if (batchBuffer == nullptr) {
 		batchBuffer = splineBuffer;
+		batchIndices = quadIndices_;
 		batchUsedSize = 0;
 		batchPrimType = prim_type;
 		batchVertType = vertType;
 		batchOrigVertType = origVertType;
 	}
-	else if (batchPrimType != prim_type || batchVertType != vertType || batchOrigVertType != origVertType || batchUsedSize > 1000) {
+	else if (batchUsedSize > 40000) {
 		SubmitSplineEnd();
 
 		batchBuffer = splineBuffer;
+		batchIndices = quadIndices_;
 		batchUsedSize = 0;
 		batchPrimType = prim_type;
 		batchVertType = vertType;
 		batchOrigVertType = origVertType;
 	}
-
 
 	SplinePatchLocal patch;
 	patch.tess_u = tess_u;
@@ -944,28 +948,24 @@ void DrawEngineCommon::SubmitSplineBatch(const void *control_points, const void 
 			memcpy(col, Vec4f::FromRGBA(points[0]->color_32).AsArray(), 4 * sizeof(float));
 
 		tessDataTransfer->SendDataToShader(pos, tex, col, count_u * count_v, hasColor, hasTexCoords);
-		count = TessellateSplinePatchHardware(batchBuffer, quadIndices_ + batchUsedSize, patch);
+		TessellateSplinePatchHardware(batchBuffer, batchIndices, batchUsedSize, patch);
 		numPatches = (count_u - 3) * (count_v - 3);
 	}
 	else {
 		//int maxVertexCount = SPLINE_BUFFER_SIZE / vertexSize;
 		switch (g_Config.iSplineBezierQuality) {
 		case LOW_QUALITY:
-			count = _SplinePatchLowQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType);
+			_SplinePatchLowQuality(batchBuffer, batchIndices, batchUsedSize, patch, origVertType);
 			break;
 		case MEDIUM_QUALITY:
-			count = SplinePatchFullQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType, 2, maxVertexCount);
+			SplinePatchFullQuality(batchBuffer, batchIndices, batchUsedSize, patch, origVertType, 2, maxVertexCount);
 			break;
 		case HIGH_QUALITY:
-			count = SplinePatchFullQuality(batchBuffer, quadIndices_ + batchUsedSize, patch, origVertType, 1, maxVertexCount);
+			SplinePatchFullQuality(batchBuffer, batchIndices, batchUsedSize, patch, origVertType, 1, maxVertexCount);
 			break;
 		}
 	}
 	delete[] points;
-
-
-	batchBuffer += count * vertexSize;
-	batchUsedSize += count;
 }
 
 void DrawEngineCommon::SubmitSplineEnd() {
@@ -983,22 +983,36 @@ void DrawEngineCommon::SubmitSplineEnd() {
 		gstate_c.uv.vOff = 0.0f;
 	}
 
-	int count = batchUsedSize;
 	u32 vertTypeWithIndex16 = (batchVertType & ~GE_VTYPE_IDX_MASK) | GE_VTYPE_IDX_16BIT;
 	uint32_t vertTypeID = GetVertTypeID(vertTypeWithIndex16, gstate.getUVGenMode());
+	
+	GEPrimitiveType prim = primType[batchPrimType];
+	prevPrim_ = prim;
 
-	int generatedBytesRead = 0;
-	u8* desc = splineBuffer;
-	u16* indices = quadIndices_;
+	// If vtype has changed, setup the vertex decoder.
+	if (vertTypeID != lastVType_) {
+		dec_ = GetVertexDecoder(vertTypeID);
+		lastVType_ = vertTypeID;
+	}
 
-	/*while(count > 0) {
-		DispatchSubmitPrim(desc, indices, primType[batchPrimType], 384, vertTypeID, &generatedBytesRead);
-		DispatchFlush();
-		desc += 384 * 36;
-		indices += 384;
-		count -= 384;
-	}*/
-	DispatchSubmitPrim(desc, indices, primType[batchPrimType], count, vertTypeID, &generatedBytesRead);
+	DeferredDrawCall &dc = drawCalls[numDrawCalls];
+	dc.verts = splineBuffer;
+	dc.inds = quadIndices_;
+	dc.indexType = (vertTypeID & GE_VTYPE_IDX_MASK) >> GE_VTYPE_IDX_SHIFT;
+	dc.prim = prim;
+	dc.vertexCount = batchUsedSize;
+	dc.uvScale = gstate_c.uv;
+
+	GetIndexBounds(dc.inds, batchUsedSize, vertTypeID, &dc.indexLowerBound, &dc.indexUpperBound);
+
+	numDrawCalls++;
+	vertexCountInDrawCalls_ += batchUsedSize;
+
+	if (g_Config.bSoftwareSkinning && (vertTypeID & GE_VTYPE_WEIGHT_MASK)) {
+		DecodeVertsStep(decoded, decodeCounter_, decodedVerts_);
+		decodeCounter_++;
+	}
+
 	DispatchFlush();
 
 	batchBuffer = nullptr;
