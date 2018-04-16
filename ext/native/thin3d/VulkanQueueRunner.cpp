@@ -435,68 +435,29 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 
 void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 	// We want to turn a sequence of copy,render(1),copy,render(1),copy,render(1) to copy,copy,copy,render(n).
+	int last = 0, size = steps.size() - 3;
+	std::vector<VKRStep *> renders;
 
-	for (int i = 0; i < (int)steps.size() - 3; i++) {
-		int last = -1;
-		if (!(steps[i]->stepType == VKRStepType::COPY &&
-			steps[i + 1]->stepType == VKRStepType::RENDER &&
-			steps[i + 2]->stepType == VKRStepType::COPY &&
-			steps[i + 1]->render.numDraws == 1 &&
-			steps[i]->copy.dst == steps[i + 2]->copy.dst))
-			continue;
-		// Looks promising! Let's start by finding the last one.
-		for (int j = i; j < (int)steps.size(); j++) {
-			switch (steps[j]->stepType) {
-			case VKRStepType::RENDER:
-				if (steps[j]->render.numDraws > 1)
-					last = j - 1;
-				// should really also check descriptor sets...
-				if (steps[j]->commands.size()) {
-					VkRenderData &cmd = steps[j]->commands.back();
-					if (cmd.cmd == VKRRenderCommand::DRAW_INDEXED && cmd.draw.count != 6)
-						last = j - 1;
-				}
-				break;
-			case VKRStepType::COPY:
-				if (steps[j]->copy.dst != steps[i]->copy.dst)
-					last = j - 1;
-				break;
-			}
-			if (last != -1)
-				break;
+	for (int i = 0; i < size; ++i) {
+		if (steps[i]->stepType == VKRStepType::COPY &&
+			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
+			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
+
+			renders.push_back(steps[i + 1]);
+			steps[++last] = steps[i + 2];
+			i += 1;
 		}
-
-		if (last != -1) {
-			// We've got a sequence from i to last that needs reordering.
-			// First, let's sort it, keeping the same length.
-			std::vector<VKRStep *> copies;
-			std::vector<VKRStep *> renders;
-			copies.reserve((last - i) / 2);
-			renders.reserve((last - i) / 2);
-			for (int n = i; n <= last; n++) {
-				if (steps[n]->stepType == VKRStepType::COPY)
-					copies.push_back(steps[n]);
-				else if (steps[n]->stepType == VKRStepType::RENDER)
-					renders.push_back(steps[n]);
-			}
-			// Write the copies back. TODO: Combine them too.
-			for (int j = 0; j < (int)copies.size(); j++) {
-				steps[i + j] = copies[j];
-			}
-			// Write the renders back (so they will be deleted properly).
-			for (int j = 0; j < (int)renders.size(); j++) {
-				steps[i + j + copies.size()] = renders[j];
-			}
-			assert(steps[i + copies.size()]->stepType == VKRStepType::RENDER);
-			// Combine the renders.
-			for (int j = 1; j < (int)renders.size(); j++) {
-				for (int k = 0; k < renders[j]->commands.size(); k++) {
-					steps[i + copies.size()]->commands.push_back(renders[j]->commands[k]);
+		else {
+			int count = renders.size();
+			if (count > 0) {
+				for (int j = 1; j < count; ++j) {
+					renders[0]->commands.insert(renders[0]->commands.end(), renders[j]->commands.begin(), renders[j]->commands.end());
+					steps[last + j]->stepType = VKRStepType::RENDER_SKIP;
 				}
-				steps[i + copies.size() + j]->stepType = VKRStepType::RENDER_SKIP;
+				steps[last + count] = renders[0];
+				renders.clear();
 			}
-			// We're done.
-			break;
+			last = i + 1;
 		}
 	}
 }
