@@ -127,6 +127,7 @@ protected:
 	u8 *splineBuffer = nullptr;
 
 	u8 *batchBuffer = nullptr;
+	u16 *batchIndices = nullptr;
 	int batchUsedSize;
 	GEPatchPrimType batchPrimType;
 	u32 batchVertType;
