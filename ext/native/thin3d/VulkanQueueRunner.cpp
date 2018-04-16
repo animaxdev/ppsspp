@@ -353,62 +353,59 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 	//  * Create copies of render target that are rendered to multiple times and textured from in sequence, and push those render passes
 	//    as early as possible in the frame (Wipeout billboards).
 
+	
+	// Queue hacks.
+	ApplyMGSHack(steps);
+	if (hacksEnabled_ & QUEUE_HACK_SONIC) {
+		ApplySonicHack(steps);
+	}
+
 	// Push down empty "Clear/Store" renderpasses, and merge them with the first "Load/Store" to the same framebuffer.
 	// Actually let's just bother with the first one for now. This affects Wipeout Pure.
-	for (int j = 0; j < (int)steps.size() - 1; j++) {
-		if (steps[j]->stepType == VKRStepType::RENDER &&
-			steps[j]->render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
-			// Just leave it at color_optimal.
-			steps[j]->render.finalColorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		}
+	int size = steps.size();
+	for (int i = 0; i < size; ++i) {
+		if (steps[i]->stepType == VKRStepType::RENDER) {
+			if (steps[i]->render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
+				// Just leave it at color_optimal.
+				steps[i]->render.finalColorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
 
-		if (steps.size() > 1 && steps[j]->stepType == VKRStepType::RENDER &&
-			steps[j]->render.numDraws == 0 &&
-			steps[j]->render.color == VKRRenderPassAction::CLEAR &&
-			steps[j]->render.stencil == VKRRenderPassAction::CLEAR &&
-			steps[j]->render.depth == VKRRenderPassAction::CLEAR) {
+			if (steps[i]->render.numDraws == 0 &&
+				steps[i]->render.color == VKRRenderPassAction::CLEAR &&
+				steps[i]->render.stencil == VKRRenderPassAction::CLEAR &&
+				steps[i]->render.depth == VKRRenderPassAction::CLEAR) {
 
-			// Drop the first step, and merge it into the next step that touches the same framebuffer.
-			for (size_t i = j + 1; i < steps.size(); i++) {
-				if (steps[i]->stepType == VKRStepType::RENDER &&
-					steps[i]->render.framebuffer == steps[j]->render.framebuffer) {
-					if (steps[i]->render.color != VKRRenderPassAction::CLEAR) {
-						steps[i]->render.color = VKRRenderPassAction::CLEAR;
-						steps[i]->render.clearColor = steps[j]->render.clearColor;
+				// Drop the first step, and merge it into the next step that touches the same framebuffer.
+				for (int j = i + 1; j < size; ++j) {
+					if (steps[j]->stepType == VKRStepType::RENDER &&
+						steps[j]->render.framebuffer == steps[i]->render.framebuffer) {
+						if (steps[j]->render.color != VKRRenderPassAction::CLEAR) {
+							steps[j]->render.color = VKRRenderPassAction::CLEAR;
+							steps[j]->render.clearColor = steps[i]->render.clearColor;
+						}
+						if (steps[j]->render.depth != VKRRenderPassAction::CLEAR) {
+							steps[j]->render.depth = VKRRenderPassAction::CLEAR;
+							steps[j]->render.clearDepth = steps[i]->render.clearDepth;
+						}
+						if (steps[j]->render.stencil != VKRRenderPassAction::CLEAR) {
+							steps[j]->render.stencil = VKRRenderPassAction::CLEAR;
+							steps[j]->render.clearStencil = steps[i]->render.clearStencil;
+						}
+						// Cheaply skip the first step.
+						steps[i]->stepType = VKRStepType::RENDER_SKIP;
+						break;
 					}
-					if (steps[i]->render.depth != VKRRenderPassAction::CLEAR) {
-						steps[i]->render.depth = VKRRenderPassAction::CLEAR;
-						steps[i]->render.clearDepth = steps[j]->render.clearDepth;
+					else if (steps[j]->stepType == VKRStepType::COPY &&
+						steps[j]->copy.src == steps[i]->render.framebuffer) {
+						// Can't eliminate the clear if a game copies from it before it's
+						// rendered to. However this should be rare.
+						break;
 					}
-					if (steps[i]->render.stencil != VKRRenderPassAction::CLEAR) {
-						steps[i]->render.stencil = VKRRenderPassAction::CLEAR;
-						steps[i]->render.clearStencil = steps[j]->render.clearStencil;
-					}
-					// Cheaply skip the first step.
-					steps[j]->stepType = VKRStepType::RENDER_SKIP;
-					break;
-				} else if (steps[i]->stepType == VKRStepType::COPY &&
-					steps[i]->copy.src == steps[j]->render.framebuffer) {
-					// Can't eliminate the clear if a game copies from it before it's
-					// rendered to. However this should be rare.
-					break;
 				}
 			}
 		}
-	}
 
-	// Queue hacks.
-	if (hacksEnabled_) {
-		if (hacksEnabled_ & QUEUE_HACK_MGS2_ACID) {
-			// Massive speedup.
-			ApplyMGSHack(steps);
-		}
-		if (hacksEnabled_ & QUEUE_HACK_SONIC) {
-			ApplySonicHack(steps);
-		}
-	}
-
-	for (size_t i = 0; i < steps.size(); i++) {
+		//
 		const VKRStep &step = *steps[i];
 		switch (step.stepType) {
 		case VKRStepType::RENDER:
@@ -436,28 +433,22 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 	// We want to turn a sequence of copy,render(1),copy,render(1),copy,render(1) to copy,copy,copy,render(n).
 	int last = 0, size = steps.size() - 3;
-	std::vector<VKRStep *> renders;
+	std::vector<VkRenderData> commands;
 
 	for (int i = 0; i < size; ++i) {
 		if (steps[i]->stepType == VKRStepType::COPY &&
 			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
 			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
 
-			renders.push_back(steps[i + 1]);
-			steps[++last] = steps[i + 2];
 			i += 1;
+			commands.insert(commands.end(), steps[i]->commands.begin(), steps[i]->commands.end());
+			steps[i]->stepType = VKRStepType::RENDER_SKIP;
+			last = i;
 		}
-		else {
-			int count = renders.size();
-			if (count > 0) {
-				for (int j = 1; j < count; ++j) {
-					renders[0]->commands.insert(renders[0]->commands.end(), renders[j]->commands.begin(), renders[j]->commands.end());
-					steps[last + j]->stepType = VKRStepType::RENDER_SKIP;
-				}
-				steps[last + count] = renders[0];
-				renders.clear();
-			}
-			last = i + 1;
+		else if (commands.size() > 0) {
+			steps[last]->stepType = VKRStepType::RENDER;
+			steps[last]->commands = std::move(commands);
+			commands.clear();
 		}
 	}
 }
