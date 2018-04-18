@@ -353,11 +353,6 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 	//  * Create copies of render target that are rendered to multiple times and textured from in sequence, and push those render passes
 	//    as early as possible in the frame (Wipeout billboards).
 
-	// Queue hacks.
-	if (hacksEnabled_ & QUEUE_HACK_SONIC) {
-		//ApplySonicHack(steps);
-	}
-	
 	int last = 0;
 	int size = steps.size();
 	bool skipThisTime = false;
@@ -413,10 +408,7 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
 			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
 
-			//if (memcmp(&(steps[i]->copy), &(steps[i + 2]->copy), sizeof(steps[i + 2]->copy)) == 0) {
-			//	steps[i]->stepType = VKRStepType::RENDER_SKIP;
-			//}
-			std::move(steps[i + 1]->commands.begin(), steps[i + 1]->commands.end(), std::back_inserter(commands));
+			commands.insert(commands.end(), steps[i + 1]->commands.begin(), steps[i + 1]->commands.end());
 			steps[i + 1]->stepType = VKRStepType::RENDER_SKIP;
 
 			last = i + 1;
@@ -425,7 +417,7 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 		else if (commands.size() > 0) {
 			if (steps[i + 1]->stepType == VKRStepType::RENDER) {
-				std::move(steps[i + 1]->commands.begin(), steps[i + 1]->commands.end(), std::back_inserter(commands));
+				commands.insert(commands.end(), steps[i + 1]->commands.begin(), steps[i + 1]->commands.end());
 				steps[i + 1]->commands = std::move(commands);
 			}
 			else {
@@ -472,10 +464,7 @@ void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
 			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
 
-			//if (memcmp(&(steps[i]->copy), &(steps[i + 2]->copy), sizeof(steps[i + 2]->copy)) == 0) {
-			//	steps[i]->stepType = VKRStepType::RENDER_SKIP;
-			//}
-			std::move(steps[i + 1]->commands.begin(), steps[i + 1]->commands.end(), std::back_inserter(commands));
+			commands.insert(commands.end(), steps[i + 1]->commands.begin(), steps[i + 1]->commands.end());
 			steps[i + 1]->stepType = VKRStepType::RENDER_SKIP;
 
 			last = i + 1;
@@ -483,7 +472,7 @@ void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 		}
 		else if (commands.size() > 0) {
 			if (steps[i + 1]->stepType == VKRStepType::RENDER) {
-				std::move(steps[i + 1]->commands.begin(), steps[i + 1]->commands.end(), std::back_inserter(commands));
+				commands.insert(commands.end(), steps[i + 1]->commands.begin(), steps[i + 1]->commands.end());
 				steps[i + 1]->commands = std::move(commands);
 			}
 			else {
@@ -555,11 +544,11 @@ void VulkanQueueRunner::ApplySonicHack(std::vector<VKRStep *> &steps) {
 
 			// Combine the renders.
 			for (int j = 1; j < (int)type1.size(); j++) {
-				std::move(type1[j]->commands.begin(), type1[j]->commands.end(), std::back_inserter(steps[i]->commands));
+				steps[i]->commands.insert(steps[i]->commands.end(), type1[j]->commands.begin(), type1[j]->commands.end());
 				steps[i + j]->stepType = VKRStepType::RENDER_SKIP;
 			}
 			for (int j = 1; j < (int)type2.size(); j++) {
-				std::move(type2[j]->commands.begin(), type2[j]->commands.end(), std::back_inserter(steps[i + type1.size()]->commands));
+				steps[i + type1.size()]->commands.insert(steps[i + type1.size()]->commands.end(), type2[j]->commands.begin(), type2[j]->commands.end());
 				steps[i + j + type1.size()]->stepType = VKRStepType::RENDER_SKIP;
 			}
 			// We're done.
