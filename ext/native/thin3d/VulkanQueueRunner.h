@@ -13,6 +13,7 @@ struct VKRImage;
 enum {
 	QUEUE_HACK_MGS2_ACID = 1,
 	QUEUE_HACK_SONIC = 2,
+	QUEUE_HACK_KILL_ZONE = 4,
 };
 
 enum class VKRRenderCommand : uint8_t {
@@ -234,6 +235,7 @@ private:
 
 	void ResizeReadbackBuffer(VkDeviceSize requiredSize);
 
+	void ApplyKZLHack(std::vector<VKRStep *> &steps);
 	void ApplyMGSHack(std::vector<VKRStep *> &steps);
 	void ApplySonicHack(std::vector<VKRStep *> &steps);
 
