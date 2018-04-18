@@ -913,8 +913,6 @@ void DrawEngineCommon::SubmitSplineEnd() {
 void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead) {
 	PROFILE_THIS_SCOPE("bezier");
 
-	DispatchFlush();
-
 	u16 index_lower_bound = 0;
 	u16 index_upper_bound = count_u * count_v - 1;
 	IndexConverter idxConv(vertType, indices);
@@ -999,6 +997,7 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 
 	int count = 0;
 	u8 *dest = splineBuffer;
+	u16 *inds = quadIndices_;
 
 	// We shouldn't really split up into separate 4x4 patches, instead we should do something that works
 	// like the splines, so we subdivide across the whole "mega-patch".
@@ -1011,7 +1010,6 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 		tess_v = 1;
 	}
 
-	u16 *inds = quadIndices_;
 	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
 		tessDataTransfer->SendDataToShader(pos, tex, col, count_u * count_v, hasColor, hasTexCoords);
 		TessellateBezierPatchHardware(dest, inds, count, tess_u, tess_v, prim_type);

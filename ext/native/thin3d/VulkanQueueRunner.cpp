@@ -543,7 +543,6 @@ void VulkanQueueRunner::ApplySonicHack(std::vector<VKRStep *> &steps) {
 	VKRFramebuffer *fb2 = nullptr;
 	std::vector<VKRStep *> steps2;
 
-	// skip first render and second copy
 	for (int i = 0; i < size; ++i) {
 		if (steps[i]->stepType == VKRStepType::RENDER) {
 			VKRFramebuffer *framebuffer = steps[i]->render.framebuffer;
