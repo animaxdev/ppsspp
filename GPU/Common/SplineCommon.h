@@ -48,6 +48,17 @@ struct BezierPatch {
 };
 
 struct SplinePatchLocal {
+	u8  *batchVertices = nullptr;
+	u16 *batchIndices = nullptr;
+	int batchVertexCount = 0;
+	int batchIndexCount = 0;
+	GEPrimitiveType batchPrimType;
+	u32 batchVertType;
+	u32 batchOrigVertType;
+	u32 batchVertTypeID;
+	int maxVertexCount;
+
+	//
 	SimpleVertex **points;
 	int tess_u;
 	int tess_v;
