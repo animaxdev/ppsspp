@@ -23,6 +23,8 @@
 #include "ui/view.h"
 #include "profiler/profiler.h"
 
+#ifdef USE_PROFILER
+
 static const uint32_t nice_colors[] = {
 	0xFF8040,
 	0x80FF40,
@@ -52,7 +54,6 @@ enum ProfileCatStatus {
 };
 
 void DrawProfile(UIContext &ui) {
-#ifdef USE_PROFILER
 	PROFILE_THIS_SCOPE("timing");
 	int numCategories = Profiler_GetNumCategories();
 	int numThreads = Profiler_GetNumThreads();
@@ -199,5 +200,47 @@ void DrawProfile(UIContext &ui) {
 	}
 
 	lastMaxVal = lastMaxVal * 0.95f + maxVal * 0.05f;
-#endif
 }
+
+
+#endif // USE_PROFILER
+
+
+
+#ifdef VKSTEP_PROFILER
+
+static const uint32_t nice_colors[] = {
+	0xFF8040,
+	0x80FF40,
+	0x8040FF,
+	0xFFFF40,
+	0x40FFFF,
+	0xFF70FF,
+};
+
+void DrawVKStepProfile(UIContext &ui) {
+	int numSteps = VKStepProfiler_GetNumSteps();
+	const uint32_t opacity = 140 << 24;
+	float x = 10, y = 10, width = 80, height = 36, padding_x = 6, padding_y = 6;
+	const Bounds &screen = ui.GetBounds();
+
+	for (int i = 0; i < numSteps; ++i) {
+		int type;
+		const char * name;
+		double elapsed;
+
+		VKStepProfiler_GetStep(i, type, name, elapsed);
+		ui.FillRect(UI::Drawable(opacity | nice_colors[type]), Bounds(x + 2, y, width, height));
+		ui.DrawTextShadow(name, x, y, 0xFFFFFFFF, ALIGN_VBASELINE);
+
+		x += width + padding_x;
+		if (x + width > screen.w) {
+			x = 20;
+			y += height + padding_y;
+		}
+	}
+
+	VKStepProfiler_RemoveSteps();
+}
+
+#endif

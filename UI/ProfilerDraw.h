@@ -7,3 +7,9 @@ class UIContext;
 void DrawProfile(UIContext &ui);
 
 #endif
+
+#ifdef VKSTEP_PROFILER
+
+void DrawVKStepProfile(UIContext &ui);
+
+#endif

@@ -2,6 +2,8 @@
 #include "VulkanQueueRunner.h"
 #include "VulkanRenderManager.h"
 
+#include "profiler/profiler.h"
+
 // Debug help: adb logcat -s DEBUG PPSSPPNativeActivity PPSSPP NativeGLView NativeRenderer NativeSurfaceView PowerSaveModeReceiver InputDeviceState
 
 void VulkanQueueRunner::CreateDeviceObjects() {
@@ -370,6 +372,8 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 
 	int size = steps.size();
 
+	PROFILE_THIS_QUEUE(steps);
+
 	for (int i = 0; i < size; ++i) {
 		// Push down empty "Clear/Store" renderpasses, and merge them with the first "Load/Store" to the same framebuffer.
 		// Actually let's just bother with the first one for now. This affects Wipeout Pure.
@@ -416,6 +420,7 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 
 		//
 		const VKRStep &step = *steps[i];
+		PROFILE_THIS_STEP(step);
 		switch (step.stepType) {
 		case VKRStepType::RENDER:
 			PerformRenderPass(step, cmd);

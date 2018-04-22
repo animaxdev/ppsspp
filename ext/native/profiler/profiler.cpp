@@ -14,6 +14,9 @@
 #include "ppsspp_config.h"
 #include "profiler/profiler.h"
 
+
+#ifdef USE_PROFILER
+
 #define MAX_CATEGORIES 64 // Can be any number, represents max profiled names.
 #define MAX_DEPTH 16      // Can be any number, represents max nesting depth of profiled names.
 #if PPSSPP_PLATFORM(IOS) && defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_9_0
@@ -268,3 +271,73 @@ void Profiler_GetHistory(int category, int thread, float *data, int count) {
 		data[i] = history[MAX_THREADS * x + thread].time_taken[category];
 	}
 }
+
+
+#endif // USE_PROFILER 
+
+
+#ifdef VKSTEP_PROFILER
+
+#include <list>
+
+struct StepInfo {
+	int type;
+	const char * name;
+	double elapsed;
+};
+
+static std::mutex framesLock;
+static char VKStepNames[6][6] = { "DRAW", "SKIP", "COPY", "BLIT", "READ", "IMAGE" };
+static StepInfo current;
+static std::vector<StepInfo> steps;
+static std::list< std::vector<StepInfo> > frames;
+
+
+int VKStepProfiler_GetNumSteps() {
+	if (frames.size() > 0) {
+		return frames.front().size();
+	}
+	else {
+		return 0;
+	}
+}
+
+void VKStepProfiler_GetStep(int i, int &type, const char * &name, double &elapsed) {
+	const StepInfo& step = frames.front()[i];
+	type = step.type;
+	name = step.name;
+	elapsed = step.elapsed;
+}
+
+void VKStepProfiler_RemoveSteps() {
+	if (frames.size() > 0) {
+		std::lock_guard<std::mutex> guard(framesLock);
+		frames.pop_front();
+	}
+}
+
+
+//
+VKQueueProfiler::VKQueueProfiler(const std::vector<VKRStep *> &steps) {
+
+}
+
+VKQueueProfiler::~VKQueueProfiler() {
+	std::lock_guard<std::mutex> guard(framesLock);
+	frames.emplace_back(std::move(steps));
+}
+
+
+//
+VKStepProfiler::VKStepProfiler(const VKRStep &step) {
+	current.type = (int)step.stepType;
+	current.name = VKStepNames[current.type];
+	current.elapsed = real_time_now();
+}
+
+VKStepProfiler::~VKStepProfiler() {
+	current.elapsed -= real_time_now();
+	steps.push_back(current);
+}
+
+#endif

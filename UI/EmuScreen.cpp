@@ -1275,6 +1275,12 @@ void EmuScreen::renderUI() {
 	}
 #endif
 
+#ifdef VKSTEP_PROFILER
+	if (g_Config.bShowFrameProfiler && !invalid_) {
+		DrawVKStepProfile(*ctx);
+	}
+#endif
+
 	ctx->End();
 }
 

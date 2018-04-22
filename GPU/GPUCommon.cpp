@@ -1120,10 +1120,7 @@ void GPUCommon::ProcessDLQueue() {
 	while (iter != dlQueue.end()) {
 		DisplayList &l = dls[*iter];
 		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
-		if (list.state != PSP_GE_DL_STATE_PAUSED && !InterpretList(l)) {
-			return;
-		}
-		else {
+		if (l.state != PSP_GE_DL_STATE_PAUSED && InterpretList(l)) {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
@@ -1131,6 +1128,9 @@ void GPUCommon::ProcessDLQueue() {
 				dlQueue.erase(iter);
 				iter = dlQueue.begin();
 			}
+		}
+		else {
+			return;
 		}
 	}
 
@@ -1214,22 +1214,20 @@ void GPUCommon::Execute_Call(u32 op, u32 diff) {
 		}
 	}
 
-	if (currentList->stackptr == ARRAY_SIZE(currentList->stack)) {
-		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
-	} else {
+	if (currentList->stackptr != ARRAY_SIZE(currentList->stack)) {
 		auto &stackEntry = currentList->stack[currentList->stackptr++];
 		stackEntry.pc = retval;
 		stackEntry.offsetAddr = gstate_c.offsetAddr;
 		// The base address is NOT saved/restored for a regular call.
 		UpdatePC(currentList->pc, target - 4);
 		currentList->pc = target - 4;	// pc will be increased after we return, counteract that
+	} else {
+		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
 	}
 }
 
 void GPUCommon::Execute_Ret(u32 op, u32 diff) {
-	if (currentList->stackptr == 0) {
-		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
-	} else {
+	if (currentList->stackptr != 0) {
 		auto &stackEntry = currentList->stack[--currentList->stackptr];
 		gstate_c.offsetAddr = stackEntry.offsetAddr;
 		// We always clear the top (uncached/etc.) bits
@@ -1242,6 +1240,8 @@ void GPUCommon::Execute_Ret(u32 op, u32 diff) {
 			UpdateState(GPUSTATE_ERROR);
 		}
 #endif
+	} else {
+		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
 	}
 }
 
