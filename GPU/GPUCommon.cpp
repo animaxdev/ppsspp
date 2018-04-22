@@ -971,21 +971,14 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 void GPUCommon::FastRunLoop(DisplayList &list) {
 	PROFILE_THIS_SCOPE("gpuloop");
 	const CommandInfo *cmdInfo = cmdInfo_;
-	int dc = downcount;
-	for (; dc > 0; --dc) {
+	for (int dc = downcount; dc > 0; --dc) {
 		// We know that display list PCs have the upper nibble == 0 - no need to mask the pointer
 		const u32 op = *(const u32 *)(Memory::base + list.pc);
 		const u32 cmd = op >> 24;
 		const CommandInfo &info = cmdInfo[cmd];
 		const u32 diff = op ^ gstate.cmdmem[cmd];
-		if (diff == 0) {
-			if (info.flags & FLAG_EXECUTE) {
-				downcount = dc;
-				(this->*info.func)(op, diff);
-				dc = downcount;
-			}
-		} else {
-			uint64_t flags = info.flags;
+		const uint64_t flags = info.flags;
+		if (diff != 0) {
 			if (flags & FLAG_FLUSHBEFOREONCHANGE) {
 				drawEngineCommon_->DispatchFlush();
 			}
@@ -995,10 +988,15 @@ void GPUCommon::FastRunLoop(DisplayList &list) {
 				(this->*info.func)(op, diff);
 				dc = downcount;
 			} else {
-				uint64_t dirty = flags >> 8;
+				const uint64_t dirty = flags >> 8;
 				if (dirty)
 					gstate_c.Dirty(dirty);
 			}
+		} else if (flags & FLAG_EXECUTE) {
+			downcount = dc;
+			(this->*info.func)(op, diff);
+			dc = downcount;
+			
 		}
 		list.pc += 4;
 	}
@@ -1122,7 +1120,7 @@ void GPUCommon::ProcessDLQueue() {
 	while (iter != dlQueue.end()) {
 		DisplayList &l = dls[*iter];
 		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
-		if (!InterpretList(l)) {
+		if (list.state != PSP_GE_DL_STATE_PAUSED && !InterpretList(l)) {
 			return;
 		}
 		else {
