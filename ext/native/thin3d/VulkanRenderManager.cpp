@@ -302,50 +302,41 @@ void VulkanRenderManager::ThreadFunc() {
 	setCurrentThreadName("RenderMan");
 	int threadFrame = threadInitFrame_;
 	bool nextFrame = false;
-	bool firstFrame = true;
+
 	while (true) {
+		if (nextFrame && ++threadFrame >= vulkan_->GetInflightFrames()) {
+			threadFrame = 0;
+		}
+		FrameData &frameData = frameData_[threadFrame];
+
 		{
-			if (nextFrame) {
-				threadFrame++;
-				if (threadFrame >= vulkan_->GetInflightFrames())
-					threadFrame = 0;
-			}
-			FrameData &frameData = frameData_[threadFrame];
 			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
 			while (!frameData.readyForRun && run_) {
-				VLOG("PULL: Waiting for frame[%d].readyForRun", threadFrame);
 				frameData.pull_condVar.wait(lock);
 			}
-			if (!frameData.readyForRun && !run_) {
-				// This means we're out of frames to render and run_ is false, so bail.
-				break;
-			}
-			VLOG("PULL: frame[%d].readyForRun = false", threadFrame);
-			frameData.readyForRun = false;
-			// Previously we had a quick exit here that avoided calling Run() if run_ was suddenly false,
-			// but that created a race condition where frames could end up not finished properly on resize etc.
+		}
 
-			// Only increment next time if we're done.
-			nextFrame = frameData.type == VKRRunType::END;
-			assert(frameData.type == VKRRunType::END || frameData.type == VKRRunType::SYNC);
+		if (!frameData.readyForRun && !run_) {
+			// This means we're out of frames to render and run_ is false, so bail.
+			break;
 		}
-		VLOG("PULL: Running frame %d", threadFrame);
-		if (firstFrame) {
-			ILOG("Running first frame (%d)", threadFrame);
-			firstFrame = false;
-		}
+		
+		frameData.readyForRun = false;
+		// Previously we had a quick exit here that avoided calling Run() if run_ was suddenly false,
+		// but that created a race condition where frames could end up not finished properly on resize etc.
+
+		// Only increment next time if we're done.
+		nextFrame = frameData.type == VKRRunType::END;
+		//assert(frameData.type == VKRRunType::END || frameData.type == VKRRunType::SYNC);
+
 		Run(threadFrame);
-		VLOG("PULL: Finished frame %d", threadFrame);
 	}
 
 	// Wait for the device to be done with everything, before tearing stuff down.
 	vkDeviceWaitIdle(vulkan_->GetDevice());
-
-	VLOG("PULL: Quitting");
 }
 
 void VulkanRenderManager::BeginFrame() {
-	VLOG("BeginFrame");
 	VkDevice device = vulkan_->GetDevice();
 
 	int curFrame = vulkan_->GetCurFrame();
@@ -355,18 +346,15 @@ void VulkanRenderManager::BeginFrame() {
 	if (useThread_) {
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1", curFrame);
 			frameData.push_condVar.wait(lock);
 		}
 		frameData.readyForFence = false;
 	}
 
-	VLOG("PUSH: Fencing %d", curFrame);
 	vkWaitForFences(device, 1, &frameData.fence, true, UINT64_MAX);
 	vkResetFences(device, 1, &frameData.fence);
 
 	// Must be after the fence - this performs deletes.
-	VLOG("PUSH: BeginFrame %d", curFrame);
 	if (!run_) {
 		WLOG("BeginFrame while !run_!");
 	}
@@ -737,14 +725,11 @@ void VulkanRenderManager::Finish() {
 	FrameData &frameData = frameData_[curFrame];
 	if (!useThread_) {
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.type = VKRRunType::END;
 		Run(curFrame);
 	} else {
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-		VLOG("PUSH: Frame[%d].readyForRun = true", curFrame);
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.readyForRun = true;
 		frameData.type = VKRRunType::END;
 		frameData.pull_condVar.notify_all();
@@ -842,7 +827,6 @@ void VulkanRenderManager::Submit(int frame, bool triggerFence) {
 
 	// When !triggerFence, we notify after syncing with Vulkan.
 	if (useThread_ && triggerFence) {
-		VLOG("PULL: Frame %d.readyForFence = true", frame);
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		frameData.readyForFence = true;
 		frameData.push_condVar.notify_all();
@@ -880,26 +864,15 @@ void VulkanRenderManager::Run(int frame) {
 	BeginSubmitFrame(frame);
 
 	FrameData &frameData = frameData_[frame];
-	auto &stepsOnThread = frameData_[frame].steps;
-	VkCommandBuffer cmd = frameData.mainCmd;
-	// queueRunner_.LogSteps(stepsOnThread);
-	queueRunner_.RunSteps(cmd, stepsOnThread);
-	stepsOnThread.clear();
+	// queueRunner_.LogSteps(frameData_[frame].steps);
+	queueRunner_.RunSteps(frameData.mainCmd, frameData_[frame].steps);
 
-	switch (frameData.type) {
-	case VKRRunType::END:
+	if (frameData.type == VKRRunType::END) {
 		EndSubmitFrame(frame);
-		break;
-
-	case VKRRunType::SYNC:
-		EndSyncFrame(frame);
-		break;
-
-	default:
-		assert(false);
 	}
-
-	VLOG("PULL: Finished running frame %d", frame);
+	else if (frameData.type == VKRRunType::SYNC) {
+		EndSyncFrame(frame);
+	}
 }
 
 void VulkanRenderManager::EndSyncFrame(int frame) {
@@ -934,14 +907,11 @@ void VulkanRenderManager::FlushSync() {
 	FrameData &frameData = frameData_[curFrame];
 	if (!useThread_) {
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.type = VKRRunType::SYNC;
 		Run(curFrame);
 	} else {
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-		VLOG("PUSH: Frame[%d].readyForRun = true (sync)", curFrame);
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.readyForRun = true;
 		assert(frameData.readyForFence == false);
 		frameData.type = VKRRunType::SYNC;
@@ -952,7 +922,6 @@ void VulkanRenderManager::FlushSync() {
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		// Wait for the flush to be hit, since we're syncing.
 		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (sync)", curFrame);
 			frameData.push_condVar.wait(lock);
 		}
 		frameData.readyForFence = false;

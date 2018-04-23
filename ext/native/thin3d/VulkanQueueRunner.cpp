@@ -442,6 +442,9 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 		delete steps[i];
 	}
+
+	//
+	steps.clear();
 }
 
 void VulkanQueueRunner::ApplyKZLHack(std::vector<VKRStep *> &steps) {
