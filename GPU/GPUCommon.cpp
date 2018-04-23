@@ -971,21 +971,14 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 void GPUCommon::FastRunLoop(DisplayList &list) {
 	PROFILE_THIS_SCOPE("gpuloop");
 	const CommandInfo *cmdInfo = cmdInfo_;
-	int dc = downcount;
-	for (; dc > 0; --dc) {
+	for (int dc = downcount; dc > 0; --dc) {
 		// We know that display list PCs have the upper nibble == 0 - no need to mask the pointer
 		const u32 op = *(const u32 *)(Memory::base + list.pc);
 		const u32 cmd = op >> 24;
 		const CommandInfo &info = cmdInfo[cmd];
 		const u32 diff = op ^ gstate.cmdmem[cmd];
-		if (diff == 0) {
-			if (info.flags & FLAG_EXECUTE) {
-				downcount = dc;
-				(this->*info.func)(op, diff);
-				dc = downcount;
-			}
-		} else {
-			uint64_t flags = info.flags;
+		const uint64_t flags = info.flags;
+		if (diff != 0) {
 			if (flags & FLAG_FLUSHBEFOREONCHANGE) {
 				drawEngineCommon_->DispatchFlush();
 			}
@@ -995,10 +988,15 @@ void GPUCommon::FastRunLoop(DisplayList &list) {
 				(this->*info.func)(op, diff);
 				dc = downcount;
 			} else {
-				uint64_t dirty = flags >> 8;
+				const uint64_t dirty = flags >> 8;
 				if (dirty)
 					gstate_c.Dirty(dirty);
 			}
+		} else if (flags & FLAG_EXECUTE) {
+			downcount = dc;
+			(this->*info.func)(op, diff);
+			dc = downcount;
+			
 		}
 		list.pc += 4;
 	}
@@ -1122,10 +1120,7 @@ void GPUCommon::ProcessDLQueue() {
 	while (iter != dlQueue.end()) {
 		DisplayList &l = dls[*iter];
 		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
-		if (!InterpretList(l)) {
-			return;
-		}
-		else {
+		if (l.state != PSP_GE_DL_STATE_PAUSED && InterpretList(l)) {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
@@ -1133,6 +1128,9 @@ void GPUCommon::ProcessDLQueue() {
 				dlQueue.erase(iter);
 				iter = dlQueue.begin();
 			}
+		}
+		else {
+			return;
 		}
 	}
 
@@ -1216,22 +1214,20 @@ void GPUCommon::Execute_Call(u32 op, u32 diff) {
 		}
 	}
 
-	if (currentList->stackptr == ARRAY_SIZE(currentList->stack)) {
-		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
-	} else {
+	if (currentList->stackptr != ARRAY_SIZE(currentList->stack)) {
 		auto &stackEntry = currentList->stack[currentList->stackptr++];
 		stackEntry.pc = retval;
 		stackEntry.offsetAddr = gstate_c.offsetAddr;
 		// The base address is NOT saved/restored for a regular call.
 		UpdatePC(currentList->pc, target - 4);
 		currentList->pc = target - 4;	// pc will be increased after we return, counteract that
+	} else {
+		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
 	}
 }
 
 void GPUCommon::Execute_Ret(u32 op, u32 diff) {
-	if (currentList->stackptr == 0) {
-		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
-	} else {
+	if (currentList->stackptr != 0) {
 		auto &stackEntry = currentList->stack[--currentList->stackptr];
 		gstate_c.offsetAddr = stackEntry.offsetAddr;
 		// We always clear the top (uncached/etc.) bits
@@ -1244,6 +1240,8 @@ void GPUCommon::Execute_Ret(u32 op, u32 diff) {
 			UpdateState(GPUSTATE_ERROR);
 		}
 #endif
+	} else {
+		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
 	}
 }
 

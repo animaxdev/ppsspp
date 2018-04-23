@@ -432,17 +432,14 @@ void GameSettingsScreen::CreateViews() {
 		"None", "Speed", "FPS", "Both"
 	};
 	graphicsSettings->Add(new PopupMultiChoice(&g_Config.iShowFPSCounter, gr->T("Show FPS Counter"), fpsChoices, 0, ARRAY_SIZE(fpsChoices), gr->GetName(), screenManager()));
-#ifndef MOBILE_DEVICE
 	graphicsSettings->Add(new CheckBox(&g_Config.bShowDebugStats, gr->T("Show Debug Statistics")))->OnClick.Handle(this, &GameSettingsScreen::OnJitAffectingSetting);
-
+#ifndef MOBILE_DEVICE
 	// Developer tools are not accessible ingame, so it goes here.
 	graphicsSettings->Add(new ItemHeader(gr->T("Debugging")));
 	Choice *dump = graphicsSettings->Add(new Choice(gr->T("Dump next frame to log")));
 	dump->OnClick.Handle(this, &GameSettingsScreen::OnDumpNextFrameToLog);
 	if (!PSP_IsInited())
 		dump->SetEnabled(false);
-#else
-	g_Config.bShowDebugStats = false;
 #endif
 
 	// Audio

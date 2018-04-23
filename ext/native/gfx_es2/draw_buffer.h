@@ -57,6 +57,10 @@ struct GradientStop {
 
 class TextDrawer;
 
+#if defined(_MSC_VER) && defined(DrawText)
+#undef DrawText
+#endif
+
 class DrawBuffer {
 public:
 	DrawBuffer();

@@ -169,5 +169,3 @@ private:
 	std::string id_;
 	DebugShaderType type_;
 };
-
-void DrawProfile(UIContext &ui);
