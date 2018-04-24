@@ -286,8 +286,6 @@ protected:
 	// TODO: Unify this.
 	virtual void FinishDeferred() {}
 
-	void DoBlockTransfer(u32 skipDrawReason);
-
 	void AdvanceVerts(u32 vertType, int count, int bytesRead) {
 		if ((vertType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
 			int indexShift = ((vertType & GE_VTYPE_IDX_MASK) >> GE_VTYPE_IDX_SHIFT) - 1;
