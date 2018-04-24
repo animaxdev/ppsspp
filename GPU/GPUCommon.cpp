@@ -1879,7 +1879,6 @@ void GPUCommon::Execute_BlockTransferStart(u32 op, u32 diff) {
 	Flush();
 	// and take appropriate action. This is a block transfer between RAM and VRAM, or vice versa.
 	// Can we skip this on SkipDraw?
-	//DoBlockTransfer(gstate_c.skipDrawReason);
 
 	// TODO: This is used a lot to copy data around between render targets and textures,
 	// and also to quickly load textures from RAM to VRAM. So we should do checks like the following:
@@ -1922,7 +1921,6 @@ void GPUCommon::Execute_BlockTransferStart(u32 op, u32 diff) {
 	}
 
 	// Check that the last address of both source and dest are valid addresses
-
 	u32 srcLastAddr = srcBasePtr + ((srcY + height - 1) * srcStride + (srcX + width - 1)) * bpp;
 	u32 dstLastAddr = dstBasePtr + ((dstY + height - 1) * dstStride + (dstX + width - 1)) * bpp;
 
@@ -1937,7 +1935,7 @@ void GPUCommon::Execute_BlockTransferStart(u32 op, u32 diff) {
 #endif
 
 	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
-	framebufferManager_->NotifyBlockTransferBefore(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
+	framebufferManager_->BlockTransfer(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
 
 #ifndef MOBILE_DEVICE
 	CBreakPoints::ExecMemCheck(srcBasePtr + (srcY * srcStride + srcX) * bpp, false, height * srcStride * bpp, currentMIPS->pc);
