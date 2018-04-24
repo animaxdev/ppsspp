@@ -1879,7 +1879,73 @@ void GPUCommon::Execute_BlockTransferStart(u32 op, u32 diff) {
 	Flush();
 	// and take appropriate action. This is a block transfer between RAM and VRAM, or vice versa.
 	// Can we skip this on SkipDraw?
-	DoBlockTransfer(gstate_c.skipDrawReason);
+	//DoBlockTransfer(gstate_c.skipDrawReason);
+
+	// TODO: This is used a lot to copy data around between render targets and textures,
+	// and also to quickly load textures from RAM to VRAM. So we should do checks like the following:
+	//  * Does dstBasePtr point to an existing texture? If so maybe reload it immediately.
+	//
+	//  * Does srcBasePtr point to a render target, and dstBasePtr to a texture? If so
+	//    either copy between rt and texture or reassign the texture to point to the render target
+	//
+	// etc....
+
+	u32 srcBasePtr = gstate.getTransferSrcAddress();
+	u32 srcStride = gstate.getTransferSrcStride();
+
+	u32 dstBasePtr = gstate.getTransferDstAddress();
+	u32 dstStride = gstate.getTransferDstStride();
+
+	int srcX = gstate.getTransferSrcX();
+	int srcY = gstate.getTransferSrcY();
+
+	int dstX = gstate.getTransferDstX();
+	int dstY = gstate.getTransferDstY();
+
+	int width = gstate.getTransferWidth();
+	int height = gstate.getTransferHeight();
+
+	int bpp = gstate.getTransferBpp();
+	u32 skipDrawReason = gstate_c.skipDrawReason;
+
+#ifndef MOBILE_DEVICE
+	//DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
+
+	if (!Memory::IsValidAddress(srcBasePtr)) {
+		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad source transfer address %08x!", srcBasePtr);
+		return;
+	}
+
+	if (!Memory::IsValidAddress(dstBasePtr)) {
+		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad destination transfer address %08x!", dstBasePtr);
+		return;
+	}
+
+	// Check that the last address of both source and dest are valid addresses
+
+	u32 srcLastAddr = srcBasePtr + ((srcY + height - 1) * srcStride + (srcX + width - 1)) * bpp;
+	u32 dstLastAddr = dstBasePtr + ((dstY + height - 1) * dstStride + (dstX + width - 1)) * bpp;
+
+	if (!Memory::IsValidAddress(srcLastAddr)) {
+		ERROR_LOG_REPORT(G3D, "Bottom-right corner of source of block transfer is at an invalid address: %08x", srcLastAddr);
+		return;
+	}
+	if (!Memory::IsValidAddress(dstLastAddr)) {
+		ERROR_LOG_REPORT(G3D, "Bottom-right corner of destination of block transfer is at an invalid address: %08x", srcLastAddr);
+		return;
+	}
+#endif
+
+	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
+	framebufferManager_->NotifyBlockTransferBefore(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
+
+#ifndef MOBILE_DEVICE
+	CBreakPoints::ExecMemCheck(srcBasePtr + (srcY * srcStride + srcX) * bpp, false, height * srcStride * bpp, currentMIPS->pc);
+	CBreakPoints::ExecMemCheck(dstBasePtr + (dstY * dstStride + dstX) * bpp, true, height * dstStride * bpp, currentMIPS->pc);
+#endif
+
+	// TODO: Correct timing appears to be 1.9, but erring a bit low since some of our other timing is inaccurate.
+	cyclesExecuted += ((height * width * bpp) * 16) / 10;
 }
 
 void GPUCommon::Execute_WorldMtxNum(u32 op, u32 diff) {
@@ -2546,100 +2612,6 @@ void GPUCommon::SetCmdValue(u32 op) {
 	PreExecuteOp(op, diff);
 	gstate.cmdmem[cmd] = op;
 	ExecuteOp(op, diff);
-}
-
-void GPUCommon::DoBlockTransfer(u32 skipDrawReason) {
-	// TODO: This is used a lot to copy data around between render targets and textures,
-	// and also to quickly load textures from RAM to VRAM. So we should do checks like the following:
-	//  * Does dstBasePtr point to an existing texture? If so maybe reload it immediately.
-	//
-	//  * Does srcBasePtr point to a render target, and dstBasePtr to a texture? If so
-	//    either copy between rt and texture or reassign the texture to point to the render target
-	//
-	// etc....
-
-	u32 srcBasePtr = gstate.getTransferSrcAddress();
-	u32 srcStride = gstate.getTransferSrcStride();
-
-	u32 dstBasePtr = gstate.getTransferDstAddress();
-	u32 dstStride = gstate.getTransferDstStride();
-
-	int srcX = gstate.getTransferSrcX();
-	int srcY = gstate.getTransferSrcY();
-
-	int dstX = gstate.getTransferDstX();
-	int dstY = gstate.getTransferDstY();
-
-	int width = gstate.getTransferWidth();
-	int height = gstate.getTransferHeight();
-
-	int bpp = gstate.getTransferBpp();
-
-#ifndef MOBILE_DEVICE
-	//DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
-
-	if (!Memory::IsValidAddress(srcBasePtr)) {
-		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad source transfer address %08x!", srcBasePtr);
-		return;
-	}
-
-	if (!Memory::IsValidAddress(dstBasePtr)) {
-		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad destination transfer address %08x!", dstBasePtr);
-		return;
-	}
-
-	// Check that the last address of both source and dest are valid addresses
-
-	u32 srcLastAddr = srcBasePtr + ((srcY + height - 1) * srcStride + (srcX + width - 1)) * bpp;
-	u32 dstLastAddr = dstBasePtr + ((dstY + height - 1) * dstStride + (dstX + width - 1)) * bpp;
-
-	if (!Memory::IsValidAddress(srcLastAddr)) {
-		ERROR_LOG_REPORT(G3D, "Bottom-right corner of source of block transfer is at an invalid address: %08x", srcLastAddr);
-		return;
-	}
-	if (!Memory::IsValidAddress(dstLastAddr)) {
-		ERROR_LOG_REPORT(G3D, "Bottom-right corner of destination of block transfer is at an invalid address: %08x", srcLastAddr);
-		return;
-	}
-#endif
-
-	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
-	if (!framebufferManager_->NotifyBlockTransferBefore(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason)) {
-		// Do the copy! (Hm, if we detect a drawn video frame (see below) then we could maybe skip this?)
-		// Can use GetPointerUnchecked because we checked the addresses above. We could also avoid them
-		// entirely by walking a couple of pointers...
-		if (srcStride == dstStride && (u32)width == srcStride) {
-			// Common case in God of War, let's do it all in one chunk.
-			u32 srcLineStartAddr = srcBasePtr + (srcY * srcStride + srcX) * bpp;
-			u32 dstLineStartAddr = dstBasePtr + (dstY * dstStride + dstX) * bpp;
-			const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
-			u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
-			memcpy(dst, src, width * height * bpp);
-		} else {
-			for (int y = 0; y < height; y++) {
-				u32 srcLineStartAddr = srcBasePtr + ((y + srcY) * srcStride + srcX) * bpp;
-				u32 dstLineStartAddr = dstBasePtr + ((y + dstY) * dstStride + dstX) * bpp;
-
-				const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
-				u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
-				memcpy(dst, src, width * bpp);
-			}
-		}
-
-		if (g_Config.bBlockInvalidateTexture) {
-			// Fixes Gran Turismo's funky text issue, since it overwrites the current texture.
-			textureCache_->Invalidate(dstBasePtr + (dstY * dstStride + dstX) * bpp, height * dstStride * bpp, GPU_INVALIDATE_HINT);
-		}
-		framebufferManager_->NotifyBlockTransferAfter(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
-	}
-
-#ifndef MOBILE_DEVICE
-	CBreakPoints::ExecMemCheck(srcBasePtr + (srcY * srcStride + srcX) * bpp, false, height * srcStride * bpp, currentMIPS->pc);
-	CBreakPoints::ExecMemCheck(dstBasePtr + (dstY * dstStride + dstX) * bpp, true, height * dstStride * bpp, currentMIPS->pc);
-#endif
-
-	// TODO: Correct timing appears to be 1.9, but erring a bit low since some of our other timing is inaccurate.
-	cyclesExecuted += ((height * width * bpp) * 16) / 10;
 }
 
 bool GPUCommon::PerformMemoryCopy(u32 dest, u32 src, int size) {

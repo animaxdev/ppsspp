@@ -286,34 +286,35 @@ struct StepInfo {
 	double elapsed;
 };
 
-static std::mutex framesLock;
-static char VKStepNames[6][6] = { "DRAW", "SKIP", "COPY", "BLIT", "READ", "IMAGE" };
+static std::mutex queueLock;
+static char VKStepNames[6][6] = { "D", "S", "C", "B", "R", "I" }; // Draw, Skip, Copy, Blit, Read, Image
 static StepInfo current;
 static std::vector<StepInfo> steps;
-static std::list< std::vector<StepInfo> > frames;
+static std::list< std::vector<StepInfo> > queue;
 
-
-int VKStepProfiler_GetNumSteps() {
-	if (frames.size() > 0) {
-		return frames.front().size();
-	}
-	else {
-		return 0;
-	}
+int VKStepProfiler_GetNumQueue() {
+	return queue.size();
 }
 
-void VKStepProfiler_GetStep(int i, int &type, const char * &name, double &elapsed) {
-	const StepInfo& step = frames.front()[i];
+int VKStepProfiler_GetNumSteps(int i) {
+	auto iter = queue.begin();
+	std::advance(iter, i);
+	return iter->size();
+}
+
+void VKStepProfiler_GetStep(int queue_index, int step_index, int &type, const char * &name, double &elapsed) {
+	auto iter = queue.begin();
+	std::advance(iter, queue_index);
+	const StepInfo& step = iter->at(step_index);
 	type = step.type;
 	name = step.name;
 	elapsed = step.elapsed;
 }
 
-void VKStepProfiler_RemoveSteps() {
-	if (frames.size() > 0) {
-		std::lock_guard<std::mutex> guard(framesLock);
-		frames.pop_front();
-	}
+void VKStepProfiler_RemoveQueue(int count) {
+	std::lock_guard<std::mutex> guard(queueLock);
+	while(count-- > 0)
+		queue.pop_front();
 }
 
 
@@ -323,8 +324,8 @@ VKQueueProfiler::VKQueueProfiler(const std::vector<VKRStep *> &steps) {
 }
 
 VKQueueProfiler::~VKQueueProfiler() {
-	std::lock_guard<std::mutex> guard(framesLock);
-	frames.emplace_back(std::move(steps));
+	std::lock_guard<std::mutex> guard(queueLock);
+	queue.emplace_back(std::move(steps));
 }
 
 
@@ -336,8 +337,10 @@ VKStepProfiler::VKStepProfiler(const VKRStep &step) {
 }
 
 VKStepProfiler::~VKStepProfiler() {
-	current.elapsed -= real_time_now();
-	steps.push_back(current);
+	if(current.type != 1) {
+		current.elapsed = (real_time_now() - current.elapsed) * 10000;
+		steps.push_back(current);
+	}
 }
 
 #endif

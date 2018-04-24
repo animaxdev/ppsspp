@@ -54,9 +54,10 @@ private:
 
 #include "ext/native/thin3d/VulkanQueueRunner.h"
 
-int VKStepProfiler_GetNumSteps();
-void VKStepProfiler_GetStep(int i, int &type, const char * &name, double &elapsed);
-void VKStepProfiler_RemoveSteps();
+int VKStepProfiler_GetNumQueue();
+int VKStepProfiler_GetNumSteps(int i);
+void VKStepProfiler_GetStep(int queue_index, int step_index, int &type, const char * &name, double &elapsed);
+void VKStepProfiler_RemoveQueue(int count);
 
 class VKQueueProfiler {
 public:

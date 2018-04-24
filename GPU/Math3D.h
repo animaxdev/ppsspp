@@ -328,7 +328,6 @@ public:
 	// Only implemented for T=float
 	float Length() const;
 	void SetLength(const float l);
-	Vec2 WithLength(const float l) const;
 	float Distance2To(Vec2 &other);
 	Vec2 Normalized() const;
 	float Normalize(); // returns the previous length, which is often useful
@@ -485,7 +484,6 @@ public:
 	// Only implemented for T=float
 	float Length() const;
 	void SetLength(const float l);
-	Vec3 WithLength(const float l) const;
 	float Distance2To(Vec3 &other);
 	Vec3 Normalized() const;
 	float Normalize(); // returns the previous length, which is often useful
@@ -686,7 +684,6 @@ public:
 	// Only implemented for T=float
 	float Length() const;
 	void SetLength(const float l);
-	Vec4 WithLength(const float l) const;
 	float Distance2To(Vec4 &other);
 	Vec4 Normalized() const;
 	float Normalize(); // returns the previous length, which is often useful
@@ -1009,12 +1006,6 @@ inline void Vec2<float>::SetLength(const float l)
 }
 
 template<>
-inline Vec2<float> Vec2<float>::WithLength(const float l) const
-{
-	return (*this) * l / Length();
-}
-
-template<>
 inline float Vec2<float>::Distance2To(Vec2<float> &other)
 {
 	return Vec2<float>(other - (*this)).Length2();
@@ -1163,11 +1154,7 @@ inline void Vec3<float>::SetLength(const float l)
 	(*this) *= l / Length();
 }
 
-template<>
-inline Vec3<float> Vec3<float>::WithLength(const float l) const
-{
-	return (*this) * l / Length();
-}
+
 
 template<>
 inline float Vec3<float>::Distance2To(Vec3<float> &other)
@@ -1309,12 +1296,6 @@ template<>
 inline void Vec4<float>::SetLength(const float l)
 {
 	(*this) *= l / Length();
-}
-
-template<>
-inline Vec4<float> Vec4<float>::WithLength(const float l) const
-{
-	return (*this) * l / Length();
 }
 
 template<>

@@ -210,37 +210,48 @@ void DrawProfile(UIContext &ui) {
 #ifdef VKSTEP_PROFILER
 
 static const uint32_t nice_colors[] = {
+	0x8040FF,
 	0xFF8040,
 	0x80FF40,
-	0x8040FF,
 	0xFFFF40,
 	0x40FFFF,
 	0xFF70FF,
 };
 
 void DrawVKStepProfile(UIContext &ui) {
-	int numSteps = VKStepProfiler_GetNumSteps();
+	int numQueue = VKStepProfiler_GetNumQueue();
 	const uint32_t opacity = 140 << 24;
-	float x = 10, y = 10, width = 80, height = 36, padding_x = 6, padding_y = 6;
+	float x = 10, y = 10, width = 80, height = 36, padding_x = 4, padding_y = 4;
 	const Bounds &screen = ui.GetBounds();
 
-	for (int i = 0; i < numSteps; ++i) {
-		int type;
-		const char * name;
-		double elapsed;
+	char buf[128];
 
-		VKStepProfiler_GetStep(i, type, name, elapsed);
-		ui.FillRect(UI::Drawable(opacity | nice_colors[type]), Bounds(x + 2, y, width, height));
-		ui.DrawTextShadow(name, x, y, 0xFFFFFFFF, ALIGN_VBASELINE);
+	for (int i = 0; i < numQueue; ++i) {
+		int numSteps = VKStepProfiler_GetNumSteps(i);
+		for (int j = 0; j < numSteps; ++j) {
+			int type;
+			const char * name;
+			double elapsed;
 
-		x += width + padding_x;
-		if (x + width > screen.w) {
-			x = 20;
-			y += height + padding_y;
+			VKStepProfiler_GetStep(i, j, type, name, elapsed);
+			ui.FillRect(UI::Drawable(opacity | nice_colors[type]), Bounds(x, y, width, height));
+			ui.DrawTextShadow(name, x + 2, y, 0xFFFFFFFF, ALIGN_VBASELINE);
+
+			sprintf(buf, "%.02f", elapsed);
+			ui.DrawTextShadow(buf, x + 20, y, 0xFFFFFFFF, ALIGN_VBASELINE);
+
+			x += width + padding_x;
+			if (x + width > screen.w) {
+				x = 10;
+				y += height + padding_y;
+			}
 		}
+
+		x = 20;
+		y += height + padding_y;
 	}
 
-	VKStepProfiler_RemoveSteps();
+	VKStepProfiler_RemoveQueue(numQueue);
 }
 
 #endif

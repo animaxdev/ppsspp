@@ -1582,75 +1582,109 @@ void FramebufferManagerCommon::OptimizeDownloadRange(VirtualFramebuffer * vfb, i
 }
 
 bool FramebufferManagerCommon::NotifyBlockTransferBefore(u32 dstBasePtr, int dstStride, int dstX, int dstY, u32 srcBasePtr, int srcStride, int srcX, int srcY, int width, int height, int bpp, u32 skipDrawReason) {
-	if (!useBufferedRendering_) {
-		return false;
-	}
+	int origin_dstX = dstX, origin_dstY = dstY;
+	int origin_srcX = srcX, origin_srcY = srcY;
 
 	// Skip checking if there's no framebuffers in that area.
-	if (!MayIntersectFramebuffer(srcBasePtr) && !MayIntersectFramebuffer(dstBasePtr)) {
-		return false;
-	}
+	if (useBufferedRendering_ && (MayIntersectFramebuffer(srcBasePtr) || MayIntersectFramebuffer(dstBasePtr))) {
+		VirtualFramebuffer *dstBuffer = 0;
+		VirtualFramebuffer *srcBuffer = 0;
+		int srcWidth = width;
+		int srcHeight = height;
+		int dstWidth = width;
+		int dstHeight = height;
+		FindTransferFramebuffers(dstBuffer, srcBuffer, dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, srcWidth, srcHeight, dstWidth, dstHeight, bpp);
 
-	VirtualFramebuffer *dstBuffer = 0;
-	VirtualFramebuffer *srcBuffer = 0;
-	int srcWidth = width;
-	int srcHeight = height;
-	int dstWidth = width;
-	int dstHeight = height;
-	FindTransferFramebuffers(dstBuffer, srcBuffer, dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, srcWidth, srcHeight, dstWidth, dstHeight, bpp);
-
-	if (dstBuffer && srcBuffer) {
-		if (srcBuffer == dstBuffer) {
-			if (srcX != dstX || srcY != dstY) {
-				WARN_LOG_ONCE(dstsrc, G3D, "Intra-buffer block transfer %08x -> %08x", srcBasePtr, dstBasePtr);
+		if (dstBuffer && srcBuffer) {
+			if (srcBuffer == dstBuffer) {
+				if (srcX != dstX || srcY != dstY) {
+					WARN_LOG_ONCE(dstsrc, G3D, "Intra-buffer block transfer %08x -> %08x", srcBasePtr, dstBasePtr);
+					if (g_Config.bBlockTransferGPU) {
+						FlushBeforeCopy();
+						BlitFramebuffer(dstBuffer, dstX, dstY, srcBuffer, srcX, srcY, dstWidth, dstHeight, bpp);
+						RebindFramebuffer();
+						SetColorUpdated(dstBuffer, skipDrawReason);
+						return true;
+					}
+				}
+				else {
+					// Ignore, nothing to do.  Tales of Phantasia X does this by accident.
+					if (g_Config.bBlockTransferGPU) {
+						return true;
+					}
+				}
+			}
+			else {
+				WARN_LOG_ONCE(dstnotsrc, G3D, "Inter-buffer block transfer %08x -> %08x", srcBasePtr, dstBasePtr);
+				// Just do the blit!
 				if (g_Config.bBlockTransferGPU) {
 					FlushBeforeCopy();
 					BlitFramebuffer(dstBuffer, dstX, dstY, srcBuffer, srcX, srcY, dstWidth, dstHeight, bpp);
 					RebindFramebuffer();
 					SetColorUpdated(dstBuffer, skipDrawReason);
-					return true;
-				}
-			} else {
-				// Ignore, nothing to do.  Tales of Phantasia X does this by accident.
-				if (g_Config.bBlockTransferGPU) {
-					return true;
+					return true;  // No need to actually do the memory copy behind, probably.
 				}
 			}
-		} else {
-			WARN_LOG_ONCE(dstnotsrc, G3D, "Inter-buffer block transfer %08x -> %08x", srcBasePtr, dstBasePtr);
-			// Just do the blit!
-			if (g_Config.bBlockTransferGPU) {
-				FlushBeforeCopy();
-				BlitFramebuffer(dstBuffer, dstX, dstY, srcBuffer, srcX, srcY, dstWidth, dstHeight, bpp);
-				RebindFramebuffer();
-				SetColorUpdated(dstBuffer, skipDrawReason);
-				return true;  // No need to actually do the memory copy behind, probably.
-			}
+			//return false;
 		}
-		return false;
-	} else if (dstBuffer) {
-		// Here we should just draw the pixels into the buffer.  Copy first.
-		return false;
-	} else if (srcBuffer) {
-		WARN_LOG_ONCE(btd, G3D, "Block transfer download %08x -> %08x", srcBasePtr, dstBasePtr);
-		FlushBeforeCopy();
-		if (g_Config.bBlockTransferGPU && !srcBuffer->memoryUpdated) {
-			const int srcBpp = srcBuffer->format == GE_FORMAT_8888 ? 4 : 2;
-			const float srcXFactor = (float)bpp / srcBpp;
-			const bool tooTall = srcY + srcHeight > srcBuffer->bufferHeight;
-			if (srcHeight <= 0 || (tooTall && srcY != 0)) {
-				WARN_LOG_ONCE(btdheight, G3D, "Block transfer download %08x -> %08x skipped, %d+%d is taller than %d", srcBasePtr, dstBasePtr, srcY, srcHeight, srcBuffer->bufferHeight);
-			} else {
-				if (tooTall)
-					WARN_LOG_ONCE(btdheight, G3D, "Block transfer download %08x -> %08x dangerous, %d+%d is taller than %d", srcBasePtr, dstBasePtr, srcY, srcHeight, srcBuffer->bufferHeight);
-				ReadFramebufferToMemory(srcBuffer, true, static_cast<int>(srcX * srcXFactor), srcY, static_cast<int>(srcWidth * srcXFactor), srcHeight);
-				srcBuffer->usageFlags = (srcBuffer->usageFlags | FB_USAGE_DOWNLOAD) & ~FB_USAGE_DOWNLOAD_CLEAR;
-			}
+		else if (dstBuffer) {
+			// Here we should just draw the pixels into the buffer.  Copy first.
+			//return false;
 		}
-		return false;  // Let the bit copy happen
-	} else {
-		return false;
+		else if (srcBuffer) {
+			WARN_LOG_ONCE(btd, G3D, "Block transfer download %08x -> %08x", srcBasePtr, dstBasePtr);
+			FlushBeforeCopy();
+			if (g_Config.bBlockTransferGPU && !srcBuffer->memoryUpdated) {
+				const int srcBpp = srcBuffer->format == GE_FORMAT_8888 ? 4 : 2;
+				const float srcXFactor = (float)bpp / srcBpp;
+				const bool tooTall = srcY + srcHeight > srcBuffer->bufferHeight;
+				if (srcHeight <= 0 || (tooTall && srcY != 0)) {
+					WARN_LOG_ONCE(btdheight, G3D, "Block transfer download %08x -> %08x skipped, %d+%d is taller than %d", srcBasePtr, dstBasePtr, srcY, srcHeight, srcBuffer->bufferHeight);
+				}
+				else {
+					if (tooTall)
+						WARN_LOG_ONCE(btdheight, G3D, "Block transfer download %08x -> %08x dangerous, %d+%d is taller than %d", srcBasePtr, dstBasePtr, srcY, srcHeight, srcBuffer->bufferHeight);
+					ReadFramebufferToMemory(srcBuffer, true, static_cast<int>(srcX * srcXFactor), srcY, static_cast<int>(srcWidth * srcXFactor), srcHeight);
+					srcBuffer->usageFlags = (srcBuffer->usageFlags | FB_USAGE_DOWNLOAD) & ~FB_USAGE_DOWNLOAD_CLEAR;
+				}
+			}
+			//return false;  // Let the bit copy happen
+		}
+		else {
+			//return false;
+		}
 	}
+	
+
+	// Do the copy! (Hm, if we detect a drawn video frame (see below) then we could maybe skip this?)
+	// Can use GetPointerUnchecked because we checked the addresses above. We could also avoid them
+	// entirely by walking a couple of pointers...
+	if (srcStride == dstStride && (u32)width == srcStride) {
+		// Common case in God of War, let's do it all in one chunk.
+		u32 srcLineStartAddr = srcBasePtr + (origin_srcY * srcStride + origin_srcX) * bpp;
+		u32 dstLineStartAddr = dstBasePtr + (origin_dstY * dstStride + origin_dstX) * bpp;
+		const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
+		u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
+		memcpy(dst, src, width * height * bpp);
+	}
+	else {
+		for (int y = 0; y < height; y++) {
+			u32 srcLineStartAddr = srcBasePtr + ((y + origin_srcY) * srcStride + origin_srcX) * bpp;
+			u32 dstLineStartAddr = dstBasePtr + ((y + origin_dstY) * dstStride + origin_dstX) * bpp;
+
+			const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
+			u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
+			memcpy(dst, src, width * bpp);
+		}
+	}
+
+	if (g_Config.bBlockInvalidateTexture) {
+		// Fixes Gran Turismo's funky text issue, since it overwrites the current texture.
+		textureCache_->Invalidate(dstBasePtr + (origin_dstY * dstStride + origin_dstX) * bpp, height * dstStride * bpp, GPU_INVALIDATE_HINT);
+	}
+	NotifyBlockTransferAfter(dstBasePtr, dstStride, origin_dstX, origin_dstY, srcBasePtr, srcStride, origin_srcX, origin_srcY, width, height, bpp, skipDrawReason);
+
+	return false;
 }
 
 void FramebufferManagerCommon::NotifyBlockTransferAfter(u32 dstBasePtr, int dstStride, int dstX, int dstY, u32 srcBasePtr, int srcStride, int srcX, int srcY, int width, int height, int bpp, u32 skipDrawReason) {
