@@ -1533,8 +1533,11 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 	int bytesRead = 0;
 	UpdateUVScaleOffset();
 
+	// cull mode
+	int cullMode = gstate.isCullEnabled() ? gstate.getCullMode() : -1;
+
 	uint32_t vertTypeID = GetVertTypeID(vertexType, gstate.getUVGenMode());
-	drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, &bytesRead);
+	drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
 	// After drawing, we advance the vertexAddr (when non indexed) or indexAddr (when indexed).
 	// Some games rely on this, they don't bother reloading VADDR and IADDR.
 	// The VADDR/IADDR registers are NOT updated.
@@ -1576,7 +1579,20 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 					inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 				}
 
-				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, &bytesRead);
+				if (gstate.isCullEnabled()) {
+					if (cullMode == -1) {
+						gstate_c.Dirty(DIRTY_RASTER_STATE);
+						Flush();
+					}
+					cullMode = gstate.getCullMode();
+				}
+				else if (cullMode != -1) {
+					cullMode = -1;
+					gstate_c.Dirty(DIRTY_RASTER_STATE);
+					Flush();
+				}
+
+				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
 				AdvanceVerts(vertexType, count, bytesRead);
 				totalVertCount += count;
 			}
@@ -1600,6 +1616,14 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_BASE:
 			gstate.cmdmem[GE_CMD_BASE] = data;
 			break;
+
+		case GE_CMD_CULL:
+			gstate.cmdmem[GE_CMD_CULL] = data;
+			break;
+		case GE_CMD_CULLFACEENABLE:
+			gstate.cmdmem[GE_CMD_CULLFACEENABLE] = data;
+			break;
+
 		case GE_CMD_NOP:
 		case GE_CMD_NOP_FF:
 			break;
