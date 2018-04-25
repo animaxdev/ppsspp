@@ -2036,11 +2036,6 @@ bool FramebufferManagerCommon::GetOutputFramebuffer(GPUDebugBuffer &buffer) {
 // dithering behavior and games that expect exact colors like Danganronpa, so we
 // can't entirely be rid of the CPU path.) -- unknown
 void FramebufferManagerCommon::PackFramebufferSync_(VirtualFramebuffer *vfb, int x, int y, int w, int h) {
-	if (!vfb->fbo) {
-		ERROR_LOG_REPORT_ONCE(vfbfbozero, SCEGE, "PackFramebufferSync_: vfb->fbo == 0");
-		return;
-	}
-
 	const u32 fb_address = (0x04000000) | vfb->fb_address;
 
 	Draw::DataFormat destFormat = GEFormatToThin3D(vfb->format);
@@ -2062,25 +2057,33 @@ void FramebufferManagerCommon::PackFramebufferSync_(VirtualFramebuffer *vfb, int
 }
 
 void FramebufferManagerCommon::ReadFramebufferToMemory(VirtualFramebuffer *vfb, bool sync, int x, int y, int w, int h) {
+	if (!vfb || !vfb->fbo) {
+		ERROR_LOG_REPORT_ONCE(vfbfbozero, SCEGE, "PackFramebufferSync_: vfb->fbo == 0");
+		return;
+	}
+
 	// Clamp to bufferWidth. Sometimes block transfers can cause this to hit.
 	if (x + w >= vfb->bufferWidth) {
 		w = vfb->bufferWidth - x;
 	}
-	if (vfb && vfb->fbo) {
-		// We'll pseudo-blit framebuffers here to get a resized version of vfb.
-		OptimizeDownloadRange(vfb, x, y, w, h);
-		if (vfb->renderWidth == vfb->width && vfb->renderHeight == vfb->height) {
-			// No need to blit
-			PackFramebufferSync_(vfb, x, y, w, h);
-		} else {
-			VirtualFramebuffer *nvfb = FindDownloadTempBuffer(vfb);
-			BlitFramebuffer(nvfb, x, y, vfb, x, y, w, h, 0);
-			PackFramebufferSync_(nvfb, x, y, w, h);
-		}
 
-		textureCache_->ForgetLastTexture();
-		RebindFramebuffer();
+	// We'll pseudo-blit framebuffers here to get a resized version of vfb.
+	OptimizeDownloadRange(vfb, x, y, w, h);
+
+
+	if (vfb->renderWidth == vfb->width && vfb->renderHeight == vfb->height) {
+		// No need to blit
+	} else {
+		VirtualFramebuffer *nvfb = FindDownloadTempBuffer(vfb);
+		BlitFramebuffer(nvfb, x, y, vfb, x, y, w, h, 0);
+		vfb = nvfb;
 	}
+
+	PackFramebufferSync_(vfb, x, y, w, h);
+
+
+	textureCache_->ForgetLastTexture();
+	RebindFramebuffer();
 }
 
 void FramebufferManagerCommon::FlushBeforeCopy() {
