@@ -514,14 +514,13 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 	int indexLowerBound = dc.indexLowerBound;
 	int indexUpperBound = dc.indexUpperBound;
 
-	void *inds = dc.inds;
 	if (dc.indexType == GE_VTYPE_IDX_NONE >> GE_VTYPE_IDX_SHIFT) {
 		// Decode the verts and apply morphing. Simple.
-		dec_->DecodeVerts(dest + decodedVerts * (int)dec_->GetDecVtxFmt().stride,
-			dc.verts, indexLowerBound, indexUpperBound);
+		dec_->DecodeVerts(dest + decodedVerts * (int)dec_->GetDecVtxFmt().stride, dc.verts, indexLowerBound, indexUpperBound);
 		decodedVerts += indexUpperBound - indexLowerBound + 1;
 		indexGen.AddPrim(dc.prim, dc.vertexCount);
-	} else {
+	} 
+	else {
 		// It's fairly common that games issue long sequences of PRIM calls, with differing
 		// inds pointer but the same base vertex pointer. We'd like to reuse vertices between
 		// these as much as possible, so we make sure here to combine as many as possible
@@ -530,31 +529,37 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		// 1. Look ahead to find the max index, only looking as "matching" drawcalls.
 		//    Expand the lower and upper bounds as we go.
 		int lastMatch = i;
-		const int total = numDrawCalls;
-		for (int j = i + 1; j < total; ++j) {
-			if (drawCalls[j].verts != dc.verts)
-				break;
-
-			indexLowerBound = std::min(indexLowerBound, (int)drawCalls[j].indexLowerBound);
-			indexUpperBound = std::max(indexUpperBound, (int)drawCalls[j].indexUpperBound);
-			lastMatch = j;
+		while (lastMatch < numDrawCalls && drawCalls[lastMatch].verts == dc.verts) {
+			//
+			if (drawCalls[lastMatch].cullMode != -1 && gstate.isCullEnabled()) {
+				drawCalls[lastMatch].cullMode = gstate.getCullMode() == drawCalls[lastMatch].cullMode ? 0 : 1;
+			}
+			//
+			if (indexLowerBound > drawCalls[lastMatch].indexLowerBound) {
+				indexLowerBound = drawCalls[lastMatch].indexLowerBound;
+			}
+			if (indexUpperBound < drawCalls[lastMatch].indexUpperBound) {
+				indexUpperBound = drawCalls[lastMatch].indexUpperBound;
+			}
+			//
+			lastMatch += 1;
 		}
 
 		// 2. Loop through the drawcalls, translating indices as we go.
 		switch (dc.indexType) {
 		case GE_VTYPE_IDX_8BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j <= lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u8 *)drawCalls[j].inds, indexLowerBound, dc.cullMode);
+			for (int j = i; j < lastMatch; j++) {
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u8 *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
 			}
 			break;
 		case GE_VTYPE_IDX_16BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j <= lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u16_le *)drawCalls[j].inds, indexLowerBound, dc.cullMode);
+			for (int j = i; j < lastMatch; j++) {
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u16_le *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
 			}
 			break;
 		case GE_VTYPE_IDX_32BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j <= lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u32_le *)drawCalls[j].inds, indexLowerBound, dc.cullMode);
+			for (int j = i; j < lastMatch; j++) {
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u32_le *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
 			}
 			break;
 		}
@@ -567,8 +572,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		}
 
 		// 3. Decode that range of vertex data.
-		dec_->DecodeVerts(dest + decodedVerts * (int)dec_->GetDecVtxFmt().stride,
-			dc.verts, indexLowerBound, indexUpperBound);
+		dec_->DecodeVerts(dest + decodedVerts * (int)dec_->GetDecVtxFmt().stride, dc.verts, indexLowerBound, indexUpperBound);
 		decodedVerts += vertexCount;
 
 		// 4. Advance indexgen vertex counter.

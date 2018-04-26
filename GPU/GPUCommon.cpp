@@ -1579,17 +1579,8 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 					inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 				}
 
-				if (gstate.isCullEnabled()) {
-					if (cullMode == -1) {
-						gstate_c.Dirty(DIRTY_RASTER_STATE);
-						Flush();
-					}
-					cullMode = gstate.getCullMode();
-				}
-				else if (cullMode != -1) {
-					cullMode = -1;
-					gstate_c.Dirty(DIRTY_RASTER_STATE);
-					Flush();
+				if(prim != 4) {
+					DEBUG_LOG(G3D, "Execute_Prim prim = %d", prim);
 				}
 
 				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
@@ -1616,14 +1607,9 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_BASE:
 			gstate.cmdmem[GE_CMD_BASE] = data;
 			break;
-
 		case GE_CMD_CULL:
-			gstate.cmdmem[GE_CMD_CULL] = data;
+			cullMode = data & 1;
 			break;
-		case GE_CMD_CULLFACEENABLE:
-			gstate.cmdmem[GE_CMD_CULLFACEENABLE] = data;
-			break;
-
 		case GE_CMD_NOP:
 		case GE_CMD_NOP_FF:
 			break;

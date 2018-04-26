@@ -887,6 +887,7 @@ void DrawEngineCommon::SubmitSplineEnd() {
 	dc.prim = prim;
 	dc.vertexCount = splinePatch.batchIndexCount;
 	dc.uvScale = gstate_c.uv;
+	dc.cullMode = -1;
 
 	dc.indexLowerBound = 0;
 	dc.indexUpperBound = splinePatch.batchVertexCount - 1;

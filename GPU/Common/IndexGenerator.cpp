@@ -236,7 +236,7 @@ void IndexGenerator::TranslateList(int numInds, const ITypeLE *inds, int indexOf
 
 template <class ITypeLE, int flag>
 void IndexGenerator::TranslateStrip(int numInds, const ITypeLE *inds, int indexOffset, int cullMode) {
-	int wind = cullMode != 0 ? 2 : 1;
+	int wind = cullMode == 1 ? 2 : 1;
 	indexOffset = index_ - indexOffset;
 	int numTris = numInds - 2;
 	u16 *outInds = inds_;
