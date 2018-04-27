@@ -145,7 +145,6 @@ protected:
 		u16 indexLowerBound;
 		u16 indexUpperBound;
 		UVScale uvScale;
-		//
 		int cullMode;
 	};
 

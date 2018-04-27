@@ -508,7 +508,7 @@ bool DrawEngineCommon::ApplyShaderBlending() {
 void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 	PROFILE_THIS_SCOPE("vertdec");
 
-	DeferredDrawCall &dc = drawCalls[i];
+	const DeferredDrawCall &dc = drawCalls[i];
 
 	indexGen.SetIndex(decodedVerts);
 	int indexLowerBound = dc.indexLowerBound;
