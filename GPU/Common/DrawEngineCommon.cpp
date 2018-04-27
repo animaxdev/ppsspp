@@ -508,7 +508,7 @@ bool DrawEngineCommon::ApplyShaderBlending() {
 void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 	PROFILE_THIS_SCOPE("vertdec");
 
-	const DeferredDrawCall &dc = drawCalls[i];
+	DeferredDrawCall &dc = drawCalls[i];
 
 	indexGen.SetIndex(decodedVerts);
 	int indexLowerBound = dc.indexLowerBound;
@@ -529,37 +529,46 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		// 1. Look ahead to find the max index, only looking as "matching" drawcalls.
 		//    Expand the lower and upper bounds as we go.
 		int lastMatch = i;
-		while (lastMatch < numDrawCalls && drawCalls[lastMatch].verts == dc.verts) {
-			//
-			if (drawCalls[lastMatch].cullMode != -1 && gstate.isCullEnabled()) {
-				drawCalls[lastMatch].cullMode = gstate.getCullMode() == drawCalls[lastMatch].cullMode ? 0 : 1;
+		for (int j = i + 1; j < numDrawCalls; ++j) {
+			if (drawCalls[j].verts != dc.verts) {
+				break;
 			}
-			//
-			if (indexLowerBound > drawCalls[lastMatch].indexLowerBound) {
-				indexLowerBound = drawCalls[lastMatch].indexLowerBound;
+			if (indexLowerBound > drawCalls[j].indexLowerBound) {
+				indexLowerBound = drawCalls[j].indexLowerBound;
 			}
-			if (indexUpperBound < drawCalls[lastMatch].indexUpperBound) {
-				indexUpperBound = drawCalls[lastMatch].indexUpperBound;
+			if (indexUpperBound < drawCalls[j].indexUpperBound) {
+				indexUpperBound = drawCalls[j].indexUpperBound;
 			}
-			//
-			lastMatch += 1;
+			lastMatch = j;
 		}
 
 		// 2. Loop through the drawcalls, translating indices as we go.
 		switch (dc.indexType) {
 		case GE_VTYPE_IDX_8BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j < lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u8 *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
+			for (int j = i; j <= lastMatch; j++) {
+				int cullMode = drawCalls[j].cullMode;
+				if (cullMode != -1 && gstate.isCullEnabled()) {
+					cullMode = gstate.getCullMode() == cullMode ? 0 : 1;
+				}
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u8 *)drawCalls[j].inds, indexLowerBound, cullMode);
 			}
 			break;
 		case GE_VTYPE_IDX_16BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j < lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u16_le *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
+			for (int j = i; j <= lastMatch; j++) {
+				int cullMode = drawCalls[j].cullMode;
+				if (cullMode != -1 && gstate.isCullEnabled()) {
+					cullMode = gstate.getCullMode() == cullMode ? 0 : 1;
+				}
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u16_le *)drawCalls[j].inds, indexLowerBound, cullMode);
 			}
 			break;
 		case GE_VTYPE_IDX_32BIT >> GE_VTYPE_IDX_SHIFT:
-			for (int j = i; j < lastMatch; j++) {
-				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u32_le *)drawCalls[j].inds, indexLowerBound, drawCalls[j].cullMode);
+			for (int j = i; j <= lastMatch; j++) {
+				int cullMode = drawCalls[j].cullMode;
+				if (cullMode != -1 && gstate.isCullEnabled()) {
+					cullMode = gstate.getCullMode() == cullMode ? 0 : 1;
+				}
+				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u32_le *)drawCalls[j].inds, indexLowerBound, cullMode);
 			}
 			break;
 		}

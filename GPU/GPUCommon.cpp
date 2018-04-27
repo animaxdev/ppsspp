@@ -648,7 +648,8 @@ u32 GPUCommon::EnqueueList(u32 listpc, u32 stall, int subIntrBase, PSPPointer<Ps
 					ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, list address %08X already used", listpc);
 					return 0x80000021;
 				} else if (stackAddr != 0 && dls[i].stackAddr == stackAddr && !dls[i].pendingInterrupt) {
-					ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, stack address %08X already used", stackAddr);
+					// AFK long time, Tomb Raider will go here
+					//ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, stack address %08X already used", stackAddr);
 					return 0x80000021;
 				}
 			}
@@ -1124,7 +1125,7 @@ void GPUCommon::ProcessDLQueue() {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
-				//dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), listIndex), dlQueue.end());
+				//dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), *iter), dlQueue.end());
 				dlQueue.erase(iter);
 				iter = dlQueue.begin();
 			}
@@ -1579,10 +1580,6 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 					inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 				}
 
-				if(prim != 4) {
-					DEBUG_LOG(G3D, "Execute_Prim prim = %d", prim);
-				}
-
 				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
 				AdvanceVerts(vertexType, count, bytesRead);
 				totalVertCount += count;
@@ -1608,9 +1605,10 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			gstate.cmdmem[GE_CMD_BASE] = data;
 			break;
 		case GE_CMD_CULL:
+			// flip face by indices for GE_PRIM_TRIANGLE_STRIP
 			cullMode = data & 1;
 			break;
-		case GE_CMD_NOP:
+		//case GE_CMD_NOP:
 		case GE_CMD_NOP_FF:
 			break;
 		case GE_CMD_BONEMATRIXNUMBER:
@@ -1624,8 +1622,16 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			gstate.cmdmem[GE_CMD_TEXSCALEV] = data;
 			gstate_c.uv.vScale = getFloat24(data);
 			break;
+		case GE_CMD_TEXOFFSETU:
+			gstate.cmdmem[GE_CMD_TEXOFFSETU] = data;
+			gstate_c.uv.uOff = getFloat24(data);
+			break;
+		case GE_CMD_TEXOFFSETV:
+			gstate.cmdmem[GE_CMD_TEXOFFSETV] = data;
+			gstate_c.uv.vOff = getFloat24(data);
+			break;
 		case GE_CMD_TEXLEVEL:
-			// Same Gran Turismo hack from Execute_TexLevel
+			// Gran Turismo hack
 			if ((data & 3) != GE_TEXLEVEL_MODE_AUTO && (0x00FF0000 & data) != 0) {
 				goto bail;
 			}
@@ -1633,6 +1639,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			break;
 		case GE_CMD_CALL:
 		{
+			// GOW hack
 			// A bone matrix probably. If not we bail.
 			const u32 target = gstate_c.getRelativeAddress(data & 0x00FFFFFC);
 			if ((Memory::ReadUnchecked_U32(target) >> 24) == GE_CMD_BONEMATRIXDATA &&
@@ -1804,10 +1811,6 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 		switch (data >> 24) {
 		case GE_CMD_SPLINE:
 			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
-			indices = 0;
-			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
-				indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
-			}
 			if (gstate_c.spline) {
 				gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 				drawEngineCommon_->SubmitSplineEnd();
@@ -1816,13 +1819,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
 		case GE_CMD_VERTEXTYPE:
-			// don't mask upper bits, vertexType is unmasked
-			if ((data ^ vertexType) & ~GE_VTYPE_WEIGHTCOUNT_MASK) {
-				goto bail;
-			}
-			else {
-				vertexType = data;
-			}
+			vertexType = data;
 			break;
 		case GE_CMD_VADDR:
 			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
@@ -1838,7 +1835,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	}
 
 bail:
-	gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
+	// always same, do not need
+	// gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
 
 	if (gstate_c.spline) {
 		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
