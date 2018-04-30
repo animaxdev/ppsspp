@@ -648,7 +648,8 @@ u32 GPUCommon::EnqueueList(u32 listpc, u32 stall, int subIntrBase, PSPPointer<Ps
 					ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, list address %08X already used", listpc);
 					return 0x80000021;
 				} else if (stackAddr != 0 && dls[i].stackAddr == stackAddr && !dls[i].pendingInterrupt) {
-					ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, stack address %08X already used", stackAddr);
+					// AFK long time, Tomb Raider will go here
+					//ERROR_LOG(G3D, "sceGeListEnqueue: can't enqueue, stack address %08X already used", stackAddr);
 					return 0x80000021;
 				}
 			}
@@ -1120,17 +1121,17 @@ void GPUCommon::ProcessDLQueue() {
 	while (iter != dlQueue.end()) {
 		DisplayList &l = dls[*iter];
 		//DEBUG_LOG(G3D, "Starting DL execution at %08x - stall = %08x", l.pc, l.stall);
-		if (list.state != PSP_GE_DL_STATE_PAUSED && !InterpretList(l)) {
-			return;
-		}
-		else {
+		if (l.state != PSP_GE_DL_STATE_PAUSED && InterpretList(l)) {
 			// Some other list could've taken the spot while we dilly-dallied around.
 			if (l.state != PSP_GE_DL_STATE_QUEUED) {
 				// At the end, we can remove it from the queue and continue.
-				//dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), listIndex), dlQueue.end());
+				//dlQueue.erase(std::remove(dlQueue.begin(), dlQueue.end(), *iter), dlQueue.end());
 				dlQueue.erase(iter);
 				iter = dlQueue.begin();
 			}
+		}
+		else {
+			return;
 		}
 	}
 
@@ -1214,22 +1215,20 @@ void GPUCommon::Execute_Call(u32 op, u32 diff) {
 		}
 	}
 
-	if (currentList->stackptr == ARRAY_SIZE(currentList->stack)) {
-		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
-	} else {
+	if (currentList->stackptr != ARRAY_SIZE(currentList->stack)) {
 		auto &stackEntry = currentList->stack[currentList->stackptr++];
 		stackEntry.pc = retval;
 		stackEntry.offsetAddr = gstate_c.offsetAddr;
 		// The base address is NOT saved/restored for a regular call.
 		UpdatePC(currentList->pc, target - 4);
 		currentList->pc = target - 4;	// pc will be increased after we return, counteract that
+	} else {
+		ERROR_LOG_REPORT(G3D, "CALL: Stack full!");
 	}
 }
 
 void GPUCommon::Execute_Ret(u32 op, u32 diff) {
-	if (currentList->stackptr == 0) {
-		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
-	} else {
+	if (currentList->stackptr != 0) {
 		auto &stackEntry = currentList->stack[--currentList->stackptr];
 		gstate_c.offsetAddr = stackEntry.offsetAddr;
 		// We always clear the top (uncached/etc.) bits
@@ -1242,6 +1241,8 @@ void GPUCommon::Execute_Ret(u32 op, u32 diff) {
 			UpdateState(GPUSTATE_ERROR);
 		}
 #endif
+	} else {
+		DEBUG_LOG_REPORT(G3D, "RET: Stack empty!");
 	}
 }
 
@@ -1533,8 +1534,11 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 	int bytesRead = 0;
 	UpdateUVScaleOffset();
 
+	// cull mode
+	int cullMode = gstate.isCullEnabled() ? gstate.getCullMode() : -1;
+
 	uint32_t vertTypeID = GetVertTypeID(vertexType, gstate.getUVGenMode());
-	drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, &bytesRead);
+	drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
 	// After drawing, we advance the vertexAddr (when non indexed) or indexAddr (when indexed).
 	// Some games rely on this, they don't bother reloading VADDR and IADDR.
 	// The VADDR/IADDR registers are NOT updated.
@@ -1576,7 +1580,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 					inds = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 				}
 
-				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, &bytesRead);
+				drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
 				AdvanceVerts(vertexType, count, bytesRead);
 				totalVertCount += count;
 			}
@@ -1600,7 +1604,11 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_BASE:
 			gstate.cmdmem[GE_CMD_BASE] = data;
 			break;
-		case GE_CMD_NOP:
+		case GE_CMD_CULL:
+			// flip face by indices for GE_PRIM_TRIANGLE_STRIP
+			cullMode = data & 1;
+			break;
+		//case GE_CMD_NOP:
 		case GE_CMD_NOP_FF:
 			break;
 		case GE_CMD_BONEMATRIXNUMBER:
@@ -1614,8 +1622,16 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			gstate.cmdmem[GE_CMD_TEXSCALEV] = data;
 			gstate_c.uv.vScale = getFloat24(data);
 			break;
+		case GE_CMD_TEXOFFSETU:
+			gstate.cmdmem[GE_CMD_TEXOFFSETU] = data;
+			gstate_c.uv.uOff = getFloat24(data);
+			break;
+		case GE_CMD_TEXOFFSETV:
+			gstate.cmdmem[GE_CMD_TEXOFFSETV] = data;
+			gstate_c.uv.vOff = getFloat24(data);
+			break;
 		case GE_CMD_TEXLEVEL:
-			// Same Gran Turismo hack from Execute_TexLevel
+			// Gran Turismo hack
 			if ((data & 3) != GE_TEXLEVEL_MODE_AUTO && (0x00FF0000 & data) != 0) {
 				goto bail;
 			}
@@ -1623,6 +1639,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			break;
 		case GE_CMD_CALL:
 		{
+			// GOW hack
 			// A bone matrix probably. If not we bail.
 			const u32 target = gstate_c.getRelativeAddress(data & 0x00FFFFFC);
 			if ((Memory::ReadUnchecked_U32(target) >> 24) == GE_CMD_BONEMATRIXDATA &&
@@ -1650,6 +1667,12 @@ bail:
 	if (cmdCount > 0) {
 		UpdatePC(currentList->pc, currentList->pc + cmdCount * 4);
 		currentList->pc += cmdCount * 4;
+		// flush back cull mode
+		if (cullMode != -1 && cullMode != gstate.getCullMode()) {
+			drawEngineCommon_->DispatchFlush();
+			gstate.cmdmem[GE_CMD_CULL] ^= 1;
+			gstate_c.Dirty(DIRTY_RASTER_STATE);
+		}
 	}
 
 	gpuStats.vertexGPUCycles += vertexCost_ * totalVertCount;
@@ -1794,10 +1817,6 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 		switch (data >> 24) {
 		case GE_CMD_SPLINE:
 			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
-			indices = 0;
-			if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
-				indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
-			}
 			if (gstate_c.spline) {
 				gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 				drawEngineCommon_->SubmitSplineEnd();
@@ -1806,13 +1825,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
 		case GE_CMD_VERTEXTYPE:
-			// don't mask upper bits, vertexType is unmasked
-			if ((data ^ vertexType) & ~GE_VTYPE_WEIGHTCOUNT_MASK) {
-				goto bail;
-			}
-			else {
-				vertexType = data;
-			}
+			vertexType = data;
 			break;
 		case GE_CMD_VADDR:
 			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
@@ -1828,7 +1841,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	}
 
 bail:
-	gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
+	// always same, do not need
+	// gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
 
 	if (gstate_c.spline) {
 		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
@@ -1879,7 +1893,71 @@ void GPUCommon::Execute_BlockTransferStart(u32 op, u32 diff) {
 	Flush();
 	// and take appropriate action. This is a block transfer between RAM and VRAM, or vice versa.
 	// Can we skip this on SkipDraw?
-	DoBlockTransfer(gstate_c.skipDrawReason);
+
+	// TODO: This is used a lot to copy data around between render targets and textures,
+	// and also to quickly load textures from RAM to VRAM. So we should do checks like the following:
+	//  * Does dstBasePtr point to an existing texture? If so maybe reload it immediately.
+	//
+	//  * Does srcBasePtr point to a render target, and dstBasePtr to a texture? If so
+	//    either copy between rt and texture or reassign the texture to point to the render target
+	//
+	// etc....
+
+	u32 srcBasePtr = gstate.getTransferSrcAddress();
+	u32 srcStride = gstate.getTransferSrcStride();
+
+	u32 dstBasePtr = gstate.getTransferDstAddress();
+	u32 dstStride = gstate.getTransferDstStride();
+
+	int srcX = gstate.getTransferSrcX();
+	int srcY = gstate.getTransferSrcY();
+
+	int dstX = gstate.getTransferDstX();
+	int dstY = gstate.getTransferDstY();
+
+	int width = gstate.getTransferWidth();
+	int height = gstate.getTransferHeight();
+
+	int bpp = gstate.getTransferBpp();
+	u32 skipDrawReason = gstate_c.skipDrawReason;
+
+#ifndef MOBILE_DEVICE
+	//DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
+
+	if (!Memory::IsValidAddress(srcBasePtr)) {
+		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad source transfer address %08x!", srcBasePtr);
+		return;
+	}
+
+	if (!Memory::IsValidAddress(dstBasePtr)) {
+		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad destination transfer address %08x!", dstBasePtr);
+		return;
+	}
+
+	// Check that the last address of both source and dest are valid addresses
+	u32 srcLastAddr = srcBasePtr + ((srcY + height - 1) * srcStride + (srcX + width - 1)) * bpp;
+	u32 dstLastAddr = dstBasePtr + ((dstY + height - 1) * dstStride + (dstX + width - 1)) * bpp;
+
+	if (!Memory::IsValidAddress(srcLastAddr)) {
+		ERROR_LOG_REPORT(G3D, "Bottom-right corner of source of block transfer is at an invalid address: %08x", srcLastAddr);
+		return;
+	}
+	if (!Memory::IsValidAddress(dstLastAddr)) {
+		ERROR_LOG_REPORT(G3D, "Bottom-right corner of destination of block transfer is at an invalid address: %08x", srcLastAddr);
+		return;
+	}
+#endif
+
+	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
+	framebufferManager_->BlockTransfer(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
+
+#ifndef MOBILE_DEVICE
+	CBreakPoints::ExecMemCheck(srcBasePtr + (srcY * srcStride + srcX) * bpp, false, height * srcStride * bpp, currentMIPS->pc);
+	CBreakPoints::ExecMemCheck(dstBasePtr + (dstY * dstStride + dstX) * bpp, true, height * dstStride * bpp, currentMIPS->pc);
+#endif
+
+	// TODO: Correct timing appears to be 1.9, but erring a bit low since some of our other timing is inaccurate.
+	cyclesExecuted += ((height * width * bpp) * 16) / 10;
 }
 
 void GPUCommon::Execute_WorldMtxNum(u32 op, u32 diff) {
@@ -2546,100 +2624,6 @@ void GPUCommon::SetCmdValue(u32 op) {
 	PreExecuteOp(op, diff);
 	gstate.cmdmem[cmd] = op;
 	ExecuteOp(op, diff);
-}
-
-void GPUCommon::DoBlockTransfer(u32 skipDrawReason) {
-	// TODO: This is used a lot to copy data around between render targets and textures,
-	// and also to quickly load textures from RAM to VRAM. So we should do checks like the following:
-	//  * Does dstBasePtr point to an existing texture? If so maybe reload it immediately.
-	//
-	//  * Does srcBasePtr point to a render target, and dstBasePtr to a texture? If so
-	//    either copy between rt and texture or reassign the texture to point to the render target
-	//
-	// etc....
-
-	u32 srcBasePtr = gstate.getTransferSrcAddress();
-	u32 srcStride = gstate.getTransferSrcStride();
-
-	u32 dstBasePtr = gstate.getTransferDstAddress();
-	u32 dstStride = gstate.getTransferDstStride();
-
-	int srcX = gstate.getTransferSrcX();
-	int srcY = gstate.getTransferSrcY();
-
-	int dstX = gstate.getTransferDstX();
-	int dstY = gstate.getTransferDstY();
-
-	int width = gstate.getTransferWidth();
-	int height = gstate.getTransferHeight();
-
-	int bpp = gstate.getTransferBpp();
-
-#ifndef MOBILE_DEVICE
-	//DEBUG_LOG(G3D, "Block transfer: %08x/%x -> %08x/%x, %ix%ix%i (%i,%i)->(%i,%i)", srcBasePtr, srcStride, dstBasePtr, dstStride, width, height, bpp, srcX, srcY, dstX, dstY);
-
-	if (!Memory::IsValidAddress(srcBasePtr)) {
-		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad source transfer address %08x!", srcBasePtr);
-		return;
-	}
-
-	if (!Memory::IsValidAddress(dstBasePtr)) {
-		ERROR_LOG_REPORT(G3D, "BlockTransfer: Bad destination transfer address %08x!", dstBasePtr);
-		return;
-	}
-
-	// Check that the last address of both source and dest are valid addresses
-
-	u32 srcLastAddr = srcBasePtr + ((srcY + height - 1) * srcStride + (srcX + width - 1)) * bpp;
-	u32 dstLastAddr = dstBasePtr + ((dstY + height - 1) * dstStride + (dstX + width - 1)) * bpp;
-
-	if (!Memory::IsValidAddress(srcLastAddr)) {
-		ERROR_LOG_REPORT(G3D, "Bottom-right corner of source of block transfer is at an invalid address: %08x", srcLastAddr);
-		return;
-	}
-	if (!Memory::IsValidAddress(dstLastAddr)) {
-		ERROR_LOG_REPORT(G3D, "Bottom-right corner of destination of block transfer is at an invalid address: %08x", srcLastAddr);
-		return;
-	}
-#endif
-
-	// Tell the framebuffer manager to take action if possible. If it does the entire thing, let's just return.
-	if (!framebufferManager_->NotifyBlockTransferBefore(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason)) {
-		// Do the copy! (Hm, if we detect a drawn video frame (see below) then we could maybe skip this?)
-		// Can use GetPointerUnchecked because we checked the addresses above. We could also avoid them
-		// entirely by walking a couple of pointers...
-		if (srcStride == dstStride && (u32)width == srcStride) {
-			// Common case in God of War, let's do it all in one chunk.
-			u32 srcLineStartAddr = srcBasePtr + (srcY * srcStride + srcX) * bpp;
-			u32 dstLineStartAddr = dstBasePtr + (dstY * dstStride + dstX) * bpp;
-			const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
-			u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
-			memcpy(dst, src, width * height * bpp);
-		} else {
-			for (int y = 0; y < height; y++) {
-				u32 srcLineStartAddr = srcBasePtr + ((y + srcY) * srcStride + srcX) * bpp;
-				u32 dstLineStartAddr = dstBasePtr + ((y + dstY) * dstStride + dstX) * bpp;
-
-				const u8 *src = Memory::GetPointerUnchecked(srcLineStartAddr);
-				u8 *dst = Memory::GetPointerUnchecked(dstLineStartAddr);
-				memcpy(dst, src, width * bpp);
-			}
-		}
-
-		if (g_Config.bBlockInvalidateTexture) {
-			// Fixes Gran Turismo's funky text issue, since it overwrites the current texture.
-			textureCache_->Invalidate(dstBasePtr + (dstY * dstStride + dstX) * bpp, height * dstStride * bpp, GPU_INVALIDATE_HINT);
-		}
-		framebufferManager_->NotifyBlockTransferAfter(dstBasePtr, dstStride, dstX, dstY, srcBasePtr, srcStride, srcX, srcY, width, height, bpp, skipDrawReason);
-	}
-
-#ifndef MOBILE_DEVICE
-	CBreakPoints::ExecMemCheck(srcBasePtr + (srcY * srcStride + srcX) * bpp, false, height * srcStride * bpp, currentMIPS->pc);
-	CBreakPoints::ExecMemCheck(dstBasePtr + (dstY * dstStride + dstX) * bpp, true, height * dstStride * bpp, currentMIPS->pc);
-#endif
-
-	// TODO: Correct timing appears to be 1.9, but erring a bit low since some of our other timing is inaccurate.
-	cyclesExecuted += ((height * width * bpp) * 16) / 10;
 }
 
 bool GPUCommon::PerformMemoryCopy(u32 dest, u32 src, int size) {

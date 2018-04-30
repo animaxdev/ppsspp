@@ -14,6 +14,9 @@
 #include "ppsspp_config.h"
 #include "profiler/profiler.h"
 
+
+#ifdef USE_PROFILER
+
 #define MAX_CATEGORIES 64 // Can be any number, represents max profiled names.
 #define MAX_DEPTH 16      // Can be any number, represents max nesting depth of profiled names.
 #if PPSSPP_PLATFORM(IOS) && defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_9_0
@@ -268,3 +271,76 @@ void Profiler_GetHistory(int category, int thread, float *data, int count) {
 		data[i] = history[MAX_THREADS * x + thread].time_taken[category];
 	}
 }
+
+
+#endif // USE_PROFILER 
+
+
+#ifdef VKSTEP_PROFILER
+
+#include <list>
+
+struct StepInfo {
+	int type;
+	const char * name;
+	double elapsed;
+};
+
+static std::mutex queueLock;
+static char VKStepNames[6][6] = { "D", "S", "C", "B", "R", "I" }; // Draw, Skip, Copy, Blit, Read, Image
+static StepInfo current;
+static std::vector<StepInfo> steps;
+static std::list< std::vector<StepInfo> > queue;
+
+int VKStepProfiler_GetNumQueue() {
+	return queue.size();
+}
+
+int VKStepProfiler_GetNumSteps(int i) {
+	auto iter = queue.begin();
+	std::advance(iter, i);
+	return iter->size();
+}
+
+void VKStepProfiler_GetStep(int queue_index, int step_index, int &type, const char * &name, double &elapsed) {
+	auto iter = queue.begin();
+	std::advance(iter, queue_index);
+	const StepInfo& step = iter->at(step_index);
+	type = step.type;
+	name = step.name;
+	elapsed = step.elapsed;
+}
+
+void VKStepProfiler_RemoveQueue(int count) {
+	std::lock_guard<std::mutex> guard(queueLock);
+	while(count-- > 0)
+		queue.pop_front();
+}
+
+
+//
+VKQueueProfiler::VKQueueProfiler(const std::vector<VKRStep *> &steps) {
+
+}
+
+VKQueueProfiler::~VKQueueProfiler() {
+	std::lock_guard<std::mutex> guard(queueLock);
+	queue.emplace_back(std::move(steps));
+}
+
+
+//
+VKStepProfiler::VKStepProfiler(const VKRStep &step) {
+	current.type = (int)step.stepType;
+	current.name = VKStepNames[current.type];
+	current.elapsed = real_time_now();
+}
+
+VKStepProfiler::~VKStepProfiler() {
+	if(current.type != 1) {
+		current.elapsed = (real_time_now() - current.elapsed) * 10000;
+		steps.push_back(current);
+	}
+}
+
+#endif

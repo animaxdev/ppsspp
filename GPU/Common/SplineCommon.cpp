@@ -501,7 +501,7 @@ static void SplinePatchFullQuality(SplinePatchLocal &spatch, int quality) {
 	spatch.batchVertices += count * sizeof(SimpleVertex);
 }
 
-static void _BezierPatchLowQuality(u8 *dest, u16 *indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType) {
+static void _BezierPatchLowQuality(u8 *&dest, u16 *&indices, int &count, int tess_u, int tess_v, const BezierPatch &patch, u32 origVertType) {
 	const float third = 1.0f / 3.0f;
 	// Fast and easy way - just draw the control points, generate some very basic normal vector subsitutes.
 	// Very inaccurate though but okay for Loco Roco. Maybe should keep it as an option.
@@ -887,6 +887,7 @@ void DrawEngineCommon::SubmitSplineEnd() {
 	dc.prim = prim;
 	dc.vertexCount = splinePatch.batchIndexCount;
 	dc.uvScale = gstate_c.uv;
+	dc.cullMode = -1;
 
 	dc.indexLowerBound = 0;
 	dc.indexUpperBound = splinePatch.batchVertexCount - 1;
