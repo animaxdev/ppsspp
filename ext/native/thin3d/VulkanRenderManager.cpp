@@ -860,30 +860,10 @@ void VulkanRenderManager::EndSubmitFrame(int frame) {
 	}
 }
 
-static bool skipSteps = false;
-static int stepCount = 0;
 void VulkanRenderManager::Run(int frame) {
 	BeginSubmitFrame(frame);
 
 	FrameData &frameData = frameData_[frame];
-
-	// test
-	int prevCount = stepCount;
-	stepCount = frameData.steps.size();
-	if (prevCount == 61 && stepCount < 5) {
-		skipSteps = true;
-	}
-	if (skipSteps && stepCount < 5) {
-		queueRunner_.LogSteps(frameData.steps);
-		for (auto s : frameData.steps) {
-			delete s;
-		}
-		frameData.steps.clear();
-	}
-	else {
-		skipSteps = false;
-	}
-	
 	queueRunner_.RunSteps(frameData.mainCmd, frameData.steps);
 
 	if (frameData.type == VKRRunType::END) {
