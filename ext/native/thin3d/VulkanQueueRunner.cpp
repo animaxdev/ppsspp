@@ -370,6 +370,14 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 	}
 
+	// starwar
+	if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER) {
+		int size = steps[0]->commands.size();
+		if(size == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
+			steps[0]->commands.pop_back();
+		}
+	}
+
 	int size = steps.size();
 
 	PROFILE_THIS_QUEUE(steps);
@@ -629,6 +637,7 @@ void VulkanQueueRunner::ApplySonicHack(std::vector<VKRStep *> &steps) {
 
 void VulkanQueueRunner::LogSteps(const std::vector<VKRStep *> &steps) {
 	ILOG("=======================================");
+	ILOG("LogSteps begin size: %d", steps.size());
 	for (size_t i = 0; i < steps.size(); i++) {
 		const VKRStep &step = *steps[i];
 		switch (step.stepType) {
@@ -652,59 +661,81 @@ void VulkanQueueRunner::LogSteps(const std::vector<VKRStep *> &steps) {
 			break;
 		}
 	}
+	ILOG("LogSteps end");
 }
 
 void VulkanQueueRunner::LogRenderPass(const VKRStep &pass) {
 	int fb = (int)(intptr_t)(pass.render.framebuffer ? pass.render.framebuffer->framebuf : 0);
-	ILOG("RenderPass Begin(%x)", fb);
+	ILOG("RenderPass Begin(%x), commands: %d", fb, pass.commands.size());
 	for (auto &cmd : pass.commands) {
 		switch (cmd.cmd) {
 		case VKRRenderCommand::BIND_PIPELINE:
-			ILOG("  BindPipeline(%x)", (int)(intptr_t)cmd.pipeline.pipeline);
+			ILOG("    BindPipeline(%x)", (int)(intptr_t)cmd.pipeline.pipeline);
 			break;
 		case VKRRenderCommand::BLEND:
-			ILOG("  Blend(%f, %f, %f, %f)", cmd.blendColor.color[0], cmd.blendColor.color[1], cmd.blendColor.color[2], cmd.blendColor.color[3]);
+			ILOG("    Blend(%f, %f, %f, %f)", cmd.blendColor.color[0], cmd.blendColor.color[1], cmd.blendColor.color[2], cmd.blendColor.color[3]);
 			break;
 		case VKRRenderCommand::CLEAR:
-			ILOG("  Clear");
+			ILOG("    Clear");
 			break;
 		case VKRRenderCommand::DRAW:
-			ILOG("  Draw(%d)", cmd.draw.count);
+			ILOG("    Draw(%d)", cmd.draw.count);
 			break;
 		case VKRRenderCommand::DRAW_INDEXED:
-			ILOG("  DrawIndexed(%d)", cmd.drawIndexed.count);
+			ILOG("    DrawIndexed(%d)", cmd.drawIndexed.count);
 			break;
 		case VKRRenderCommand::SCISSOR:
-			ILOG("  Scissor(%d, %d, %d, %d)", (int)cmd.scissor.scissor.offset.x, (int)cmd.scissor.scissor.offset.y, (int)cmd.scissor.scissor.extent.width, (int)cmd.scissor.scissor.extent.height);
+			ILOG("    Scissor(%d, %d, %d, %d)", (int)cmd.scissor.scissor.offset.x, (int)cmd.scissor.scissor.offset.y, (int)cmd.scissor.scissor.extent.width, (int)cmd.scissor.scissor.extent.height);
 			break;
 		case VKRRenderCommand::STENCIL:
-			ILOG("  Stencil(ref=%d, compare=%d, write=%d)", cmd.stencil.stencilRef, cmd.stencil.stencilCompareMask, cmd.stencil.stencilWriteMask);
+			ILOG("    Stencil(ref=%d, compare=%d, write=%d)", cmd.stencil.stencilRef, cmd.stencil.stencilCompareMask, cmd.stencil.stencilWriteMask);
 			break;
 		case VKRRenderCommand::VIEWPORT:
-			ILOG("  Viewport(%f, %f, %f, %f, %f, %f)", cmd.viewport.vp.x, cmd.viewport.vp.y, cmd.viewport.vp.width, cmd.viewport.vp.height, cmd.viewport.vp.minDepth, cmd.viewport.vp.maxDepth);
+			ILOG("    Viewport(%f, %f, %f, %f, %f, %f)", cmd.viewport.vp.x, cmd.viewport.vp.y, cmd.viewport.vp.width, cmd.viewport.vp.height, cmd.viewport.vp.minDepth, cmd.viewport.vp.maxDepth);
 			break;
 		case VKRRenderCommand::PUSH_CONSTANTS:
-			ILOG("  PushConstants(%d)", cmd.push.size);
+			ILOG("    PushConstants(%d)", cmd.push.size);
 			break;
 		}
 	}
-	ILOG("RenderPass End(%x)", fb);
+	ILOG("RenderPass End(%x), commands: %d", fb, pass.commands.size());
 }
 
 void VulkanQueueRunner::LogCopy(const VKRStep &pass) {
-	ILOG("Copy()");
+	ILOG("Copy() src: 0x%08x, rect(%d, %d, %d, %d), dst: %08x, pos(%d, %d)", 
+		pass.copy.src, 
+		pass.copy.srcRect.offset.x, pass.copy.srcRect.offset.y,
+		pass.copy.srcRect.extent.width, pass.copy.srcRect.extent.height,
+		pass.copy.dst,
+		pass.copy.dstPos.x, pass.copy.dstPos.y);
 }
 
 void VulkanQueueRunner::LogBlit(const VKRStep &pass) {
-	ILOG("Blit()");
+	ILOG("Blit() filter: %d, mask: %d, src: 0x%08x, rect(%d, %d, %d, %d), dst: 0x%08x, rect(%d, %d, %d, %d)", 
+		pass.blit.filter,
+		pass.blit.aspectMask,
+		pass.blit.src,
+		pass.blit.srcRect.offset.x, pass.blit.srcRect.offset.y,
+		pass.blit.srcRect.extent.width, pass.blit.srcRect.extent.height,
+		pass.blit.dst,
+		pass.blit.dstRect.offset.x, pass.blit.dstRect.offset.y,
+		pass.blit.dstRect.extent.width, pass.blit.dstRect.extent.height);
 }
 
 void VulkanQueueRunner::LogReadback(const VKRStep &pass) {
-	ILOG("Readback");
+	ILOG("Readback() src: 0x%08x, mask: %d, rect(%d, %d, %d, %d)", 
+		pass.readback.src, 
+		pass.readback.aspectMask,
+		pass.readback.srcRect.offset.x, pass.readback.srcRect.offset.x, 
+		pass.readback.srcRect.extent.width, pass.readback.srcRect.extent.height);
 }
 
 void VulkanQueueRunner::LogReadbackImage(const VKRStep &pass) {
-	ILOG("ReadbackImage");
+	ILOG("ReadbackImage() image: 0x%08x, mipLevel: %d, rect(%d, %d, %d, %d)", 
+		pass.readback_image.image, 
+		pass.readback_image.mipLevel,
+		pass.readback_image.srcRect.offset.x, pass.readback_image.srcRect.offset.y,
+		pass.readback_image.srcRect.extent.width, pass.readback_image.srcRect.extent.height);
 }
 
 void VulkanQueueRunner::PerformRenderPass(const VKRStep &step, VkCommandBuffer cmd) {

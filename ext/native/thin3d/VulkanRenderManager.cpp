@@ -864,7 +864,6 @@ void VulkanRenderManager::Run(int frame) {
 	BeginSubmitFrame(frame);
 
 	FrameData &frameData = frameData_[frame];
-	// queueRunner_.LogSteps(frameData.steps);
 	queueRunner_.RunSteps(frameData.mainCmd, frameData.steps);
 
 	if (frameData.type == VKRRunType::END) {
