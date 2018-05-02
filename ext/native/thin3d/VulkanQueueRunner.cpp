@@ -368,15 +368,21 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 			// for disable slower effects
 			ApplySonicHack(steps);
 		}
-	}
-
-	// starwar
-	if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER) {
-		int size = steps[0]->commands.size();
-		if(size == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
-			steps[0]->commands.pop_back();
+		if (hacksEnabled_ & QUEUE_HACK_STARWAR_CLEAR) {
+			// starwar
+			if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER) {
+				int size = steps[0]->commands.size();
+				if (size == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
+					steps[0]->commands.pop_back();
+				}
+			}
+			else
+			{
+				ApplyMGSHack(steps);
+			}
 		}
 	}
+
 
 	int size = steps.size();
 
@@ -514,8 +520,12 @@ void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 
 	for (int i = 0; i < size; ++i) {
 		if (steps[i]->stepType == VKRStepType::COPY &&
-			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
-			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
+			steps[i + 1]->stepType == VKRStepType::RENDER &&
+			steps[i + 2]->stepType == VKRStepType::COPY &&
+			steps[i + 1]->render.numDraws == 1 &&
+			steps[i]->copy.dst == steps[i + 2]->copy.dst &&
+			steps[i]->copy.srcRect.extent.width == steps[i + 2]->copy.srcRect.extent.width &&
+			steps[i]->copy.srcRect.extent.height == steps[i + 2]->copy.srcRect.extent.height) {
 
 			if (memcmp(&steps[i]->copy, &steps[i + 2]->copy, sizeof(steps[i]->copy)) == 0) {
 				steps[i]->stepType = VKRStepType::RENDER_SKIP;

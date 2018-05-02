@@ -468,8 +468,8 @@ void GLRenderManager::Run(int frame) {
 
 	FrameData &frameData = frameData_[frame];
 
-	auto &stepsOnThread = frameData_[frame].steps;
-	auto &initStepsOnThread = frameData_[frame].initSteps;
+	auto &stepsOnThread = frameData.steps;
+	auto &initStepsOnThread = frameData.initSteps;
 	// queueRunner_.LogSteps(stepsOnThread);
 	queueRunner_.RunInitSteps(initStepsOnThread);
 	initStepsOnThread.clear();
