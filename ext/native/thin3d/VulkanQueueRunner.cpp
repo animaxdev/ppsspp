@@ -370,15 +370,9 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 		if (hacksEnabled_ & QUEUE_HACK_STARWAR_CLEAR) {
 			// starwar
-			if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER) {
-				int size = steps[0]->commands.size();
-				if (size == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
-					steps[0]->commands.pop_back();
-				}
-			}
-			else
-			{
-				ApplyMGSHack(steps);
+			if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER &&
+				steps[0]->commands.size() == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
+				steps[0]->commands.pop_back();
 			}
 		}
 	}
