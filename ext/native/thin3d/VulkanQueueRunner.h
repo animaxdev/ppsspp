@@ -14,7 +14,6 @@ enum {
 	QUEUE_HACK_MGS2_ACID = 1,
 	QUEUE_HACK_SONIC = 2,
 	QUEUE_HACK_KILL_ZONE = 4,
-	QUEUE_HACK_STARWAR_CLEAR = 8,
 };
 
 enum class VKRRenderCommand : uint8_t {
