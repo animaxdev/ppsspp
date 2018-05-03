@@ -467,8 +467,6 @@ void GPU_Vulkan::InitDeviceObjects() {
 		hacks |= QUEUE_HACK_SONIC;
 	if (PSP_CoreParameter().compat.flags().KillZoneHack)
 		hacks |= QUEUE_HACK_KILL_ZONE;
-	if (PSP_CoreParameter().compat.flags().StarWarClearHack)
-		hacks |= QUEUE_HACK_STARWAR_CLEAR;
 	if (hacks) {
 		rm->GetQueueRunner()->EnableHacks(hacks);
 	}

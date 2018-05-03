@@ -368,13 +368,6 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 			// for disable slower effects
 			ApplySonicHack(steps);
 		}
-		if (hacksEnabled_ & QUEUE_HACK_STARWAR_CLEAR) {
-			// starwar
-			if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER &&
-				steps[0]->commands.size() == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
-				steps[0]->commands.pop_back();
-			}
-		}
 	}
 
 
@@ -680,7 +673,7 @@ void VulkanQueueRunner::LogRenderPass(const VKRStep &pass) {
 			ILOG("    Blend(%f, %f, %f, %f)", cmd.blendColor.color[0], cmd.blendColor.color[1], cmd.blendColor.color[2], cmd.blendColor.color[3]);
 			break;
 		case VKRRenderCommand::CLEAR:
-			ILOG("    Clear");
+			ILOG("    Clear(%d, %08x, %f, %02x)", cmd.clear.clearMask, cmd.clear.clearColor, cmd.clear.clearZ, cmd.clear.clearStencil);
 			break;
 		case VKRRenderCommand::DRAW:
 			ILOG("    Draw(%d)", cmd.draw.count);
