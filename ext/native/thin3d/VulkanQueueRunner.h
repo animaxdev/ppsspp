@@ -17,6 +17,7 @@ enum {
 };
 
 enum class VKRRenderCommand : uint8_t {
+	REMOVED,
 	BIND_PIPELINE,
 	STENCIL,
 	BLEND,
@@ -26,6 +27,7 @@ enum class VKRRenderCommand : uint8_t {
 	DRAW,
 	DRAW_INDEXED,
 	PUSH_CONSTANTS,
+	NUM_RENDER_COMMANDS,
 };
 
 struct VkRenderData {
