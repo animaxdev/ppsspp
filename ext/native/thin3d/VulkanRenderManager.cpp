@@ -600,10 +600,10 @@ bool VulkanRenderManager::InitDepthStencilBuffer(VkCommandBuffer cmd) {
 
 	return true;
 }
-
-static void RemoveDrawCommands(std::vector<VkRenderData> *cmds) {
+/*
+static void RemoveDrawCommands(std::vector<VkRenderData> &cmds) {
 	// Here we remove any DRAW type commands when we hit a CLEAR.
-	for (auto &c : *cmds) {
+	for (auto &c : cmds) {
 		if (c.cmd == VKRRenderCommand::DRAW || c.cmd == VKRRenderCommand::DRAW_INDEXED) {
 			c.cmd = VKRRenderCommand::REMOVED;
 		}
@@ -661,7 +661,7 @@ static void CleanupRenderCommands(std::vector<VkRenderData> *cmds) {
 		}
 	}
 }
-
+*/
 void VulkanRenderManager::Clear(uint32_t clearColor, float clearZ, int clearStencil, int clearMask) {
 	_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == VKRStepType::RENDER);
 	if (!clearMask)
@@ -678,7 +678,12 @@ void VulkanRenderManager::Clear(uint32_t clearColor, float clearZ, int clearSten
 
 		// In case there were commands already.
 		curRenderStep_->render.numDraws = 0;
-		RemoveDrawCommands(&curRenderStep_->commands);
+		// Here we remove any DRAW type commands when we hit a CLEAR.
+		for (auto &c : curRenderStep_->commands) {
+			if (c.cmd == VKRRenderCommand::DRAW || c.cmd == VKRRenderCommand::DRAW_INDEXED) {
+				c.cmd = VKRRenderCommand::REMOVED;
+			}
+		}
 	} else {
 		VkRenderData data{ VKRRenderCommand::CLEAR };
 		data.clear.clearColor = clearColor;
@@ -790,11 +795,11 @@ void VulkanRenderManager::Finish() {
 	curRenderStep_ = nullptr;
 
 	// Let's do just a bit of cleanup on render commands now.
-	for (auto &step : steps_) {
+	/*for (auto &step : steps_) {
 		if (step->stepType == VKRStepType::RENDER) {
 			CleanupRenderCommands(&step->commands);
 		}
-	}
+	}*/
 
 	int curFrame = vulkan_->GetCurFrame();
 	FrameData &frameData = frameData_[curFrame];

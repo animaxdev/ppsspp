@@ -60,7 +60,6 @@ struct CompatFlags {
 	bool MGS2AcidHack;
 	bool SonicRivalsHack;
 	bool KillZoneHack;
-	bool StarWarClearHack;
 };
 
 class IniFile;
