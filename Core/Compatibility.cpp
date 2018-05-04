@@ -60,7 +60,6 @@ void Compatibility::CheckSettings(IniFile &iniFile, const std::string &gameID) {
 	CheckSetting(iniFile, gameID, "MGS2AcidHack", &flags_.MGS2AcidHack);
 	CheckSetting(iniFile, gameID, "SonicRivalsHack", &flags_.SonicRivalsHack);
 	CheckSetting(iniFile, gameID, "KillZoneHack", &flags_.KillZoneHack);
-	CheckSetting(iniFile, gameID, "StarWarClearHack", &flags_.StarWarClearHack);
 }
 
 void Compatibility::CheckSetting(IniFile &iniFile, const std::string &gameID, const char *option, bool *flag) {
