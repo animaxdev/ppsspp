@@ -47,7 +47,7 @@ void GenerateDepalShader300(char *buffer, GEBufferFormat pixelFormat, ShaderLang
 		WRITE(p, "layout(location = 0) out vec4 fragColor0;\n");
 	} else {
 		if (gl_extensions.IsGLES) {
-			WRITE(p, "#version 300 es\n");
+			WRITE(p, "#version 320 es\n");
 			WRITE(p, "precision mediump float;\n");
 		} else {
 			WRITE(p, "#version 330\n");

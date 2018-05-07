@@ -1318,9 +1318,9 @@ void GPUCommon::Execute_End(u32 op, u32 diff) {
 					// pc will be increased after we return, counteract that.
 					u32 target = (((signal << 16) | enddata) & 0xFFFFFFFC) - 4;
 					if (currentList->stackptr == ARRAY_SIZE(currentList->stack)) {
-						ERROR_LOG_REPORT(G3D, "Signal with Call: stack full. signal/end: %04x %04x", signal, enddata);
+						//ERROR_LOG_REPORT(G3D, "Signal with Call: stack full. signal/end: %04x %04x", signal, enddata);
 					} else if (!Memory::IsValidAddress(target)) {
-						ERROR_LOG_REPORT(G3D, "Signal with Call: bad address. signal/end: %04x %04x", signal, enddata);
+						//ERROR_LOG_REPORT(G3D, "Signal with Call: bad address. signal/end: %04x %04x", signal, enddata);
 					} else {
 						// TODO: This might save/restore other state...
 						auto &stackEntry = currentList->stack[currentList->stackptr++];
@@ -1329,7 +1329,7 @@ void GPUCommon::Execute_End(u32 op, u32 diff) {
 						stackEntry.baseAddr = gstate.base;
 						UpdatePC(currentList->pc, target);
 						currentList->pc = target;
-						DEBUG_LOG(G3D, "Signal with Call. signal/end: %04x %04x", signal, enddata);
+						//DEBUG_LOG(G3D, "Signal with Call. signal/end: %04x %04x", signal, enddata);
 					}
 				}
 				break;

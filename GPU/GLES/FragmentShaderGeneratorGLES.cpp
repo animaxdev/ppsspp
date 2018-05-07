@@ -43,7 +43,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	// In GLSL ES 3.0, you use "in" variables instead of varying.
 
 	bool glslES30 = false;
-	const char *varying = "varying";
 	const char *fragColor0 = "gl_FragColor";
 	const char *fragColor1 = "fragColor1";
 	const char *texture = "texture2D";
@@ -58,7 +57,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	if (gl_extensions.IsGLES) {
 		// ES doesn't support dual source alpha :(
 		if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300)) {
-			WRITE(p, "#version 300 es\n");  // GLSL ES 3.0
+			WRITE(p, "#version 320 es\n");  // GLSL ES 3.0
 			fragColor0 = "fragColor0";
 			texture = "texture";
 			glslES30 = true;
@@ -139,10 +138,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 		WRITE(p, "#define lowp\n");
 		WRITE(p, "#define mediump\n");
 		WRITE(p, "#define highp\n");
-	}
-
-	if (glslES30 || gl_extensions.IsCoreContext) {
-		varying = "in";
 	}
 
 	bool lmode = id.Bit(FS_BIT_LMODE);
@@ -234,16 +229,16 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 		WRITE(p, "uniform vec3 u_texenv;\n");
 	}
 
-	WRITE(p, "%s %s vec4 v_color0;\n", shading, varying);
+	WRITE(p, "%s in vec4 v_color0;\n", shading);
 	if (lmode)
-		WRITE(p, "%s %s vec3 v_color1;\n", shading, varying);
+		WRITE(p, "%s in vec3 v_color1;\n", shading);
 	if (enableFog) {
 		*uniformMask |= DIRTY_FOGCOLOR;
 		WRITE(p, "uniform vec3 u_fogcolor;\n");
-		WRITE(p, "%s %s float v_fogdepth;\n", varying, highpFog ? "highp" : "mediump");
+		WRITE(p, "in %s float v_fogdepth;\n", highpFog ? "highp" : "mediump");
 	}
 	if (doTexture) {
-		WRITE(p, "%s %s vec3 v_texcoord;\n", varying, highpTexcoord ? "highp" : "mediump");
+		WRITE(p, "in %s vec3 v_texcoord;\n", highpTexcoord ? "highp" : "mediump");
 	}
 
 	if (!g_Config.bFragmentTestCache) {

@@ -52,14 +52,14 @@ static const char * const boneWeightAttrDecl[9] = {
 
 static const char * const boneWeightInDecl[9] = {
 	"#ERROR#",
-	"in mediump float w1;\n",
-	"in mediump vec2 w1;\n",
-	"in mediump vec3 w1;\n",
-	"in mediump vec4 w1;\n",
-	"in mediump vec4 w1;\nin mediump float w2;\n",
-	"in mediump vec4 w1;\nin mediump vec2 w2;\n",
-	"in mediump vec4 w1;\nin mediump vec3 w2;\n",
-	"in mediump vec4 w1, w2;\n",
+	"layout(location = 3) in mediump float w1;\n",
+	"layout(location = 3) in mediump vec2 w1;\n",
+	"layout(location = 3) in mediump vec3 w1;\n",
+	"layout(location = 3) in mediump vec4 w1;\n",
+	"layout(location = 3) in mediump vec4 w1;\nlayout(location = 4) in mediump float w2;\n",
+	"layout(location = 3) in mediump vec4 w1;\nlayout(location = 4) in mediump vec2 w2;\n",
+	"layout(location = 3) in mediump vec4 w1;\nlayout(location = 4) in mediump vec3 w2;\n",
+	"layout(location = 3) in mediump vec4 w1;\nlayout(location = 4) in mediump vec4 w2;\n",
 };
 
 enum DoLightComputation {
@@ -103,8 +103,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 	// In GLSL ES 3.0, you use "out" variables instead.
 	bool glslES30 = false;
-	const char *varying = "varying";
-	const char *attribute = "attribute";
 	const char * const * boneWeightDecl = boneWeightAttrDecl;
 	const char *texelFetch = NULL;
 	bool highpFog = false;
@@ -112,7 +110,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 	if (gl_extensions.IsGLES) {
 		if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300)) {
-			WRITE(p, "#version 300 es\n");
+			WRITE(p, "#version 320 es\n");
 			glslES30 = true;
 			texelFetch = "texelFetch";
 		} else {
@@ -156,8 +154,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	}
 
 	if (glslES30 || gl_extensions.IsCoreContext) {
-		attribute = "in";
-		varying = "out";
 		boneWeightDecl = boneWeightInDecl;
 	}
 
@@ -194,7 +190,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 	const char *shading = "";
 	if (glslES30)
-		shading = doFlatShading ? "flat " : "";
+		shading = doFlatShading ? "flat" : "";
 
 	DoLightComputation doLight[4] = { LIGHT_OFF, LIGHT_OFF, LIGHT_OFF, LIGHT_OFF };
 	if (useHWTransform) {
@@ -219,31 +215,31 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	}
 
 	if (useHWTransform)
-		WRITE(p, "%s vec3 position;\n", attribute);
+		WRITE(p, "layout(location = %d) in vec3 position;\n", ATTR_POSITION);
 	else
-		WRITE(p, "%s vec4 position;\n", attribute);  // need to pass the fog coord in w
+		WRITE(p, "layout(location = %d) in vec4 position;\n", ATTR_POSITION);  // need to pass the fog coord in w
 	*attrMask |= 1 << ATTR_POSITION;
 
 	if (useHWTransform && hasNormal) {
-		WRITE(p, "%s mediump vec3 normal;\n", attribute);
+		WRITE(p, "layout(location = %d) in mediump vec3 normal;\n", ATTR_NORMAL);
 		*attrMask |= 1 << ATTR_NORMAL;
 	}
 
 	bool texcoordVec3In = false;
 	if (doTexture && hasTexcoord) {
 		if (!useHWTransform && doTextureProjection && !throughmode) {
-			WRITE(p, "%s vec3 texcoord;\n", attribute);
+			WRITE(p, "layout(location = %d) in vec3 texcoord;\n", ATTR_TEXCOORD);
 			texcoordVec3In = true;
 		} else {
-			WRITE(p, "%s vec2 texcoord;\n", attribute);
+			WRITE(p, "layout(location = %d) in vec2 texcoord;\n", ATTR_TEXCOORD);
 		}
 		*attrMask |= 1 << ATTR_TEXCOORD;
 	}
 	if (hasColor) {
-		WRITE(p, "%s lowp vec4 color0;\n", attribute);
+		WRITE(p, "layout(location = %d) in lowp vec4 color0;\n", ATTR_COLOR0);
 		*attrMask |= 1 << ATTR_COLOR0;
 		if (lmode && !useHWTransform) { // only software transform supplies color1 as vertex data
-			WRITE(p, "%s lowp vec3 color1;\n", attribute);
+			WRITE(p, "layout(location = %d) in lowp vec3 color1;\n", ATTR_COLOR1);
 			*attrMask |= 1 << ATTR_COLOR1;
 		}
 	}
@@ -336,21 +332,21 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		*uniformMask |= DIRTY_DEPTHRANGE;
 	}
 
-	WRITE(p, "%s%s lowp vec4 v_color0;\n", shading, varying);
+	WRITE(p, "%s out lowp vec4 v_color0;\n", shading);
 	if (lmode) {
-		WRITE(p, "%s%s lowp vec3 v_color1;\n", shading, varying);
+		WRITE(p, "%s out lowp vec3 v_color1;\n", shading);
 	}
 
 	if (doTexture) {
-		WRITE(p, "%s %s vec3 v_texcoord;\n", varying, highpTexcoord ? "highp" : "mediump");
+		WRITE(p, "out %s vec3 v_texcoord;\n", highpTexcoord ? "highp" : "mediump");
 	}
 
 	if (enableFog) {
 		// See the fragment shader generator
 		if (highpFog) {
-			WRITE(p, "%s highp float v_fogdepth;\n", varying);
+			WRITE(p, "out highp float v_fogdepth;\n");
 		} else {
-			WRITE(p, "%s mediump float v_fogdepth;\n", varying);
+			WRITE(p, "out mediump float v_fogdepth;\n");
 		}
 	}
 

@@ -44,13 +44,13 @@ static const char *depalVShader100 =
 
 static const char *depalVShader300 =
 #ifdef USING_GLES2
-"#version 300 es\n"
+"#version 320 es\n"
 "precision highp float;\n"
 #else
 "#version 330\n"
 #endif
-"in vec4 a_position;\n"
-"in vec2 a_texcoord0;\n"
+"layout(location = 0) in vec4 a_position;\n"
+"layout(location = 1) in vec2 a_texcoord0;\n"
 "out vec2 v_texcoord0;\n"
 "void main() {\n"
 "  v_texcoord0 = a_texcoord0;\n"
@@ -163,8 +163,8 @@ DepalShader *DepalShaderCacheGLES::GetDepalettizeShader(uint32_t clutMode, GEBuf
 	DepalShader *depal = new DepalShader();
 
 	std::vector<GLRProgram::Semantic> semantics;
-	semantics.push_back({ 0, "a_position" });
-	semantics.push_back({ 1, "a_texcoord0" });
+	//semantics.push_back({ 0, "a_position" });
+	//semantics.push_back({ 1, "a_texcoord0" });
 
 	std::vector<GLRProgram::UniformLocQuery> queries;
 	queries.push_back({ &depal->u_tex, "tex" });

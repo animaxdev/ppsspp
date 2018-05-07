@@ -58,19 +58,15 @@ static const char tex_fs[] =
 	"precision mediump float;\n"
 #endif
 	"uniform sampler2D sampler0;\n"
-	"varying vec2 v_texcoord0;\n"
+	"in vec2 v_texcoord0;\n"
 	"void main() {\n"
 	"  gl_FragColor = texture2D(sampler0, v_texcoord0);\n"
 	"}\n";
 
 static const char basic_vs[] =
-	"#if __VERSION__ >= 130\n"
-	"#define attribute in\n"
-	"#define varying out\n"
-	"#endif\n"
-	"attribute vec4 a_position;\n"
-	"attribute vec2 a_texcoord0;\n"
-	"varying vec2 v_texcoord0;\n"
+	"layout(location = 0) in vec4 a_position;\n"
+	"layout(location = 1) in vec2 a_texcoord0;\n"
+	"out vec2 v_texcoord0;\n"
 	"void main() {\n"
 	"  v_texcoord0 = a_texcoord0;\n"
 	"  gl_Position = a_position;\n"
@@ -95,8 +91,8 @@ void FramebufferManagerGLES::CompileDraw2DProgram() {
 		std::vector<GLRProgram::Initializer> initializers;
 		initializers.push_back({ &u_draw2d_tex, 0 });
 		std::vector<GLRProgram::Semantic> semantics;
-		semantics.push_back({ 0, "a_position" });
-		semantics.push_back({ 1, "a_texcoord0" });
+		//semantics.push_back({ 0, "a_position" });
+		//semantics.push_back({ 1, "a_texcoord0" });
 		draw2dprogram_ = render_->CreateProgram(shaders, semantics, queries, initializers, false);
 		for (auto shader : shaders)
 			render_->DeleteShader(shader);

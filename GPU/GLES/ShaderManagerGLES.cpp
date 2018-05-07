@@ -76,13 +76,13 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 
 
 	std::vector<GLRProgram::Semantic> semantics;
-	semantics.push_back({ ATTR_POSITION, "position" });
-	semantics.push_back({ ATTR_TEXCOORD, "texcoord" });
-	semantics.push_back({ ATTR_NORMAL, "normal" });
-	semantics.push_back({ ATTR_W1, "w1" });
-	semantics.push_back({ ATTR_W2, "w2" });
-	semantics.push_back({ ATTR_COLOR0, "color0" });
-	semantics.push_back({ ATTR_COLOR1, "color1" });
+	//semantics.push_back({ ATTR_POSITION, "position" });
+	//semantics.push_back({ ATTR_TEXCOORD, "texcoord" });
+	//semantics.push_back({ ATTR_NORMAL, "normal" });
+	//semantics.push_back({ ATTR_W1, "w1" });
+	//semantics.push_back({ ATTR_W2, "w2" });
+	//semantics.push_back({ ATTR_COLOR0, "color0" });
+	//semantics.push_back({ ATTR_COLOR1, "color1" });
 
 	std::vector<GLRProgram::UniformLocQuery> queries;
 	queries.push_back({ &u_tex, "tex" });
@@ -278,6 +278,71 @@ static inline void ScaleProjMatrix(Matrix4x4 &in) {
 void LinkedShader::use(const ShaderID &VSID) {
 	render_->BindProgram(program);
 	// Note that we no longer track attr masks here - we do it for the input layouts instead.
+}
+
+void LinkedShader::UBOtest()
+{
+	int nUniformBufferAlignSize = 0;
+	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &nUniformBufferAlignSize);
+
+	enum {
+		UBO_BASE = 0,
+		UBO_LIGHT = 1,
+		UBO_BONE = 2,
+	};
+
+	GLint nBlockBaseStart = 0;
+	GLint nBlockBaseSize = 0;
+
+	GLint nBlockLightStart = 0;
+	GLint nBlockLightSize = 0;
+
+	GLint nBlockBoneStart = 0;
+	GLint nBlockBoneSize = 0;
+
+	GLuint m_nUBO;
+
+	
+	nBlockBaseStart = 0;
+	glGetActiveUniformBlockiv(program->program, UBO_BASE, GL_UNIFORM_BLOCK_DATA_SIZE, &nBlockBaseSize);
+
+
+	int mod = (nBlockBaseStart + nBlockBaseSize) % nUniformBufferAlignSize;
+	int time = (nBlockBaseStart + nBlockBaseSize) / nUniformBufferAlignSize;
+	if (mod != 0) {
+		time += 1;
+	}
+	nBlockLightStart = time * nUniformBufferAlignSize;
+	glGetActiveUniformBlockiv(program->program, UBO_LIGHT, GL_UNIFORM_BLOCK_DATA_SIZE, &nBlockLightSize);
+
+
+	mod = (nBlockLightStart + nBlockLightSize) % nUniformBufferAlignSize;
+	time = (nBlockLightStart + nBlockLightSize) / nUniformBufferAlignSize;
+	if (mod != 0) {
+		time += 1;
+	}
+	nBlockBoneStart = time * nUniformBufferAlignSize;
+	glGetActiveUniformBlockiv(program->program, UBO_BONE, GL_UNIFORM_BLOCK_DATA_SIZE, &nBlockBoneSize);
+
+	glGenBuffers(1, &m_nUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_nUBO);
+
+
+
+	glBufferData(GL_UNIFORM_BUFFER, nBlockLightStart + nBlockLightSize, NULL, GL_DYNAMIC_DRAW);
+
+	glBindBufferRange(GL_UNIFORM_BUFFER, UBO_BASE, m_nUBO, nBlockBaseStart, nBlockBaseSize);
+	glUniformBlockBinding(program->program, UBO_BASE, UBO_BASE);
+
+	glBindBufferRange(GL_UNIFORM_BUFFER, UBO_LIGHT, m_nUBO, nBlockLightStart, nBlockLightSize);
+	glUniformBlockBinding(program->program, UBO_LIGHT, UBO_LIGHT);
+
+	glBindBufferRange(GL_UNIFORM_BUFFER, UBO_BONE, m_nUBO, nBlockBoneStart, nBlockBoneSize);
+	glUniformBlockBinding(program->program, UBO_BONE, UBO_BONE);
+
+
+
+	glDeleteBuffers(1, &m_nUBO);
 }
 
 void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {

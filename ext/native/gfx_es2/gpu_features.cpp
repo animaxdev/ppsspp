@@ -502,18 +502,12 @@ static const char *glsl_fragment_prelude =
 std::string ApplyGLSLPrelude(const std::string &source, uint32_t stage) {
 #if !PPSSPP_PLATFORM(UWP)
 	std::string temp;
-	std::string version = "";
-	if (!gl_extensions.IsGLES && gl_extensions.IsCoreContext) {
-		// We need to add a corresponding #version.  Apple drives fail without an exact match.
-		if (gl_extensions.VersionGEThan(3, 3)) {
-			version = StringFromFormat("#version %d%d0\n", gl_extensions.ver[0], gl_extensions.ver[1]);
-		} else if (gl_extensions.VersionGEThan(3, 2)) {
-			version = "#version 150\n";
-		} else if (gl_extensions.VersionGEThan(3, 1)) {
-			version = "#version 140\n";
-		} else {
-			version = "#version 130\n";
-		}
+	std::string version;
+	if (gl_extensions.IsGLES) {
+		version = "#version 320 es\n";
+	}
+	else {
+		version = "#version 330\n";
 	}
 	if (stage == GL_FRAGMENT_SHADER) {
 		temp = version + glsl_fragment_prelude + source;
