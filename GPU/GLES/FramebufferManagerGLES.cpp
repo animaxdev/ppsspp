@@ -55,7 +55,7 @@ static const char tex_fs[] =
 	"out vec4 fragColor0;\n"
 	"#endif\n"
 #ifdef USING_GLES2
-	"precision mediump float;\n"
+	"precision highp float;\n"
 #endif
 	"uniform sampler2D sampler0;\n"
 	"in vec2 v_texcoord0;\n"

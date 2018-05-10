@@ -122,10 +122,6 @@ public:
 	int u_spline_count_v;
 	int u_spline_type_u;
 	int u_spline_type_v;
-
-
-	// UBO
-	void UBOtest();
 };
 
 // Real public interface

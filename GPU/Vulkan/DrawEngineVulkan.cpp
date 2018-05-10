@@ -167,7 +167,7 @@ void DrawEngineVulkan::InitDeviceObjects() {
 
 	vertexCache_ = new VulkanPushBuffer(vulkan_, VERTEX_CACHE_SIZE);
 
-	tessDataTransfer = new TessellationDataTransferVulkan(vulkan_, draw_);
+	tessDataTransfer = new TessellationDataTransferVulkan(vulkan_);
 }
 
 DrawEngineVulkan::~DrawEngineVulkan() {
@@ -563,7 +563,7 @@ void DrawEngineVulkan::DirtyAllUBOs() {
 	baseBuf = VK_NULL_HANDLE;
 	lightBuf = VK_NULL_HANDLE;
 	boneBuf = VK_NULL_HANDLE;
-	dirtyUniforms_ = DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS | DIRTY_BONE_UNIFORMS;
+	dirtyUniforms_ = 0;// DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS | DIRTY_BONE_UNIFORMS;
 	imageView = VK_NULL_HANDLE;
 	sampler = VK_NULL_HANDLE;
 	gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
@@ -834,26 +834,21 @@ void DrawEngineVulkan::DoFlush() {
 		//}
 		lastPrim_ = prim;
 
-		dirtyUniforms_ |= shaderManager_->UpdateUniforms();
-		UpdateUBOs(frame);
-
-		
 		{
-		PROFILE_THIS_SCOPE("render_q");
-		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
+			PROFILE_THIS_SCOPE("render_q");
+			UpdateUBOs(frame);
+			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
+			const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
+			int stride = dec_->GetDecVtxFmt().stride;
 
-		const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
-
-		int stride = dec_->GetDecVtxFmt().stride;
-
-		if (useElements) {
-			if (!ibuf)
-				ibOffset = (uint32_t)frame->pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &ibuf);
-			int numInstances = tess ? numPatches : 1;
-			renderManager->DrawIndexed(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, ibuf, ibOffset, vertexCount, numInstances, VK_INDEX_TYPE_UINT16);
-		} else {
-			renderManager->Draw(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, vertexCount);
-		}
+			if (useElements) {
+				if (!ibuf)
+					ibOffset = (uint32_t)frame->pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &ibuf);
+				int numInstances = tess ? numPatches : 1;
+				renderManager->DrawIndexed(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, ibuf, ibOffset, vertexCount, numInstances, VK_INDEX_TYPE_UINT16);
+			} else {
+				renderManager->Draw(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, vertexCount);
+			}
 		}
 	} else {
 		PROFILE_THIS_SCOPE("soft");
@@ -937,11 +932,8 @@ void DrawEngineVulkan::DoFlush() {
 			//}
 			lastPrim_ = prim;
 
-			dirtyUniforms_ |= shaderManager_->UpdateUniforms();
-
 			// Even if the first draw is through-mode, make sure we at least have one copy of these uniforms buffered
 			UpdateUBOs(frame);
-
 			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
 			const uint32_t dynamicUBOOffsets[3] = {
 				baseUBOOffset, lightUBOOffset, boneUBOOffset,
@@ -1003,6 +995,8 @@ void DrawEngineVulkan::DoFlush() {
 }
 
 void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
+	dirtyUniforms_ |= shaderManager_->UpdateUniforms();
+
 	if ((dirtyUniforms_ & DIRTY_BASE_UNIFORMS) || baseBuf == VK_NULL_HANDLE) {
 		baseUBOOffset = shaderManager_->PushBaseBuffer(frame->pushUBO, &baseBuf);
 		dirtyUniforms_ &= ~DIRTY_BASE_UNIFORMS;
@@ -1017,8 +1011,8 @@ void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
 	}
 }
 
-DrawEngineVulkan::TessellationDataTransferVulkan::TessellationDataTransferVulkan(VulkanContext *vulkan, Draw::DrawContext *draw)
-	: TessellationDataTransfer(), vulkan_(vulkan), draw_(draw) {
+DrawEngineVulkan::TessellationDataTransferVulkan::TessellationDataTransferVulkan(VulkanContext *vulkan)
+	: TessellationDataTransfer(), vulkan_(vulkan) {
 }
 
 DrawEngineVulkan::TessellationDataTransferVulkan::~TessellationDataTransferVulkan() {
