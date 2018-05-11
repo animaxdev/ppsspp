@@ -47,8 +47,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	const char *fragColor1 = "fragColor1";
 	const char *texture = "texture2D";
 	const char *texelFetch = NULL;
-	bool highpFog = false;
-	bool highpTexcoord = false;
 	bool bitwiseOps = false;
 	const char *lastFragData = nullptr;
 
@@ -84,11 +82,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			}
 		}
 
-		// PowerVR needs highp to do the fog in MHU correctly.
-		// Others don't, and some can't handle highp in the fragment shader.
-		highpFog = (gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_BAD) ? true : false;
-		highpTexcoord = highpFog;
-
 		if (gstate_c.Supports(GPU_SUPPORTS_ANY_FRAMEBUFFER_FETCH)) {
 			if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300) && gl_extensions.EXT_shader_framebuffer_fetch) {
 				WRITE(p, "#extension GL_EXT_shader_framebuffer_fetch : require\n");
@@ -106,7 +99,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			}
 		}
 
-		WRITE(p, "precision lowp float;\n");
+		WRITE(p, "precision highp float;\n");
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
@@ -235,10 +228,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	if (enableFog) {
 		*uniformMask |= DIRTY_FOGCOLOR;
 		WRITE(p, "uniform vec3 u_fogcolor;\n");
-		WRITE(p, "in %s float v_fogdepth;\n", highpFog ? "highp" : "mediump");
+		WRITE(p, "in float v_fogdepth;\n");
 	}
 	if (doTexture) {
-		WRITE(p, "in %s vec3 v_texcoord;\n", highpTexcoord ? "highp" : "mediump");
+		WRITE(p, "in vec3 v_texcoord;\n");
 	}
 
 	if (!g_Config.bFragmentTestCache) {
@@ -246,7 +239,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			if (bitwiseOps) {
 				WRITE(p, "int roundAndScaleTo255i(in float x) { return int(floor(x * 255.0 + 0.5)); }\n");
 			} else if (gl_extensions.gpuVendor == GPU_VENDOR_IMGTEC) {
-				WRITE(p, "float roundTo255thf(in mediump float x) { mediump float y = x + (0.5/255.0); return y - fract(y * 255.0) * (1.0 / 255.0); }\n");
+				WRITE(p, "float roundTo255thf(in float x) { float y = x + (0.5/255.0); return y - fract(y * 255.0) * (1.0 / 255.0); }\n");
 			} else {
 				WRITE(p, "float roundAndScaleTo255f(in float x) { return floor(x * 255.0 + 0.5); }\n");
 			}
@@ -622,11 +615,11 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			// If we have NV_shader_framebuffer_fetch / EXT_shader_framebuffer_fetch, we skip the blit.
 			// We can just read the prev value more directly.
 			if (gstate_c.Supports(GPU_SUPPORTS_ANY_FRAMEBUFFER_FETCH)) {
-				WRITE(p, "  lowp vec4 destColor = %s;\n", lastFragData);
+				WRITE(p, "  vec4 destColor = %s;\n", lastFragData);
 			} else if (!texelFetch) {
-				WRITE(p, "  lowp vec4 destColor = %s(fbotex, gl_FragCoord.xy * u_fbotexSize.xy);\n", texture);
+				WRITE(p, "  vec4 destColor = %s(fbotex, gl_FragCoord.xy * u_fbotexSize.xy);\n", texture);
 			} else {
-				WRITE(p, "  lowp vec4 destColor = %s(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n", texelFetch);
+				WRITE(p, "  vec4 destColor = %s(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n", texelFetch);
 			}
 
 			const char *srcFactor = "vec3(1.0)";
@@ -773,7 +766,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	if (gstate_c.Supports(GPU_ROUND_FRAGMENT_DEPTH_TO_16BIT)) {
 		const double scale = DepthSliceFactor() * 65535.0;
 
-		WRITE(p, "  highp float z = gl_FragCoord.z;\n");
+		WRITE(p, "  float z = gl_FragCoord.z;\n");
 		if (gstate_c.Supports(GPU_SUPPORTS_ACCURATE_DEPTH)) {
 			// We center the depth with an offset, but only its fraction matters.
 			// When (DepthSliceFactor() - 1) is odd, it will be 0.5, otherwise 0.
