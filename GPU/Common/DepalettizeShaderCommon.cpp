@@ -48,7 +48,7 @@ void GenerateDepalShader300(char *buffer, GEBufferFormat pixelFormat, ShaderLang
 	} else {
 		if (gl_extensions.IsGLES) {
 			WRITE(p, "#version 320 es\n");
-			WRITE(p, "precision mediump float;\n");
+			WRITE(p, "precision highp float;\n");
 		} else {
 			WRITE(p, "#version 330\n");
 		}
@@ -249,7 +249,7 @@ void GenerateDepalShaderFloat(char *buffer, GEBufferFormat pixelFormat, ShaderLa
 	if (lang == GLSL_140) {
 		if (gl_extensions.IsGLES) {
 			WRITE(p, "#version 100\n");
-			WRITE(p, "precision mediump float;\n");
+			WRITE(p, "precision highp float;\n");
 		} else {
 			WRITE(p, "#version 110\n");
 		}

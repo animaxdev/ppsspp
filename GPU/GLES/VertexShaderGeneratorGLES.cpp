@@ -181,9 +181,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	bool hasTexcoordTess = id.Bit(VS_BIT_HAS_TEXCOORD_TESS);
 	bool flipNormalTess = id.Bit(VS_BIT_NORM_REVERSE_TESS);
 
-	const char *shading = "";
-	if (glslES30)
-		shading = doFlatShading ? "flat" : "";
+	const char *shading = doFlatShading ? "flat" : "";
 
 	DoLightComputation doLight[4] = { LIGHT_OFF, LIGHT_OFF, LIGHT_OFF, LIGHT_OFF };
 	if (useHWTransform) {
