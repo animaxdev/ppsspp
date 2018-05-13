@@ -28,6 +28,7 @@ android {
 			storePassword 'zhangwei'
 		}
 	}
+
 	compileSdkVersion 27
 	buildToolsVersion '27.0.3'
 	defaultConfig {

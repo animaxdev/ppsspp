@@ -76,13 +76,13 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 
 
 	std::vector<GLRProgram::Semantic> semantics;
-	semantics.push_back({ ATTR_POSITION, "position" });
-	semantics.push_back({ ATTR_TEXCOORD, "texcoord" });
-	semantics.push_back({ ATTR_NORMAL, "normal" });
-	semantics.push_back({ ATTR_W1, "w1" });
-	semantics.push_back({ ATTR_W2, "w2" });
-	semantics.push_back({ ATTR_COLOR0, "color0" });
-	semantics.push_back({ ATTR_COLOR1, "color1" });
+	//semantics.push_back({ ATTR_POSITION, "position" });
+	//semantics.push_back({ ATTR_TEXCOORD, "texcoord" });
+	//semantics.push_back({ ATTR_NORMAL, "normal" });
+	//semantics.push_back({ ATTR_W1, "w1" });
+	//semantics.push_back({ ATTR_W2, "w2" });
+	//semantics.push_back({ ATTR_COLOR0, "color0" });
+	//semantics.push_back({ ATTR_COLOR1, "color1" });
 
 	std::vector<GLRProgram::UniformLocQuery> queries;
 	queries.push_back({ &u_tex, "tex" });
@@ -612,7 +612,8 @@ void ShaderManagerGLES::DirtyShader() {
 	lastFSID_.set_invalid();
 	lastVSID_.set_invalid();
 	DirtyLastShader();
-	gstate_c.Dirty(DIRTY_ALL_UNIFORMS | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
+	//gstate_c.Dirty(DIRTY_ALL_UNIFORMS | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
+	gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
 	shaderSwitchDirtyUniforms_ = 0;
 }
 

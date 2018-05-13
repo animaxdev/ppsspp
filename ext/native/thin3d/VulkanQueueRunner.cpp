@@ -370,13 +370,6 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 	}
 
-	// starwar
-	if (steps.size() == 2 && steps[0]->stepType == VKRStepType::RENDER) {
-		int size = steps[0]->commands.size();
-		if(size == 6 && steps[0]->commands[5].cmd == VKRRenderCommand::CLEAR) {
-			steps[0]->commands.pop_back();
-		}
-	}
 
 	int size = steps.size();
 
@@ -514,8 +507,12 @@ void VulkanQueueRunner::ApplyMGSHack(std::vector<VKRStep *> &steps) {
 
 	for (int i = 0; i < size; ++i) {
 		if (steps[i]->stepType == VKRStepType::COPY &&
-			steps[i + 1]->stepType == VKRStepType::RENDER && steps[i + 1]->render.numDraws == 1 &&
-			steps[i + 2]->stepType == VKRStepType::COPY && steps[i]->copy.dst == steps[i + 2]->copy.dst) {
+			steps[i + 1]->stepType == VKRStepType::RENDER &&
+			steps[i + 2]->stepType == VKRStepType::COPY &&
+			steps[i + 1]->render.numDraws == 1 &&
+			steps[i]->copy.dst == steps[i + 2]->copy.dst &&
+			steps[i]->copy.srcRect.extent.width == steps[i + 2]->copy.srcRect.extent.width &&
+			steps[i]->copy.srcRect.extent.height == steps[i + 2]->copy.srcRect.extent.height) {
 
 			if (memcmp(&steps[i]->copy, &steps[i + 2]->copy, sizeof(steps[i]->copy)) == 0) {
 				steps[i]->stepType = VKRStepType::RENDER_SKIP;
@@ -680,7 +677,7 @@ void VulkanQueueRunner::LogRenderPass(const VKRStep &pass) {
 			ILOG("    Blend(%f, %f, %f, %f)", cmd.blendColor.color[0], cmd.blendColor.color[1], cmd.blendColor.color[2], cmd.blendColor.color[3]);
 			break;
 		case VKRRenderCommand::CLEAR:
-			ILOG("    Clear");
+			ILOG("    Clear(%d, %08x, %f, %02x)", cmd.clear.clearMask, cmd.clear.clearColor, cmd.clear.clearZ, cmd.clear.clearStencil);
 			break;
 		case VKRRenderCommand::DRAW:
 			ILOG("    Draw(%d)", cmd.draw.count);

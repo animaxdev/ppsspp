@@ -43,13 +43,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	// In GLSL ES 3.0, you use "in" variables instead of varying.
 
 	bool glslES30 = false;
-	const char *varying = "varying";
 	const char *fragColor0 = "gl_FragColor";
 	const char *fragColor1 = "fragColor1";
 	const char *texture = "texture2D";
 	const char *texelFetch = NULL;
-	bool highpFog = false;
-	bool highpTexcoord = false;
 	bool bitwiseOps = false;
 	const char *lastFragData = nullptr;
 
@@ -58,7 +55,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	if (gl_extensions.IsGLES) {
 		// ES doesn't support dual source alpha :(
 		if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300)) {
-			WRITE(p, "#version 300 es\n");  // GLSL ES 3.0
+			WRITE(p, "#version 320 es\n");  // GLSL ES 3.0
 			fragColor0 = "fragColor0";
 			texture = "texture";
 			glslES30 = true;
@@ -85,11 +82,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			}
 		}
 
-		// PowerVR needs highp to do the fog in MHU correctly.
-		// Others don't, and some can't handle highp in the fragment shader.
-		highpFog = (gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_BAD) ? true : false;
-		highpTexcoord = highpFog;
-
 		if (gstate_c.Supports(GPU_SUPPORTS_ANY_FRAMEBUFFER_FETCH)) {
 			if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300) && gl_extensions.EXT_shader_framebuffer_fetch) {
 				WRITE(p, "#extension GL_EXT_shader_framebuffer_fetch : require\n");
@@ -107,7 +99,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			}
 		}
 
-		WRITE(p, "precision lowp float;\n");
+		WRITE(p, "precision highp float;\n");
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
@@ -139,10 +131,6 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 		WRITE(p, "#define lowp\n");
 		WRITE(p, "#define mediump\n");
 		WRITE(p, "#define highp\n");
-	}
-
-	if (glslES30 || gl_extensions.IsCoreContext) {
-		varying = "in";
 	}
 
 	bool lmode = id.Bit(FS_BIT_LMODE);
@@ -234,16 +222,16 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 		WRITE(p, "uniform vec3 u_texenv;\n");
 	}
 
-	WRITE(p, "%s %s vec4 v_color0;\n", shading, varying);
+	WRITE(p, "%s in vec4 v_color0;\n", shading);
 	if (lmode)
-		WRITE(p, "%s %s vec3 v_color1;\n", shading, varying);
+		WRITE(p, "%s in vec3 v_color1;\n", shading);
 	if (enableFog) {
 		*uniformMask |= DIRTY_FOGCOLOR;
 		WRITE(p, "uniform vec3 u_fogcolor;\n");
-		WRITE(p, "%s %s float v_fogdepth;\n", varying, highpFog ? "highp" : "mediump");
+		WRITE(p, "in float v_fogdepth;\n");
 	}
 	if (doTexture) {
-		WRITE(p, "%s %s vec3 v_texcoord;\n", varying, highpTexcoord ? "highp" : "mediump");
+		WRITE(p, "in vec3 v_texcoord;\n");
 	}
 
 	if (!g_Config.bFragmentTestCache) {
@@ -251,7 +239,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			if (bitwiseOps) {
 				WRITE(p, "int roundAndScaleTo255i(in float x) { return int(floor(x * 255.0 + 0.5)); }\n");
 			} else if (gl_extensions.gpuVendor == GPU_VENDOR_IMGTEC) {
-				WRITE(p, "float roundTo255thf(in mediump float x) { mediump float y = x + (0.5/255.0); return y - fract(y * 255.0) * (1.0 / 255.0); }\n");
+				WRITE(p, "float roundTo255thf(in float x) { float y = x + (0.5/255.0); return y - fract(y * 255.0) * (1.0 / 255.0); }\n");
 			} else {
 				WRITE(p, "float roundAndScaleTo255f(in float x) { return floor(x * 255.0 + 0.5); }\n");
 			}
@@ -342,92 +330,95 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			}
 
 			if (doTextureProjection) {
-				WRITE(p, "  vec4 t = %sProj(tex, %s);\n", texture, texcoord);
+				WRITE(p, "  vec4 t = textureProj(tex, %s);\n", texcoord);
 				if (shaderDepal) {
-					WRITE(p, "  vec4 t1 = %sProjOffset(tex, %s, ivec2(1, 0));\n", texture, texcoord);
-					WRITE(p, "  vec4 t2 = %sProjOffset(tex, %s, ivec2(0, 1));\n", texture, texcoord);
-					WRITE(p, "  vec4 t3 = %sProjOffset(tex, %s, ivec2(1, 1));\n", texture, texcoord);
+					WRITE(p, "  vec4 t1 = textureProjOffset(tex, %s, ivec2(1, 0));\n", texcoord);
+					WRITE(p, "  vec4 t2 = textureProjOffset(tex, %s, ivec2(0, 1));\n", texcoord);
+					WRITE(p, "  vec4 t3 = textureProjOffset(tex, %s, ivec2(1, 1));\n", texcoord);
 				}
 			} else {
-				WRITE(p, "  vec4 t = %s(tex, %s.xy);\n", texture, texcoord);
+				WRITE(p, "  vec4 t = texture(tex, %s.xy);\n", texcoord);
 				if (shaderDepal) {
-					WRITE(p, "  vec4 t1 = %sOffset(tex, %s.xy, ivec2(1, 0));\n", texture, texcoord);
-					WRITE(p, "  vec4 t2 = %sOffset(tex, %s.xy, ivec2(0, 1));\n", texture, texcoord);
-					WRITE(p, "  vec4 t3 = %sOffset(tex, %s.xy, ivec2(1, 1));\n", texture, texcoord);
+					WRITE(p, "  vec4 t1 = textureOffset(tex, %s.xy, ivec2(1, 0));\n", texcoord);
+					WRITE(p, "  vec4 t2 = textureOffset(tex, %s.xy, ivec2(0, 1));\n", texcoord);
+					WRITE(p, "  vec4 t3 = textureOffset(tex, %s.xy, ivec2(1, 1));\n", texcoord);
 				}
 			}
 
 			if (shaderDepal) {
+				int depalFormat = id.Bits(FS_BIT_SHADER_DEPAL_FORMAT, 2);
+				bool depalBilinearFiltering = id.Bit(FS_BIT_SHADER_DEPAL_BILINEAR);
 				WRITE(p, "  int depalMask = (u_depal & 0xFF);\n");
 				WRITE(p, "  int depalShift = ((u_depal >> 8) & 0xFF);\n");
 				WRITE(p, "  int depalOffset = (((u_depal >> 16) & 0xFF) << 4);\n");
-				WRITE(p, "  int depalFmt = ((u_depal >> 24) & 0x3);\n");
-				WRITE(p, "  bool bilinear = (u_depal >> 31) != 0;\n");
-				WRITE(p, "  vec2 fraction = fract(%s.xy * vec2(textureSize(tex, 0).xy));\n", texcoord);
+				//WRITE(p, "  int depalFmt = ((u_depal >> 24) & 0x3);\n");
+				//WRITE(p, "  bool bilinear = (u_depal >> 31) != 0;\n");
+				WRITE(p, "  vec2 fraction = fract(%s.xy);\n", texcoord);
 				WRITE(p, "  ivec4 col; int index0; int index1; int index2; int index3;\n");
-				WRITE(p, "  switch (depalFmt) {\n");  // We might want to include fmt in the shader ID if this is a performance issue.
-				WRITE(p, "  case 0:\n");  // 565
-				WRITE(p, "    col = ivec4(t.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
-				WRITE(p, "    index0 = (col.b << 11) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "    if (bilinear) {\n");
-				WRITE(p, "      col = ivec4(t1.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
-				WRITE(p, "      index1 = (col.b << 11) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t2.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
-				WRITE(p, "      index2 = (col.b << 11) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t3.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
-				WRITE(p, "      index3 = (col.b << 11) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "    }\n");
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 1:\n");  // 5551
-				WRITE(p, "    col = ivec4(t.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
-				WRITE(p, "    index0 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "    if (bilinear) {\n");
-				WRITE(p, "      col = ivec4(t1.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
-				WRITE(p, "      index1 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t2.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
-				WRITE(p, "      index2 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t3.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
-				WRITE(p, "      index3 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
-				WRITE(p, "    }\n");
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 2:\n");  // 4444
-				WRITE(p, "    col = ivec4(t.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
-				WRITE(p, "    index0 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-				WRITE(p, "    if (bilinear) {\n");
-				WRITE(p, "      col = ivec4(t1.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
-				WRITE(p, "      index1 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t2.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
-				WRITE(p, "      index2 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t3.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
-				WRITE(p, "      index3 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-				WRITE(p, "    }\n");
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 3:\n");  // 8888
-				WRITE(p, "    col = ivec4(t.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
-				WRITE(p, "    index0 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-				WRITE(p, "    if (bilinear) {\n");
-				WRITE(p, "      col = ivec4(t1.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
-				WRITE(p, "      index1 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t2.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
-				WRITE(p, "      index2 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-				WRITE(p, "      col = ivec4(t3.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
-				WRITE(p, "      index3 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-				WRITE(p, "    }\n");
-				WRITE(p, "    break;\n");
-				WRITE(p, "  };\n");
+				switch (depalFormat)
+				{
+				case 0: // 565
+					WRITE(p, "    col = ivec4(t.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
+					WRITE(p, "    index0 = (col.b << 11) | (col.g << 5) | (col.r);\n");
+					if (depalBilinearFiltering) {
+						WRITE(p, "      col = ivec4(t1.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
+						WRITE(p, "      index1 = (col.b << 11) | (col.g << 5) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t2.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
+						WRITE(p, "      index2 = (col.b << 11) | (col.g << 5) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t3.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
+						WRITE(p, "      index3 = (col.b << 11) | (col.g << 5) | (col.r);\n");
+					}
+					break;
+				case 1: // 5551
+					WRITE(p, "    col = ivec4(t.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
+					WRITE(p, "    index0 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
+					if (depalBilinearFiltering) {
+						WRITE(p, "      col = ivec4(t1.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
+						WRITE(p, "      index1 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t2.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
+						WRITE(p, "      index2 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t3.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
+						WRITE(p, "      index3 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
+					}
+					break;
+				case 2: // 4444
+					WRITE(p, "    col = ivec4(t.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+					WRITE(p, "    index0 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
+					if (depalBilinearFiltering) {
+						WRITE(p, "      col = ivec4(t1.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      index1 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t2.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      index2 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t3.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      index3 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
+					}
+				case 3: // 8888
+					WRITE(p, "    col = ivec4(t.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+					WRITE(p, "    index0 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
+					if (depalBilinearFiltering) {
+						WRITE(p, "      col = ivec4(t1.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      index1 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t2.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      index2 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
+						WRITE(p, "      col = ivec4(t3.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      index3 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
+					}
+				default:
+					break;
+				}
 				WRITE(p, "  index0 = ((index0 >> depalShift) & depalMask) | depalOffset;\n");
 				WRITE(p, "  t = texelFetch(pal, ivec2(index0, 0), 0);\n");
-				WRITE(p, "  if (bilinear) {\n");
-				WRITE(p, "    index1 = ((index1 >> depalShift) & depalMask) | depalOffset;\n");
-				WRITE(p, "    index2 = ((index2 >> depalShift) & depalMask) | depalOffset;\n");
-				WRITE(p, "    index3 = ((index3 >> depalShift) & depalMask) | depalOffset;\n");
-				WRITE(p, "    t1 = texelFetch(pal, ivec2(index1, 0), 0);\n");
-				WRITE(p, "    t2 = texelFetch(pal, ivec2(index2, 0), 0);\n");
-				WRITE(p, "    t3 = texelFetch(pal, ivec2(index3, 0), 0);\n");
-				WRITE(p, "    t = mix(t, t1, fraction.x);\n");
-				WRITE(p, "    t2 = mix(t2, t3, fraction.x);\n");
-				WRITE(p, "    t = mix(t, t2, fraction.y);\n");
-				WRITE(p, "  }\n");
+				if (depalBilinearFiltering) {
+					WRITE(p, "    index1 = ((index1 >> depalShift) & depalMask) | depalOffset;\n");
+					WRITE(p, "    index2 = ((index2 >> depalShift) & depalMask) | depalOffset;\n");
+					WRITE(p, "    index3 = ((index3 >> depalShift) & depalMask) | depalOffset;\n");
+					WRITE(p, "    t1 = texelFetch(pal, ivec2(index1, 0), 0);\n");
+					WRITE(p, "    t2 = texelFetch(pal, ivec2(index2, 0), 0);\n");
+					WRITE(p, "    t3 = texelFetch(pal, ivec2(index3, 0), 0);\n");
+					WRITE(p, "    t = mix(t, t1, fraction.x);\n");
+					WRITE(p, "    t2 = mix(t2, t3, fraction.x);\n");
+					WRITE(p, "    t = mix(t, t2, fraction.y);\n");
+				}
 			}
 
 			if (texFunc != GE_TEXFUNC_REPLACE || !doTextureAlpha)
@@ -627,11 +618,11 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			// If we have NV_shader_framebuffer_fetch / EXT_shader_framebuffer_fetch, we skip the blit.
 			// We can just read the prev value more directly.
 			if (gstate_c.Supports(GPU_SUPPORTS_ANY_FRAMEBUFFER_FETCH)) {
-				WRITE(p, "  lowp vec4 destColor = %s;\n", lastFragData);
+				WRITE(p, "  vec4 destColor = %s;\n", lastFragData);
 			} else if (!texelFetch) {
-				WRITE(p, "  lowp vec4 destColor = %s(fbotex, gl_FragCoord.xy * u_fbotexSize.xy);\n", texture);
+				WRITE(p, "  vec4 destColor = %s(fbotex, gl_FragCoord.xy * u_fbotexSize.xy);\n", texture);
 			} else {
-				WRITE(p, "  lowp vec4 destColor = %s(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n", texelFetch);
+				WRITE(p, "  vec4 destColor = %s(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n", texelFetch);
 			}
 
 			const char *srcFactor = "vec3(1.0)";
@@ -778,7 +769,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 	if (gstate_c.Supports(GPU_ROUND_FRAGMENT_DEPTH_TO_16BIT)) {
 		const double scale = DepthSliceFactor() * 65535.0;
 
-		WRITE(p, "  highp float z = gl_FragCoord.z;\n");
+		WRITE(p, "  float z = gl_FragCoord.z;\n");
 		if (gstate_c.Supports(GPU_SUPPORTS_ACCURATE_DEPTH)) {
 			// We center the depth with an offset, but only its fraction matters.
 			// When (DepthSliceFactor() - 1) is odd, it will be 0.5, otherwise 0.

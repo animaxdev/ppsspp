@@ -55,22 +55,18 @@ static const char tex_fs[] =
 	"out vec4 fragColor0;\n"
 	"#endif\n"
 #ifdef USING_GLES2
-	"precision mediump float;\n"
+	"precision highp float;\n"
 #endif
 	"uniform sampler2D sampler0;\n"
-	"varying vec2 v_texcoord0;\n"
+	"in vec2 v_texcoord0;\n"
 	"void main() {\n"
 	"  gl_FragColor = texture2D(sampler0, v_texcoord0);\n"
 	"}\n";
 
 static const char basic_vs[] =
-	"#if __VERSION__ >= 130\n"
-	"#define attribute in\n"
-	"#define varying out\n"
-	"#endif\n"
-	"attribute vec4 a_position;\n"
-	"attribute vec2 a_texcoord0;\n"
-	"varying vec2 v_texcoord0;\n"
+	"layout(location = 0) in vec4 a_position;\n"
+	"layout(location = 1) in vec2 a_texcoord0;\n"
+	"out vec2 v_texcoord0;\n"
 	"void main() {\n"
 	"  v_texcoord0 = a_texcoord0;\n"
 	"  gl_Position = a_position;\n"
@@ -95,8 +91,8 @@ void FramebufferManagerGLES::CompileDraw2DProgram() {
 		std::vector<GLRProgram::Initializer> initializers;
 		initializers.push_back({ &u_draw2d_tex, 0 });
 		std::vector<GLRProgram::Semantic> semantics;
-		semantics.push_back({ 0, "a_position" });
-		semantics.push_back({ 1, "a_texcoord0" });
+		//semantics.push_back({ 0, "a_position" });
+		//semantics.push_back({ 1, "a_texcoord0" });
 		draw2dprogram_ = render_->CreateProgram(shaders, semantics, queries, initializers, false);
 		for (auto shader : shaders)
 			render_->DeleteShader(shader);
@@ -544,7 +540,7 @@ void FramebufferManagerGLES::BindFramebufferAsColorTexture(int stage, VirtualFra
 	}
 	if (!skipCopy && currentRenderVfb_ && framebuffer->fb_address == gstate.getFrameBufRawAddress()) {
 		// TODO: Maybe merge with bvfbs_?  Not sure if those could be packing, and they're created at a different size.
-		Draw::Framebuffer *renderCopy = GetTempFBO(framebuffer->renderWidth, framebuffer->renderHeight, (Draw::FBColorDepth)framebuffer->colorDepth);
+		Draw::Framebuffer *renderCopy = GetTempFBO(TempFBO::COPY, framebuffer->renderWidth, framebuffer->renderHeight, (Draw::FBColorDepth)framebuffer->colorDepth);
 		if (renderCopy) {
 			VirtualFramebuffer copyInfo = *framebuffer;
 			copyInfo.fbo = renderCopy;

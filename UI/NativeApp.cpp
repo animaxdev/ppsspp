@@ -326,6 +326,21 @@ static void PostLoadConfig() {
 		i18nrepo.LoadIni(g_Config.sLanguageIni, langOverridePath);
 }
 
+void CreateDirectoriesAndroid() {
+	// On Android, create a PSP directory tree in the external_dir,
+	// to hopefully reduce confusion a bit.
+	ILOG("Creating %s", (g_Config.memStickDirectory + "PSP").c_str());
+	File::CreateDir(g_Config.memStickDirectory + "PSP");
+	File::CreateDir(g_Config.memStickDirectory + "PSP/SAVEDATA");
+	File::CreateDir(g_Config.memStickDirectory + "PSP/PPSSPP_STATE");
+	File::CreateDir(g_Config.memStickDirectory + "PSP/GAME");
+	File::CreateDir(g_Config.memStickDirectory + "PSP/SYSTEM");
+
+	// Avoid media scanners in PPSSPP_STATE and SAVEDATA directories
+	File::CreateEmptyFile(g_Config.memStickDirectory + "PSP/PPSSPP_STATE/.nomedia");
+	File::CreateEmptyFile(g_Config.memStickDirectory + "PSP/SAVEDATA/.nomedia");
+}
+
 void NativeInit(int argc, const char *argv[], const char *savegame_dir, const char *external_dir, const char *cache_dir, bool fs) {
 	net::Init();  // This needs to happen before we load the config. So on Windows we also run it in Main. It's fine to call multiple times.
 
@@ -409,16 +424,8 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 	LogManager *logman = LogManager::GetInstance();
 
 #ifdef __ANDROID__
-	// TODO: This is also done elsewhere. Remove?
-	// On Android, create a PSP directory tree in the external_dir,
-	// to hopefully reduce confusion a bit.
-	ILOG("Creating %s", (g_Config.memStickDirectory + "PSP").c_str());
-	File::CreateDir((g_Config.memStickDirectory + "PSP").c_str());
-	File::CreateDir((g_Config.memStickDirectory + "PSP/SAVEDATA").c_str());
-	File::CreateDir((g_Config.memStickDirectory + "PSP/GAME").c_str());
+	CreateDirectoriesAndroid();
 #endif
-
-
 
 	const char *fileToLog = 0;
 	const char *stateToLoad = 0;
@@ -500,12 +507,22 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 					std::unique_ptr<FileLoader> fileLoader(ConstructFileLoader(boot_filename));
 					if (!fileLoader->Exists()) {
 						fprintf(stderr, "File not found: %s\n", boot_filename.c_str());
+#ifdef _WIN32
+						// Ignore and proceed.
+#else
+						// Bail.
 						exit(1);
+#endif
 					}
 				}
 			} else {
 				fprintf(stderr, "Can only boot one file");
+#ifdef _WIN32
+				// Ignore and proceed.
+#else
+				// Bail.
 				exit(1);
+#endif
 			}
 		}
 	}
@@ -953,10 +970,12 @@ void HandleGlobalMessage(const std::string &msg, const std::string &value) {
 			osm.Show(sy->T("WARNING: Battery save mode is on"), 2.0f, 0xFFFFFF, -1, true, "core_powerSaving");
 #endif
 		}
-
 		Core_SetPowerSaving(value != "false");
 	}
 	if (msg == "permission_granted" && value == "storage") {
+#ifdef __ANDROID__
+		CreateDirectoriesAndroid();
+#endif
 		// We must have failed to load the config before, so load it now to avoid overwriting the old config
 		// with a freshly generated one.
 		ILOG("Reloading config after storage permission grant.");

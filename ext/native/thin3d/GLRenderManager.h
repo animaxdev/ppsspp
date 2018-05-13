@@ -188,8 +188,6 @@ class GLRenderManager;
 // runs on the render thread.
 class GLPushBuffer {
 public:
-	friend class GLRenderManager;
-
 	struct BufInfo {
 		GLRBuffer *buffer = nullptr;
 		uint8_t *localMemory = nullptr;
@@ -202,7 +200,6 @@ public:
 
 	void Reset() { offset_ = 0; }
 
-private:
 	// Needs context in case of defragment.
 	void Begin() {
 		buf_ = 0;
@@ -221,7 +218,6 @@ private:
 		Unmap();
 	}
 
-public:
 	void Map();
 	void Unmap();
 
@@ -281,6 +277,7 @@ public:
 	void Flush();
 
 protected:
+	friend class GLRenderManager;
 	void MapDevice(GLBufferStrategy strategy);
 	void UnmapDevice();
 
@@ -479,14 +476,6 @@ public:
 	}
 	void DeletePushBuffer(GLPushBuffer *pushbuffer) {
 		deleter_.pushBuffers.push_back(pushbuffer);
-	}
-
-	void BeginPushBuffer(GLPushBuffer *pushbuffer) {
-		pushbuffer->Begin();
-	}
-
-	void EndPushBuffer(GLPushBuffer *pushbuffer) {
-		pushbuffer->End();
 	}
 
 	void BindFramebufferAsRenderTarget(GLRFramebuffer *fb, GLRRenderPassAction color, GLRRenderPassAction depth, GLRRenderPassAction stencil, uint32_t clearColor, float clearDepth, uint8_t clearStencil);

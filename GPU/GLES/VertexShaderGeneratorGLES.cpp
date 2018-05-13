@@ -52,14 +52,14 @@ static const char * const boneWeightAttrDecl[9] = {
 
 static const char * const boneWeightInDecl[9] = {
 	"#ERROR#",
-	"in mediump float w1;\n",
-	"in mediump vec2 w1;\n",
-	"in mediump vec3 w1;\n",
-	"in mediump vec4 w1;\n",
-	"in mediump vec4 w1;\nin mediump float w2;\n",
-	"in mediump vec4 w1;\nin mediump vec2 w2;\n",
-	"in mediump vec4 w1;\nin mediump vec3 w2;\n",
-	"in mediump vec4 w1, w2;\n",
+	"layout(location = 3) in float w1;\n",
+	"layout(location = 3) in vec2 w1;\n",
+	"layout(location = 3) in vec3 w1;\n",
+	"layout(location = 3) in vec4 w1;\n",
+	"layout(location = 3) in vec4 w1;\nlayout(location = 4) in float w2;\n",
+	"layout(location = 3) in vec4 w1;\nlayout(location = 4) in vec2 w2;\n",
+	"layout(location = 3) in vec4 w1;\nlayout(location = 4) in vec3 w2;\n",
+	"layout(location = 3) in vec4 w1;\nlayout(location = 4) in vec4 w2;\n",
 };
 
 enum DoLightComputation {
@@ -103,16 +103,12 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 	// In GLSL ES 3.0, you use "out" variables instead.
 	bool glslES30 = false;
-	const char *varying = "varying";
-	const char *attribute = "attribute";
 	const char * const * boneWeightDecl = boneWeightAttrDecl;
 	const char *texelFetch = NULL;
-	bool highpFog = false;
-	bool highpTexcoord = false;
 
 	if (gl_extensions.IsGLES) {
 		if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300)) {
-			WRITE(p, "#version 300 es\n");
+			WRITE(p, "#version 320 es\n");
 			glslES30 = true;
 			texelFetch = "texelFetch";
 		} else {
@@ -123,11 +119,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 			}
 		}
 		WRITE(p, "precision highp float;\n");
-
-		// PowerVR needs highp to do the fog in MHU correctly.
-		// Others don't, and some can't handle highp in the fragment shader.
-		highpFog = (gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_BAD) ? true : false;
-		highpTexcoord = highpFog;
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
@@ -156,8 +147,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	}
 
 	if (glslES30 || gl_extensions.IsCoreContext) {
-		attribute = "in";
-		varying = "out";
 		boneWeightDecl = boneWeightInDecl;
 	}
 
@@ -192,9 +181,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	bool hasTexcoordTess = id.Bit(VS_BIT_HAS_TEXCOORD_TESS);
 	bool flipNormalTess = id.Bit(VS_BIT_NORM_REVERSE_TESS);
 
-	const char *shading = "";
-	if (glslES30)
-		shading = doFlatShading ? "flat " : "";
+	const char *shading = doFlatShading ? "flat" : "";
 
 	DoLightComputation doLight[4] = { LIGHT_OFF, LIGHT_OFF, LIGHT_OFF, LIGHT_OFF };
 	if (useHWTransform) {
@@ -219,31 +206,31 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	}
 
 	if (useHWTransform)
-		WRITE(p, "%s vec3 position;\n", attribute);
+		WRITE(p, "layout(location = %d) in vec3 position;\n", ATTR_POSITION);
 	else
-		WRITE(p, "%s vec4 position;\n", attribute);  // need to pass the fog coord in w
+		WRITE(p, "layout(location = %d) in vec4 position;\n", ATTR_POSITION);  // need to pass the fog coord in w
 	*attrMask |= 1 << ATTR_POSITION;
 
 	if (useHWTransform && hasNormal) {
-		WRITE(p, "%s mediump vec3 normal;\n", attribute);
+		WRITE(p, "layout(location = %d) in vec3 normal;\n", ATTR_NORMAL);
 		*attrMask |= 1 << ATTR_NORMAL;
 	}
 
 	bool texcoordVec3In = false;
 	if (doTexture && hasTexcoord) {
 		if (!useHWTransform && doTextureProjection && !throughmode) {
-			WRITE(p, "%s vec3 texcoord;\n", attribute);
+			WRITE(p, "layout(location = %d) in vec3 texcoord;\n", ATTR_TEXCOORD);
 			texcoordVec3In = true;
 		} else {
-			WRITE(p, "%s vec2 texcoord;\n", attribute);
+			WRITE(p, "layout(location = %d) in vec2 texcoord;\n", ATTR_TEXCOORD);
 		}
 		*attrMask |= 1 << ATTR_TEXCOORD;
 	}
 	if (hasColor) {
-		WRITE(p, "%s lowp vec4 color0;\n", attribute);
+		WRITE(p, "layout(location = %d) in vec4 color0;\n", ATTR_COLOR0);
 		*attrMask |= 1 << ATTR_COLOR0;
 		if (lmode && !useHWTransform) { // only software transform supplies color1 as vertex data
-			WRITE(p, "%s lowp vec3 color1;\n", attribute);
+			WRITE(p, "layout(location = %d) in vec3 color1;\n", ATTR_COLOR1);
 			*attrMask |= 1 << ATTR_COLOR1;
 		}
 	}
@@ -265,12 +252,12 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		WRITE(p, "uniform mat4 u_view;\n");
 		*uniformMask |= DIRTY_WORLDMATRIX | DIRTY_VIEWMATRIX;
 		if (doTextureProjection) {
-			WRITE(p, "uniform mediump mat4 u_texmtx;\n");
+			WRITE(p, "uniform mat4 u_texmtx;\n");
 			*uniformMask |= DIRTY_TEXMATRIX;
 		}
 		if (enableBones) {
 #ifdef USE_BONE_ARRAY
-			WRITE(p, "uniform mediump mat4 u_bone[%i];\n", numBoneWeights);
+			WRITE(p, "uniform mat4 u_bone[%i];\n", numBoneWeights);
 			*uniformMask |= DIRTY_BONE_UNIFORMS;
 #else
 			for (int i = 0; i < numBoneWeights; i++) {
@@ -295,63 +282,59 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				GELightComputation comp = static_cast<GELightComputation>(id.Bits(VS_BIT_LIGHT0_COMP + 4 * i, 2));
 
 				if (type != GE_LIGHTTYPE_DIRECTIONAL)
-					WRITE(p, "uniform mediump vec3 u_lightatt%i;\n", i);
+					WRITE(p, "uniform vec3 u_lightatt%i;\n", i);
 
 				if (type == GE_LIGHTTYPE_SPOT || type == GE_LIGHTTYPE_UNKNOWN) {
-					WRITE(p, "uniform mediump vec3 u_lightdir%i;\n", i);
-					WRITE(p, "uniform mediump vec2 u_lightangle_spotCoef%i;\n", i);
+					WRITE(p, "uniform vec3 u_lightdir%i;\n", i);
+					WRITE(p, "uniform vec2 u_lightangle_spotCoef%i;\n", i);
 				}
-				WRITE(p, "uniform lowp vec3 u_lightambient%i;\n", i);
-				WRITE(p, "uniform lowp vec3 u_lightdiffuse%i;\n", i);
+				WRITE(p, "uniform vec3 u_lightambient%i;\n", i);
+				WRITE(p, "uniform vec3 u_lightdiffuse%i;\n", i);
 
 				if (comp != GE_LIGHTCOMP_ONLYDIFFUSE) {
-					WRITE(p, "uniform lowp vec3 u_lightspecular%i;\n", i);
+					WRITE(p, "uniform vec3 u_lightspecular%i;\n", i);
 				}
 			}
 		}
 		if (enableLighting) {
-			WRITE(p, "uniform lowp vec4 u_ambient;\n");
+			WRITE(p, "uniform vec4 u_ambient;\n");
 			*uniformMask |= DIRTY_AMBIENT;
 			if ((matUpdate & 2) == 0 || !hasColor) {
-				WRITE(p, "uniform lowp vec3 u_matdiffuse;\n");
+				WRITE(p, "uniform vec3 u_matdiffuse;\n");
 				*uniformMask |= DIRTY_MATDIFFUSE;
 			}
-			WRITE(p, "uniform lowp vec4 u_matspecular;\n");  // Specular coef is contained in alpha
-			WRITE(p, "uniform lowp vec3 u_matemissive;\n");
+			WRITE(p, "uniform vec4 u_matspecular;\n");  // Specular coef is contained in alpha
+			WRITE(p, "uniform vec3 u_matemissive;\n");
 			*uniformMask |= DIRTY_MATSPECULAR | DIRTY_MATEMISSIVE;
 		}
 	}
 
 	if (useHWTransform || !hasColor) {
-		WRITE(p, "uniform lowp vec4 u_matambientalpha;\n");  // matambient + matalpha
+		WRITE(p, "uniform vec4 u_matambientalpha;\n");  // matambient + matalpha
 		*uniformMask |= DIRTY_MATAMBIENTALPHA;
 	}
 	if (enableFog) {
-		WRITE(p, "uniform highp vec2 u_fogcoef;\n");
+		WRITE(p, "uniform vec2 u_fogcoef;\n");
 		*uniformMask |= DIRTY_FOGCOEF;
 	}
 
 	if (!isModeThrough && gstate_c.Supports(GPU_ROUND_DEPTH_TO_16BIT)) {
-		WRITE(p, "uniform highp vec4 u_depthRange;\n");
+		WRITE(p, "uniform vec4 u_depthRange;\n");
 		*uniformMask |= DIRTY_DEPTHRANGE;
 	}
 
-	WRITE(p, "%s%s lowp vec4 v_color0;\n", shading, varying);
+	WRITE(p, "%s out vec4 v_color0;\n", shading);
 	if (lmode) {
-		WRITE(p, "%s%s lowp vec3 v_color1;\n", shading, varying);
+		WRITE(p, "%s out vec3 v_color1;\n", shading);
 	}
 
 	if (doTexture) {
-		WRITE(p, "%s %s vec3 v_texcoord;\n", varying, highpTexcoord ? "highp" : "mediump");
+		WRITE(p, "out vec3 v_texcoord;\n");
 	}
 
 	if (enableFog) {
 		// See the fragment shader generator
-		if (highpFog) {
-			WRITE(p, "%s highp float v_fogdepth;\n", varying);
-		} else {
-			WRITE(p, "%s mediump float v_fogdepth;\n", varying);
-		}
+		WRITE(p, "out float v_fogdepth;\n");
 	}
 
 	// See comment above this function (GenerateVertexShader).
@@ -579,17 +562,17 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				}
 				WRITE(p, "  vec3 worldpos = (u_world * vec4(pos.xyz, 1.0)).xyz;\n");
 				if (hasNormal) {
-					WRITE(p, "  mediump vec3 worldnormal = normalize((u_world * vec4(%snrm, 0.0)).xyz);\n", flipNormalTess ? "-" : "");
+					WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(%snrm, 0.0)).xyz);\n", flipNormalTess ? "-" : "");
 				} else {
-					WRITE(p, "  mediump vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
+					WRITE(p, "  vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
 				}
 			} else {
 				// No skinning, just standard T&L.
 				WRITE(p, "  vec3 worldpos = (u_world * vec4(position.xyz, 1.0)).xyz;\n");
 				if (hasNormal)
-					WRITE(p, "  mediump vec3 worldnormal = normalize((u_world * vec4(%snormal, 0.0)).xyz);\n", flipNormal ? "-" : "");
+					WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(%snormal, 0.0)).xyz);\n", flipNormal ? "-" : "");
 				else
-					WRITE(p, "  mediump vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
+					WRITE(p, "  vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
 			}
 		} else {
 			static const char *rescale[4] = {"", " * 1.9921875", " * 1.999969482421875", ""}; // 2*127.5f/128.f, 2*32767.5f/32768.f, 1.0f};
@@ -661,11 +644,11 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 			WRITE(p, "  vec3 worldpos = (u_world * vec4(skinnedpos, 1.0)).xyz;\n");
 
 			if (hasNormal) {
-				WRITE(p, "  mediump vec3 skinnednormal = (skinMatrix * vec4(%snormal, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
+				WRITE(p, "  vec3 skinnednormal = (skinMatrix * vec4(%snormal, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
 			} else {
-				WRITE(p, "  mediump vec3 skinnednormal = (skinMatrix * vec4(0.0, 0.0, %s1.0, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
+				WRITE(p, "  vec3 skinnednormal = (skinMatrix * vec4(0.0, 0.0, %s1.0, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
 			}
-			WRITE(p, "  mediump vec3 worldnormal = normalize((u_world * vec4(skinnednormal, 0.0)).xyz);\n");
+			WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(skinnednormal, 0.0)).xyz);\n");
 		}
 
 		WRITE(p, "  vec4 viewPos = u_view * vec4(worldpos, 1.0);\n");
@@ -693,7 +676,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		bool distanceNeeded = false;
 		bool anySpots = false;
 		if (enableLighting) {
-			WRITE(p, "  lowp vec4 lightSum0 = u_ambient * %s + vec4(u_matemissive, 0.0);\n", ambientStr);
+			WRITE(p, "  vec4 lightSum0 = u_ambient * %s + vec4(u_matemissive, 0.0);\n", ambientStr);
 
 			for (int i = 0; i < 4; i++) {
 				GELightType type = static_cast<GELightType>(id.Bits(VS_BIT_LIGHT0_TYPE + 4*i, 2));
@@ -710,19 +693,19 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 			}
 
 			if (!specularIsZero) {
-				WRITE(p, "  lowp vec3 lightSum1 = vec3(0.0);\n");
+				WRITE(p, "  vec3 lightSum1 = vec3(0.0);\n");
 			}
 			if (!diffuseIsZero) {
 				WRITE(p, "  vec3 toLight;\n");
-				WRITE(p, "  lowp vec3 diffuse;\n");
+				WRITE(p, "  vec3 diffuse;\n");
 			}
 			if (distanceNeeded) {
 				WRITE(p, "  float distance;\n");
-				WRITE(p, "  lowp float lightScale;\n");
+				WRITE(p, "  float lightScale;\n");
 			}
-			WRITE(p, "  mediump float ldot;\n");
+			WRITE(p, "  float ldot;\n");
 			if (anySpots) {
-				WRITE(p, "  lowp float angle;\n");
+				WRITE(p, "  float angle;\n");
 			}
 		}
 

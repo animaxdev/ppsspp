@@ -1044,12 +1044,14 @@ void GameSettingsScreen::CallbackRenderingBackend(bool yes) {
 }
 
 UI::EventReturn GameSettingsScreen::OnRenderingBackend(UI::EventParams &e) {
-	I18NCategory *di = GetI18NCategory("Dialog");
+	//I18NCategory *di = GetI18NCategory("Dialog");
 
 	// It only makes sense to show the restart prompt if the backend was actually changed.
 	if (g_Config.iGPUBackend != (int)GetGPUBackend()) {
-		screenManager()->push(new PromptScreen(di->T("ChangingGPUBackends", "Changing GPU backends requires PPSSPP to restart. Restart now?"), di->T("Yes"), di->T("No"),
-			std::bind(&GameSettingsScreen::CallbackRenderingBackend, this, std::placeholders::_1)));
+		//screenManager()->push(new PromptScreen(di->T("ChangingGPUBackends", "Changing GPU backends requires PPSSPP to restart. Restart now?"), di->T("Yes"), di->T("No"),
+		//	std::bind(&GameSettingsScreen::CallbackRenderingBackend, this, std::placeholders::_1)));
+		g_Config.Save();
+		System_SendMessage("graphics_restart", "");
 	}
 	return UI::EVENT_DONE;
 }
