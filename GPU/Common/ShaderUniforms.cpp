@@ -206,10 +206,7 @@ void BaseUpdateUniforms(UB_VS_FS_Base *ub, uint64_t dirtyUniforms, bool flipView
 		int indexShift = gstate.getClutIndexShift();
 		int indexOffset = gstate.getClutIndexStartPos() >> 4;
 		int format = gstate_c.depalFramebufferFormat;
-		uint32_t val = BytesToUint32(indexMask, indexShift, indexOffset, format);
-		// Poke in a bilinear filter flag in the top bit.
-		val |= gstate.isMagnifyFilteringEnabled() << 31;
-		ub->depal_mask_shift_off_fmt = val;
+		ub->depal_mask_shift_off_fmt = BytesToUint32(indexMask, indexShift, indexOffset, format);
 	}
 }
 

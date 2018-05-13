@@ -303,7 +303,6 @@ void ComputeFragmentShaderID(ShaderID *id_out) {
 		id.SetBit(FS_BIT_FLATSHADE, doFlatShading);
 
 		id.SetBit(FS_BIT_SHADER_DEPAL, useShaderDepal);
-		id.SetBits(FS_BIT_SHADER_DEPAL_FORMAT, 2, gstate_c.depalFramebufferFormat);
 		id.SetBit(FS_BIT_SHADER_DEPAL_BILINEAR, gstate.isMagnifyFilteringEnabled());
 	}
 
