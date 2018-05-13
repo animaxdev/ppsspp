@@ -171,8 +171,8 @@ DepalShader *DepalShaderCacheGLES::GetDepalettizeShader(uint32_t clutMode, GEBuf
 	queries.push_back({ &depal->u_pal, "pal" });
 
 	std::vector<GLRProgram::Initializer> initializer;
-	initializer.push_back({ &depal->u_tex, 0, 0 });
-	initializer.push_back({ &depal->u_pal, 0, 3 });
+	initializer.push_back({ &depal->u_tex, 0, 0 }); //TEX_SLOT_PSP_TEXTURE = 0,
+	initializer.push_back({ &depal->u_pal, 0, 3 }); //TEX_SLOT_CLUT = 3,
 
 	std::vector<GLRShader *> shaders{ vertexShader_, fragShader };
 

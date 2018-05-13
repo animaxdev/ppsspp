@@ -465,11 +465,11 @@ void TextureCacheVulkan::ApplyTextureFramebuffer(TexCacheEntry *entry, VirtualFr
 	} else {
 		entry->status &= ~TexCacheEntry::STATUS_DEPALETTIZE;
 
-		framebufferManager_->RebindFramebuffer();  // TODO: This line should usually not be needed.
+		//framebufferManager_->RebindFramebuffer();  // TODO: This line should usually not be needed.
 		imageView_ = framebufferManagerVulkan_->BindFramebufferAsColorTexture(0, framebuffer, BINDFBCOLOR_MAY_COPY_WITH_UV | BINDFBCOLOR_APPLY_TEX_OFFSET);
 		// fx sonic rival 2 too bright
-		drawEngine_->SetDepalTexture(VK_NULL_HANDLE);
-		gstate_c.SetUseShaderDepal(false);
+		//drawEngine_->SetDepalTexture(VK_NULL_HANDLE);
+		//gstate_c.SetUseShaderDepal(false);
 
 		gstate_c.SetTextureFullAlpha(gstate.getTextureFormat() == GE_TFMT_5650);
 	}
