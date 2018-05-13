@@ -140,7 +140,8 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 		if (doTexture) {
 			const char *texcoord = "v_texcoord";
 			// TODO: Not sure the right way to do this for projection.
-			// This path destroys resolution on older PowerVR no matter what I do, so we disable it on SGX 540 and lesser, and live with the consequences.
+			// This path destroys resolution on older PowerVR no matter what I do, 
+			// so we disable it on SGX 540 and lesser, and live with the consequences.
 			if (needShaderTexClamp && !(gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_TERRIBLE)) {
 				// We may be clamping inside a larger surface (tex = 64x64, buffer=480x272).
 				// We may also be wrapping in such a surface, or either one in a too-small surface.
@@ -175,31 +176,38 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 				doTextureProjection = false;
 			}
 
-			if (doTextureProjection) {
-				WRITE(p, "  vec4 t = textureProj(tex, %s);\n", texcoord);
-				if (shaderDepal) {
-					WRITE(p, "  vec4 t1 = textureProjOffset(tex, %s, ivec2(1, 0));\n", texcoord);
-					WRITE(p, "  vec4 t2 = textureProjOffset(tex, %s, ivec2(0, 1));\n", texcoord);
-					WRITE(p, "  vec4 t3 = textureProjOffset(tex, %s, ivec2(1, 1));\n", texcoord);
+			if (!shaderDepal) {
+				if (doTextureProjection) {
+					WRITE(p, "  vec4 t = textureProj(tex, %s);\n", texcoord);
+				} else {
+					WRITE(p, "  vec4 t = texture(tex, %s.xy);\n", texcoord);
 				}
 			} else {
-				WRITE(p, "  vec4 t = texture(tex, %s.xy);\n", texcoord);
-				if (shaderDepal) {
-					WRITE(p, "  vec4 t1 = textureOffset(tex, %s.xy, ivec2(1, 0));\n", texcoord);
-					WRITE(p, "  vec4 t2 = textureOffset(tex, %s.xy, ivec2(0, 1));\n", texcoord);
-					WRITE(p, "  vec4 t3 = textureOffset(tex, %s.xy, ivec2(1, 1));\n", texcoord);
+				if (doTextureProjection) {
+					// We don't use textureProj because we need better control and it's probably not much of a savings anyway.
+					WRITE(p, "  vec2 uv = %s.xy/%s.z;\n  vec2 uv_round;\n", texcoord, texcoord);
+				} else {
+					WRITE(p, "  vec2 uv = %s.xy;\n  vec2 uv_round;\n", texcoord);
 				}
-			}
-
-			if (shaderDepal) {
 				int depalFormat = id.Bits(FS_BIT_SHADER_DEPAL_FORMAT, 2);
 				bool depalBilinearFiltering = id.Bit(FS_BIT_SHADER_DEPAL_BILINEAR);
+				WRITE(p, "  vec2 tsize = vec2(textureSize(tex, 0));\n");
+				WRITE(p, "  vec2 fraction;\n");
+				if(depalBilinearFiltering) {
+					WRITE(p, "    uv_round = uv * tsize - vec2(0.5, 0.5);\n");
+					WRITE(p, "    fraction = fract(uv_round);\n");
+					WRITE(p, "    uv_round = (uv_round - fraction + vec2(0.5, 0.5)) / tsize;\n");  // We want to take our four point samples at pixel centers.
+				}
+				else {
+					WRITE(p, "    uv_round = uv;\n");
+				}
+				WRITE(p, "  vec4 t = texture(tex, uv_round);\n");
+				WRITE(p, "  vec4 t1 = textureOffset(tex, uv_round, ivec2(1, 0));\n");
+				WRITE(p, "  vec4 t2 = textureOffset(tex, uv_round, ivec2(0, 1));\n");
+				WRITE(p, "  vec4 t3 = textureOffset(tex, uv_round, ivec2(1, 1));\n");
 				WRITE(p, "  uint depalMask = (base.depal_mask_shift_off_fmt & 0xFF);\n");
 				WRITE(p, "  uint depalShift = (base.depal_mask_shift_off_fmt >> 8) & 0xFF;\n");
 				WRITE(p, "  uint depalOffset = ((base.depal_mask_shift_off_fmt >> 16) & 0xFF) << 4;\n");
-				//WRITE(p, "  uint depalFmt = (base.depal_mask_shift_off_fmt >> 24) & 0x3;\n");
-				//WRITE(p, "  bool bilinear = (base.depal_mask_shift_off_fmt >> 31) != 0;\n");
-				WRITE(p, "  vec2 fraction = fract(%s.xy * vec2(textureSize(tex, 0).xy));\n", texcoord);
 				WRITE(p, "  uvec4 col; uint index0; uint index1; uint index2; uint index3;\n");
 				switch (depalFormat)
 				{
