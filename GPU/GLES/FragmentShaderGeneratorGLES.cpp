@@ -345,6 +345,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 					WRITE(p, "  vec2 uv = %s.xy;\n  vec2 uv_round;\n", texcoord);
 				}
 				bool depalBilinearFiltering = id.Bit(FS_BIT_SHADER_DEPAL_BILINEAR);
+				int depalFormat = id.Bits(FS_BIT_SHADER_DEPAL_FORMAT, 2);
 				WRITE(p, "  vec2 tsize = vec2(textureSize(tex, 0));\n");
 				WRITE(p, "  vec2 fraction;\n");
 				if(depalBilinearFiltering) {
@@ -359,14 +360,15 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 				WRITE(p, "  vec4 t1 = textureOffset(tex, uv_round, ivec2(1, 0));\n");
 				WRITE(p, "  vec4 t2 = textureOffset(tex, uv_round, ivec2(0, 1));\n");
 				WRITE(p, "  vec4 t3 = textureOffset(tex, uv_round, ivec2(1, 1));\n");
-				WRITE(p, "  uint depal_mask_shift_off_fmt = uint(u_depal);\n");
-				WRITE(p, "  uint depalMask = (depal_mask_shift_off_fmt & uint(0xFF));\n");
-				WRITE(p, "  uint depalShift = (depal_mask_shift_off_fmt >> 8) & uint(0xFF);\n");
-				WRITE(p, "  uint depalOffset = ((depal_mask_shift_off_fmt >> 16) & uint(0xFF)) << 4;\n");
-				WRITE(p, "  uint depalFmt = (depal_mask_shift_off_fmt >> 24) & uint(0x3);\n");
+				WRITE(p, "  uint depalMask = (uint(u_depal) & uint(0xFF));\n");
+				WRITE(p, "  int depalShift = (u_depal >> 8) & 0xFF;\n");
+				WRITE(p, "  uint depalOffset = ((uint(u_depal) >> 16) & uint(0xFF)) << 4;\n");
+				//WRITE(p, "  int depalFmt = (u_depal >> 24) & 0x3;\n"); // switch case need use int type.
 				WRITE(p, "  uvec4 col; uint index0; uint index1; uint index2; uint index3;\n");
-				WRITE(p, "  switch (depalFmt) {\n");  // We might want to include fmt in the shader ID if this is a performance issue.
-				WRITE(p, "  case 0:\n");  // 565
+				//WRITE(p, "  switch (depalFmt) {\n");  // We might want to include fmt in the shader ID if this is a performance issue.
+				switch (depalFormat) {
+					//WRITE(p, "  case 0:\n");  // 565
+				case 0:
 					WRITE(p, "    col = uvec4(t.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
 					WRITE(p, "    index0 = (col.b << 11) | (col.g << 5) | (col.r);\n");
 					if (depalBilinearFiltering) {
@@ -377,8 +379,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 						WRITE(p, "      col = uvec4(t3.rgb * vec3(31.99, 63.99, 31.99), 0);\n");
 						WRITE(p, "      index3 = (col.b << 11) | (col.g << 5) | (col.r);\n");
 					}
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 1:\n");  // 5551
+					//WRITE(p, "    break;\n");
+					break;
+					//WRITE(p, "  case 1:\n");  // 5551
+				case 1:
 					WRITE(p, "    col = uvec4(t.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
 					WRITE(p, "    index0 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
 					if (depalBilinearFiltering) {
@@ -389,8 +393,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 						WRITE(p, "      col = uvec4(t3.rgba * vec4(31.99, 31.99, 31.99, 1.0));\n");
 						WRITE(p, "      index3 = (col.a << 15) | (col.b << 10) | (col.g << 5) | (col.r);\n");
 					}
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 2:\n");  // 4444
+					//WRITE(p, "    break;\n");
+					break;
+					//WRITE(p, "  case 2:\n");  // 4444
+				case 2:
 					WRITE(p, "    col = uvec4(t.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
 					WRITE(p, "    index0 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					if (depalBilinearFiltering) {
@@ -401,8 +407,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 						WRITE(p, "      col = uvec4(t3.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
 						WRITE(p, "      index3 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					}
-				WRITE(p, "    break;\n");
-				WRITE(p, "  case 3:\n");  // 8888
+					//WRITE(p, "    break;\n");
+					break;
+					//WRITE(p, "  case 3:\n");  // 8888
+				case 3:
 					WRITE(p, "    col = uvec4(t.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
 					WRITE(p, "    index0 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					if (depalBilinearFiltering) {
@@ -413,8 +421,10 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 						WRITE(p, "      col = uvec4(t3.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
 						WRITE(p, "      index3 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					}
-				WRITE(p, "    break;\n");
-				WRITE(p, "  };\n");
+					//WRITE(p, "    break;\n");
+					break;
+					//WRITE(p, "  };\n");
+				}
 				WRITE(p, "  index0 = ((index0 >> depalShift) & depalMask) | depalOffset;\n");
 				WRITE(p, "  t = texelFetch(pal, ivec2(index0, 0), 0);\n");
 				if (depalBilinearFiltering) {
