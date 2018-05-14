@@ -276,8 +276,6 @@ private:
 	VulkanPipelineRasterStateKey pipelineKey_{};
 	VulkanDynamicState dynState_{};
 
-	int tessOffset_ = 0;
-
 	// Hardware tessellation
 	class TessellationDataTransferVulkan : public TessellationDataTransfer {
 	public:

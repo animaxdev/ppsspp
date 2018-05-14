@@ -172,11 +172,6 @@ protected:
 	// Hardware tessellation
 	int numPatches;
 	class TessellationDataTransfer {
-	protected:
-		// TODO: These aren't used by all backends.
-		int prevSize;
-		int prevSizeTex;
-		int prevSizeCol;
 	public:
 		virtual ~TessellationDataTransfer() {}
 		// Send spline/bezier's control points to vertex shader through floating point texture.

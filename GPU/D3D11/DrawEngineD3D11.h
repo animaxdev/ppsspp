@@ -200,6 +200,11 @@ private:
 
 	// Hardware tessellation
 	class TessellationDataTransferD3D11 : public TessellationDataTransfer {
+	protected:
+		// TODO: These aren't used by all backends.
+		int prevSize;
+		int prevSizeTex;
+		int prevSizeCol;
 	private:
 		ID3D11DeviceContext *context_;
 		ID3D11Device *device_;

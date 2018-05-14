@@ -397,9 +397,6 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	key.base_ = base;
 	key.light_ = light;
 	key.bone_ = bone;
-	_dbg_assert_(G3D, base != VK_NULL_HANDLE);
-	_dbg_assert_(G3D, light != VK_NULL_HANDLE);
-	_dbg_assert_(G3D, bone != VK_NULL_HANDLE);
 
 	FrameData &frame = frame_[vulkan_->GetCurFrame()];
 	// See if we already have this descriptor set cached.
@@ -498,53 +495,75 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		n++;
 	}
 
+	// Uniform buffer objects
+	VkDescriptorBufferInfo bufferInfo[4]{};
+	if (base) {
+		bufferInfo[0].buffer = base;
+		bufferInfo[0].offset = 0;
+		bufferInfo[0].range = sizeof(UB_VS_FS_Base);
+		
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].pNext = nullptr;
+		writes[n].dstBinding = DRAW_BINDING_DYNUBO_BASE;
+		writes[n].dstArrayElement = 0;
+		writes[n].pBufferInfo = &bufferInfo[0];
+		writes[n].dstSet = desc;
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		n++;
+	}
+	
+	if (light) {
+		bufferInfo[1].buffer = light;
+		bufferInfo[1].offset = 0;
+		bufferInfo[1].range = sizeof(UB_VS_Lights);
+		
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].pNext = nullptr;
+		writes[n].dstBinding = DRAW_BINDING_DYNUBO_LIGHT;
+		writes[n].dstArrayElement = 0;
+		writes[n].pBufferInfo = &bufferInfo[1];
+		writes[n].dstSet = desc;
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		n++;
+	}
+	
+	if (bone) {
+		bufferInfo[2].buffer = bone;
+		bufferInfo[2].offset = 0;
+		bufferInfo[2].range = sizeof(UB_VS_Bones);
+		
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].pNext = nullptr;
+		writes[n].dstBinding = DRAW_BINDING_DYNUBO_BONE;
+		writes[n].dstArrayElement = 0;
+		writes[n].pBufferInfo = &bufferInfo[2];
+		writes[n].dstSet = desc;
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		n++;
+	}
+
 	// Tessellation data buffer. Make sure this is declared outside the if to avoid optimizer
 	// shenanigans.
-	VkDescriptorBufferInfo tess_buf{};
 	if (tess) {
 		VkBuffer buf;
 		VkDeviceSize offset;
 		VkDeviceSize range;
 		((TessellationDataTransferVulkan *)tessDataTransfer)->GetBufferAndOffset(&buf, &offset, &range);
 		assert(buf);
-		tess_buf.buffer = buf;
-		tess_buf.offset = offset;
-		tess_buf.range = range;
-		tessOffset_ = offset;
+		bufferInfo[3].buffer = buf;
+		bufferInfo[3].offset = offset;
+		bufferInfo[3].range = range;
+
 		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[n].pNext = nullptr;
 		writes[n].dstBinding = DRAW_BINDING_TESS_STORAGE_BUF;
-		writes[n].pBufferInfo = &tess_buf;
+		writes[n].pBufferInfo = &bufferInfo[3];
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		writes[n].dstSet = desc;
-		n++;
-	}
-
-	// Uniform buffer objects
-	VkDescriptorBufferInfo buf[3]{};
-	int count = 0;
-	buf[count].buffer = base;
-	buf[count].offset = 0;
-	buf[count].range = sizeof(UB_VS_FS_Base);
-	count++;
-	buf[count].buffer = light;
-	buf[count].offset = 0;
-	buf[count].range = sizeof(UB_VS_Lights);
-	count++;
-	buf[count].buffer = bone;
-	buf[count].offset = 0;
-	buf[count].range = sizeof(UB_VS_Bones);
-	count++;
-	for (int i = 0; i < count; i++) {
-		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[n].pNext = nullptr;
-		writes[n].dstBinding = DRAW_BINDING_DYNUBO_BASE + i;
-		writes[n].dstArrayElement = 0;
-		writes[n].pBufferInfo = &buf[i];
-		writes[n].dstSet = desc;
-		writes[n].descriptorCount = 1;
-		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		n++;
 	}
 
@@ -995,15 +1014,15 @@ void DrawEngineVulkan::DoFlush() {
 void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
 	dirtyUniforms_ |= shaderManager_->UpdateUniforms();
 
-	if ((dirtyUniforms_ & DIRTY_BASE_UNIFORMS) || baseBuf == VK_NULL_HANDLE) {
+	if (dirtyUniforms_ & DIRTY_BASE_UNIFORMS) {
 		baseUBOOffset = shaderManager_->PushBaseBuffer(frame->pushUBO, &baseBuf);
 		dirtyUniforms_ &= ~DIRTY_BASE_UNIFORMS;
 	}
-	if ((dirtyUniforms_ & DIRTY_LIGHT_UNIFORMS) || lightBuf == VK_NULL_HANDLE) {
+	if (dirtyUniforms_ & DIRTY_LIGHT_UNIFORMS) {
 		lightUBOOffset = shaderManager_->PushLightBuffer(frame->pushUBO, &lightBuf);
 		dirtyUniforms_ &= ~DIRTY_LIGHT_UNIFORMS;
 	}
-	if ((dirtyUniforms_ & DIRTY_BONE_UNIFORMS) || boneBuf == VK_NULL_HANDLE) {
+	if (dirtyUniforms_ & DIRTY_BONE_UNIFORMS) {
 		boneUBOOffset = shaderManager_->PushBoneBuffer(frame->pushUBO, &boneBuf);
 		dirtyUniforms_ &= ~DIRTY_BONE_UNIFORMS;
 	}
