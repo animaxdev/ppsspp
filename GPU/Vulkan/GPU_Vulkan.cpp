@@ -285,7 +285,8 @@ void GPU_Vulkan::BeginHostFrame() {
 	vulkan2D_.BeginFrame();
 
 	shaderManagerVulkan_->DirtyShader();
-	gstate_c.Dirty(DIRTY_ALL);
+	// this line move to AfterSaveStateAction
+	//gstate_c.Dirty(DIRTY_ALL);
 
 	if (dumpNextFrame_) {
 		NOTICE_LOG(G3D, "DUMPING THIS FRAME");

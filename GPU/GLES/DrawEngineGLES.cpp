@@ -512,10 +512,8 @@ rotateVBO:
 				indexBufferOffset = (uint32_t)frameData.pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &indexBuffer);
 				render_->BindIndexBuffer(indexBuffer);
 			}
-			if (gstate_c.bezier || gstate_c.spline)
-				render_->DrawIndexed(glprim[prim], vertexCount, GL_UNSIGNED_SHORT, (GLvoid*)(intptr_t)indexBufferOffset, numPatches);
-			else
-				render_->DrawIndexed(glprim[prim], vertexCount, GL_UNSIGNED_SHORT, (GLvoid*)(intptr_t)indexBufferOffset);
+			int numInstances = (gstate_c.bezier || gstate_c.spline) ? numPatches : 1;
+			render_->DrawIndexed(glprim[prim], vertexCount, GL_UNSIGNED_SHORT, (GLvoid*)(intptr_t)indexBufferOffset, numInstances);
 		} else {
 			render_->Draw(glprim[prim], 0, vertexCount);
 		}
@@ -562,18 +560,14 @@ rotateVBO:
 			dec_->VertexType(), inds, GE_VTYPE_IDX_16BIT, dec_->GetDecVtxFmt(),
 			maxIndex, drawBuffer, numTrans, drawIndexed, &params, &result);
 
-		if (textureNeedsApply)
-			textureCache_->ApplyTexture();
-
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
-
-		LinkedShader *program = shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
-
+		
 		if (result.action == SW_DRAW_PRIMITIVES) {
-			const int vertexSize = sizeof(transformed[0]);
+			if (textureNeedsApply)
+				textureCache_->ApplyTexture();
 
-			bool doTextureProjection = gstate.getUVGenMode() == GE_TEXMAP_TEXTURE_MATRIX;
+			shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 
 			if (drawIndexed) {
 				vertexBufferOffset = (uint32_t)frameData.pushVertex->Push(drawBuffer, maxIndex * sizeof(TransformedVertex), &vertexBuffer);

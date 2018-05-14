@@ -243,6 +243,7 @@ void SaveSlotView::Draw(UIContext &dc) {
 
 static void AfterSaveStateAction(bool status, const std::string &message, void *) {
 	if (!message.empty()) {
+		gstate_c.Dirty(DIRTY_ALL);
 		osm.Show(message, 2.0);
 	}
 }

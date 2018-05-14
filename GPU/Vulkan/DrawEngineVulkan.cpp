@@ -57,7 +57,7 @@ enum {
 };
 
 #define VERTEXCACHE_DECIMATION_INTERVAL 17
-#define DESCRIPTORSET_DECIMATION_INTERVAL 1  // Temporarily cut to 1. Handle reuse breaks this when textures get deleted.
+#define DESCRIPTORSET_DECIMATION_INTERVAL 17  // Temporarily cut to 1. Handle reuse breaks this when textures get deleted.
 
 enum { VAI_KILL_AGE = 120, VAI_UNRELIABLE_KILL_AGE = 240, VAI_UNRELIABLE_KILL_MAX = 4 };
 
@@ -591,8 +591,6 @@ void DrawEngineVulkan::DoFlush() {
 
 	FrameData *frame = &frame_[vulkan_->GetCurFrame()];
 
-	bool tess = gstate_c.bezier || gstate_c.spline;
-
 	bool textureNeedsApply = false;
 	if (gstate_c.IsDirty(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS) && !gstate.isModeClear() && gstate.isTextureMapEnabled()) {
 		textureCache_->SetTexture();
@@ -834,21 +832,21 @@ void DrawEngineVulkan::DoFlush() {
 		//}
 		lastPrim_ = prim;
 
-		{
-			PROFILE_THIS_SCOPE("render_q");
-			UpdateUBOs(frame);
-			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
-			const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
-			int stride = dec_->GetDecVtxFmt().stride;
+		PROFILE_THIS_SCOPE("render_q");
+		UpdateUBOs(frame);
 
-			if (useElements) {
-				if (!ibuf)
-					ibOffset = (uint32_t)frame->pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &ibuf);
-				int numInstances = tess ? numPatches : 1;
-				renderManager->DrawIndexed(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, ibuf, ibOffset, vertexCount, numInstances, VK_INDEX_TYPE_UINT16);
-			} else {
-				renderManager->Draw(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, vertexCount);
-			}
+		bool tess = gstate_c.bezier || gstate_c.spline;
+		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
+		const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
+		int stride = dec_->GetDecVtxFmt().stride;
+
+		if (useElements) {
+			if (!ibuf)
+				ibOffset = (uint32_t)frame->pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &ibuf);
+			int numInstances = tess ? numPatches : 1;
+			renderManager->DrawIndexed(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, ibuf, ibOffset, vertexCount, numInstances, VK_INDEX_TYPE_UINT16);
+		} else {
+			renderManager->Draw(pipelineLayout_, ds, ARRAY_SIZE(dynamicUBOOffsets), dynamicUBOOffsets, vbuf, vbOffset, vertexCount);
 		}
 	} else {
 		PROFILE_THIS_SCOPE("soft");
@@ -934,12 +932,12 @@ void DrawEngineVulkan::DoFlush() {
 
 			// Even if the first draw is through-mode, make sure we at least have one copy of these uniforms buffered
 			UpdateUBOs(frame);
-			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
+			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, false);
 			const uint32_t dynamicUBOOffsets[3] = {
 				baseUBOOffset, lightUBOOffset, boneUBOOffset,
 			};
 
-			PROFILE_THIS_SCOPE("renderman_q");
+			PROFILE_THIS_SCOPE("render_q");
 
 			if (drawIndexed) {
 				VkBuffer vbuf, ibuf;
