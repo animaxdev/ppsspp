@@ -1011,12 +1011,6 @@ void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
 	}
 }
 
-DrawEngineVulkan::TessellationDataTransferVulkan::TessellationDataTransferVulkan(VulkanContext *vulkan)
-	: TessellationDataTransfer(), vulkan_(vulkan) {
-}
-
-DrawEngineVulkan::TessellationDataTransferVulkan::~TessellationDataTransferVulkan() {
-}
 
 void DrawEngineVulkan::TessellationDataTransferVulkan::PrepareBuffers(float *&pos, float *&tex, float *&col, int &posStride, int &texStride, int &colStride, int size, bool hasColor, bool hasTexCoords) {
 	colStride = 4;

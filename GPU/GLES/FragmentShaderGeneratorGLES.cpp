@@ -165,13 +165,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 
 	bool isModeClear = id.Bit(FS_BIT_CLEARMODE);
 
-	if (shaderDepal) {
-		WRITE(p, "precision highp int;\n");
-	}
-
-	const char *shading = "";
-	if (glslES30)
-		shading = doFlatShading ? "flat" : "";
+	const char *shading = doFlatShading ? "flat" : "";
 
 	if (doTexture)
 		WRITE(p, "uniform sampler2D tex;\n");

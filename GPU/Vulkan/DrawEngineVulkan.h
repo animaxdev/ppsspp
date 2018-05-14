@@ -281,8 +281,8 @@ private:
 	// Hardware tessellation
 	class TessellationDataTransferVulkan : public TessellationDataTransfer {
 	public:
-		TessellationDataTransferVulkan(VulkanContext *vulkan);
-		~TessellationDataTransferVulkan();
+		TessellationDataTransferVulkan(VulkanContext *vulkan) : vulkan_(vulkan) {}
+		~TessellationDataTransferVulkan() {}
 
 		void SetPushBuffer(VulkanPushBuffer *push) { push_ = push; }
 		void SendDataToShader(const float *pos, const float *tex, const float *col, int size, bool hasColor, bool hasTexCoords) override;

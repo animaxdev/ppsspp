@@ -432,7 +432,7 @@ void GPU_GLES::BeginFrame() {
 	shaderManagerGL_->DirtyShader();
 
 	// Not sure if this is really needed.
-	gstate_c.Dirty(DIRTY_ALL_UNIFORMS);
+	//gstate_c.Dirty(DIRTY_ALL_UNIFORMS);
 
 	framebufferManagerGL_->BeginFrame();
 }

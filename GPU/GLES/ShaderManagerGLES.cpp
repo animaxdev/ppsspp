@@ -283,8 +283,6 @@ void LinkedShader::use(const ShaderID &VSID) {
 void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 	u64 dirty = dirtyUniforms & availableUniforms;
 	dirtyUniforms = 0;
-	if (!dirty)
-		return;
 
 	if (dirty & DIRTY_DEPAL) {
 		int indexMask = gstate.getClutIndexMask();
