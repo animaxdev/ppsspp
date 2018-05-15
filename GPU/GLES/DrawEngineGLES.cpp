@@ -565,10 +565,9 @@ rotateVBO:
 
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
-		
-		if (result.action == SW_DRAW_PRIMITIVES) {
-			shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
+		shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 
+		if (result.action == SW_DRAW_PRIMITIVES) {
 			if (drawIndexed) {
 				vertexBufferOffset = (uint32_t)frameData.pushVertex->Push(drawBuffer, maxIndex * sizeof(TransformedVertex), &vertexBuffer);
 				indexBufferOffset = (uint32_t)frameData.pushIndex->Push(inds, sizeof(uint16_t) * numTrans, &indexBuffer);
@@ -644,6 +643,7 @@ bool DrawEngineGLES::IsCodePtrVertexDecoder(const u8 *ptr) const {
 
 void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float *pos, const float *tex, const float *col, int size, bool hasColor, bool hasTexCoords) {
 	// Removed the 1D texture support, it's unlikely to be relevant for performance.
+	//float pos[3];
 	if (data_tex[0])
 		renderManager_->DeleteTexture(data_tex[0]);
 	uint8_t *pos_data = new uint8_t[size * sizeof(float) * 4];
@@ -654,6 +654,7 @@ void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float 
 	renderManager_->BindTexture(TEX_SLOT_SPLINE_POS, data_tex[0]);
 
 	// Texcoords
+	// float uv[2];
 	if (hasTexCoords) {
 		if (data_tex[1])
 			renderManager_->DeleteTexture(data_tex[1]);
@@ -665,6 +666,7 @@ void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float 
 		renderManager_->BindTexture(TEX_SLOT_SPLINE_NRM, data_tex[1]);
 	}
 
+	// float color[4];
 	if (data_tex[2])
 		renderManager_->DeleteTexture(data_tex[2]);
 	data_tex[2] = renderManager_->CreateTexture(GL_TEXTURE_2D);

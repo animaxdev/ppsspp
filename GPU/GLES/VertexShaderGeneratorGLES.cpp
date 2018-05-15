@@ -90,26 +90,15 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	// #define USE_FOR_LOOP
 
 	// In GLSL ES 3.0, you use "out" variables instead.
-	bool glslES30 = false;
 	const char *texelFetch = NULL;
 
 	if (gl_extensions.IsGLES) {
-		if (gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300)) {
-			WRITE(p, "#version 320 es\n");
-			glslES30 = true;
-			texelFetch = "texelFetch";
-		} else {
-			WRITE(p, "#version 100\n");  // GLSL ES 1.0
-			if (gl_extensions.EXT_gpu_shader4) {
-				WRITE(p, "#extension GL_EXT_gpu_shader4 : enable\n");
-				texelFetch = "texelFetch2D";
-			}
-		}
+		WRITE(p, "#version 320 es\n");
 		WRITE(p, "precision highp float;\n");
+		texelFetch = "texelFetch";
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
-				glslES30 = true;
 				WRITE(p, "#version 330\n");
 				texelFetch = "texelFetch";
 			} else if (gl_extensions.VersionGEThan(3, 0, 0)) {
