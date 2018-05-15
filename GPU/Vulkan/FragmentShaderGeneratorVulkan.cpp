@@ -242,28 +242,28 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 					break;
 					//WRITE(p, "  case 2:\n");  // 4444
 				case 2:
-					WRITE(p, "    col = uvec4(t.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+					WRITE(p, "    col = uvec4(t.rgba * vec4(15.99));\n");
 					WRITE(p, "    index0 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					if (depalBilinearFiltering) {
-						WRITE(p, "      col = uvec4(t1.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      col = uvec4(t1.rgba * vec4(15.99));\n");
 						WRITE(p, "      index1 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t2.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      col = uvec4(t2.rgba * vec4(15.99));\n");
 						WRITE(p, "      index2 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t3.rgba * vec4(15.99, 15.99, 15.99, 15.99));\n");
+						WRITE(p, "      col = uvec4(t3.rgba * vec4(15.99));\n");
 						WRITE(p, "      index3 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					}
 					//WRITE(p, "    break;\n");
 					break;
 					//WRITE(p, "  case 3:\n");  // 8888
 				case 3:
-					WRITE(p, "    col = uvec4(t.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+					WRITE(p, "    col = uvec4(t.rgba * vec4(255.99));\n");
 					WRITE(p, "    index0 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					if (depalBilinearFiltering) {
-						WRITE(p, "      col = uvec4(t1.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      col = uvec4(t1.rgba * vec4(255.99));\n");
 						WRITE(p, "      index1 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t2.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      col = uvec4(t2.rgba * vec4(255.99));\n");
 						WRITE(p, "      index2 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t3.rgba * vec4(255.99, 255.99, 255.99, 255.99));\n");
+						WRITE(p, "      col = uvec4(t3.rgba * vec4(255.99));\n");
 						WRITE(p, "      index3 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					}
 					//WRITE(p, "    break;\n");

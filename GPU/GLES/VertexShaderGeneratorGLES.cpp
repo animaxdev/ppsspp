@@ -38,19 +38,7 @@
 
 #define WRITE p+=sprintf
 
-static const char * const boneWeightAttrDecl[9] = {
-	"#ERROR#",
-	"attribute mediump float w1;\n",
-	"attribute mediump vec2 w1;\n",
-	"attribute mediump vec3 w1;\n",
-	"attribute mediump vec4 w1;\n",
-	"attribute mediump vec4 w1;\nattribute mediump float w2;\n",
-	"attribute mediump vec4 w1;\nattribute mediump vec2 w2;\n",
-	"attribute mediump vec4 w1;\nattribute mediump vec3 w2;\n",
-	"attribute mediump vec4 w1, w2;\n",
-};
-
-static const char * const boneWeightInDecl[9] = {
+static const char * const boneWeightDecl[9] = {
 	"#ERROR#",
 	"layout(location = 3) in float w1;\n",
 	"layout(location = 3) in vec2 w1;\n",
@@ -103,7 +91,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 	// In GLSL ES 3.0, you use "out" variables instead.
 	bool glslES30 = false;
-	const char * const * boneWeightDecl = boneWeightAttrDecl;
 	const char *texelFetch = NULL;
 
 	if (gl_extensions.IsGLES) {
@@ -144,10 +131,6 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		WRITE(p, "#define lowp\n");
 		WRITE(p, "#define mediump\n");
 		WRITE(p, "#define highp\n");
-	}
-
-	if (glslES30 || gl_extensions.IsCoreContext) {
-		boneWeightDecl = boneWeightInDecl;
 	}
 
 	bool isModeThrough = id.Bit(VS_BIT_IS_THROUGH);

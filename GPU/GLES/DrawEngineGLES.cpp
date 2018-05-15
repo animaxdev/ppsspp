@@ -560,13 +560,13 @@ rotateVBO:
 			dec_->VertexType(), inds, GE_VTYPE_IDX_16BIT, dec_->GetDecVtxFmt(),
 			maxIndex, drawBuffer, numTrans, drawIndexed, &params, &result);
 
+		if (textureNeedsApply)
+			textureCache_->ApplyTexture();
+
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
 		
 		if (result.action == SW_DRAW_PRIMITIVES) {
-			if (textureNeedsApply)
-				textureCache_->ApplyTexture();
-
 			shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 
 			if (drawIndexed) {

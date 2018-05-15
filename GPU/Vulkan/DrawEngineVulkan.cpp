@@ -582,7 +582,7 @@ void DrawEngineVulkan::DirtyAllUBOs() {
 	baseBuf = VK_NULL_HANDLE;
 	lightBuf = VK_NULL_HANDLE;
 	boneBuf = VK_NULL_HANDLE;
-	dirtyUniforms_ = 0;// DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS | DIRTY_BONE_UNIFORMS;
+	dirtyUniforms_ = DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS | DIRTY_BONE_UNIFORMS;
 	imageView = VK_NULL_HANDLE;
 	sampler = VK_NULL_HANDLE;
 	gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
@@ -857,7 +857,6 @@ void DrawEngineVulkan::DoFlush() {
 		bool tess = gstate_c.bezier || gstate_c.spline;
 		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
 		const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
-		int stride = dec_->GetDecVtxFmt().stride;
 
 		if (useElements) {
 			if (!ibuf)
@@ -952,9 +951,7 @@ void DrawEngineVulkan::DoFlush() {
 			// Even if the first draw is through-mode, make sure we at least have one copy of these uniforms buffered
 			UpdateUBOs(frame);
 			VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, false);
-			const uint32_t dynamicUBOOffsets[3] = {
-				baseUBOOffset, lightUBOOffset, boneUBOOffset,
-			};
+			const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
 
 			PROFILE_THIS_SCOPE("render_q");
 
@@ -1014,14 +1011,19 @@ void DrawEngineVulkan::DoFlush() {
 void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
 	dirtyUniforms_ |= shaderManager_->UpdateUniforms();
 
+	// base
 	if (dirtyUniforms_ & DIRTY_BASE_UNIFORMS) {
 		baseUBOOffset = shaderManager_->PushBaseBuffer(frame->pushUBO, &baseBuf);
 		dirtyUniforms_ &= ~DIRTY_BASE_UNIFORMS;
 	}
+
+	// light
 	if (dirtyUniforms_ & DIRTY_LIGHT_UNIFORMS) {
 		lightUBOOffset = shaderManager_->PushLightBuffer(frame->pushUBO, &lightBuf);
 		dirtyUniforms_ &= ~DIRTY_LIGHT_UNIFORMS;
 	}
+
+	// bone
 	if (dirtyUniforms_ & DIRTY_BONE_UNIFORMS) {
 		boneUBOOffset = shaderManager_->PushBoneBuffer(frame->pushUBO, &boneBuf);
 		dirtyUniforms_ &= ~DIRTY_BONE_UNIFORMS;
