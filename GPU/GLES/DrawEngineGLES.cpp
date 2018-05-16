@@ -565,9 +565,9 @@ rotateVBO:
 
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
-		shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 
 		if (result.action == SW_DRAW_PRIMITIVES) {
+			shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 			if (drawIndexed) {
 				vertexBufferOffset = (uint32_t)frameData.pushVertex->Push(drawBuffer, maxIndex * sizeof(TransformedVertex), &vertexBuffer);
 				indexBufferOffset = (uint32_t)frameData.pushIndex->Push(inds, sizeof(uint16_t) * numTrans, &indexBuffer);

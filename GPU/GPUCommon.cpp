@@ -1816,11 +1816,10 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 		uint32_t data = *src;
 		switch (data >> 24) {
 		case GE_CMD_SPLINE:
-			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 			if (gstate_c.spline) {
-				gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 				drawEngineCommon_->SubmitSplineEnd();
 			}
+			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 			drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
@@ -1843,13 +1842,13 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 bail:
 	// always same, do not need
 	// gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
+	drawEngineCommon_->SubmitSplineEnd();
 
 	if (gstate_c.spline) {
 		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		gstate_c.spline = false;
 	}
-	drawEngineCommon_->SubmitSplineEnd();
-
+	
 	// Skip over the commands we just read out manually.
 	if (cmdCount > 0) {
 		UpdatePC(currentList->pc, currentList->pc + cmdCount * 4);

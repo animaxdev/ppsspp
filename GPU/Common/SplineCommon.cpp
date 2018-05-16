@@ -763,7 +763,6 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 	*bytesRead = count_u * count_v * origVDecoder->VertexSize();
 
 
-
 	// Simplify away bones and morph before proceeding
 	SimpleVertex *simplified_control_points = (SimpleVertex *)(decoded + 65536 * 12);
 	u8 *temp_buffer = decoded + 65536 * 18;
@@ -879,7 +878,6 @@ void DrawEngineCommon::SubmitSplineEnd() {
 		lastVType_ = vertTypeID;
 	}
 
-	
 	DeferredDrawCall &dc = drawCalls[numDrawCalls];
 	dc.verts = splineBuffer;
 	dc.inds = quadIndices_;
@@ -905,6 +903,7 @@ void DrawEngineCommon::SubmitSplineEnd() {
 
 	splinePatch.batchVertices = nullptr;
 	splinePatch.batchIndices = nullptr;
+	splinePatch.batchVertexCount = 0;
 
 	if ((splinePatch.batchOrigVertType & GE_VTYPE_TC_MASK) != 0) {
 		gstate_c.uv = prevUVScale;

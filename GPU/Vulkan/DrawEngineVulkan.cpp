@@ -57,7 +57,10 @@ enum {
 };
 
 #define VERTEXCACHE_DECIMATION_INTERVAL 17
-#define DESCRIPTORSET_DECIMATION_INTERVAL 17  // Temporarily cut to 1. Handle reuse breaks this when textures get deleted.
+
+// Temporarily cut to 1. Handle reuse breaks this when textures get deleted.
+// like MG ACID 2, need set to 1
+#define DESCRIPTORSET_DECIMATION_INTERVAL 60
 
 enum { VAI_KILL_AGE = 120, VAI_UNRELIABLE_KILL_AGE = 240, VAI_UNRELIABLE_KILL_MAX = 4 };
 
@@ -397,7 +400,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	key.base_ = base;
 	key.light_ = light;
 	key.bone_ = bone;
-
+	
 	FrameData &frame = frame_[vulkan_->GetCurFrame()];
 	// See if we already have this descriptor set cached.
 	if (!tess) { // Don't cache descriptors for HW tessellation.
@@ -816,6 +819,9 @@ void DrawEngineVulkan::DoFlush() {
 				imageView = nullTexture_->GetImageView();
 			if (sampler == VK_NULL_HANDLE)
 				sampler = nullSampler_;
+
+			// need reset desc pool, zhangwei
+			descDecimationCounter_ = 0;
 		}
 
 		//if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
@@ -916,6 +922,9 @@ void DrawEngineVulkan::DoFlush() {
 					imageView = nullTexture_->GetImageView();
 				if (sampler == VK_NULL_HANDLE)
 					sampler = nullSampler_;
+
+				// need reset desc pool, zhangwei
+				descDecimationCounter_ = 0;
 			}
 			//if (!lastPipeline_ || gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
 				shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, false);  // usehwtransform
