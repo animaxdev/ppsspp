@@ -611,6 +611,7 @@ void ShaderManagerGLES::DirtyShader() {
 	lastVSID_.set_invalid();
 	DirtyLastShader();
 	//gstate_c.Dirty(DIRTY_ALL_UNIFORMS | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
+	// remove DIRTY_ALL_UNIFORMS, zhangwei
 	gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
 	shaderSwitchDirtyUniforms_ = 0;
 }

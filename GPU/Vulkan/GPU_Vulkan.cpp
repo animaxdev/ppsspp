@@ -285,7 +285,7 @@ void GPU_Vulkan::BeginHostFrame() {
 	vulkan2D_.BeginFrame();
 
 	shaderManagerVulkan_->DirtyShader();
-	// this line move to AfterSaveStateAction
+	// this line move to AfterSaveStateAction, zhangwei
 	//gstate_c.Dirty(DIRTY_ALL);
 
 	if (dumpNextFrame_) {
