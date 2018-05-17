@@ -197,7 +197,7 @@ private:
 	void DestroyDeviceObjects();
 
 	void DecodeVertsToPushBuffer(VulkanPushBuffer *push, uint32_t *bindOffset, VkBuffer *vkbuf);
-	VkResult RecreateDescriptorPool(FrameData &frame, int newSize);
+	VkResult RecreateDescriptorPool(FrameData &frame);
 
 	void DoFlush();
 	void UpdateUBOs(FrameData *frame);
@@ -234,17 +234,15 @@ private:
 
 	// We alternate between these.
 	struct FrameData {
-		FrameData() : descSets(512) {}
+		FrameData() {}
 
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 		int descCount = 0;
-		int descPoolSize = 256;  // We double this before we allocate so we initialize this to half the size we want.
+		int descPoolSize = 4096;  // We double this before we allocate so we initialize this to half the size we want.
 
 		VulkanPushBuffer *pushUBO = nullptr;
 		VulkanPushBuffer *pushVertex = nullptr;
 		VulkanPushBuffer *pushIndex = nullptr;
-		// We do rolling allocation and reset instead of caching across frames. That we might do later.
-		DenseHashMap<DescriptorSetKey, VkDescriptorSet, (VkDescriptorSet)VK_NULL_HANDLE> descSets;
 
 		void Destroy(VulkanContext *vulkan);
 	};

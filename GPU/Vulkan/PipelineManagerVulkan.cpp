@@ -15,7 +15,7 @@
 #include "ext/native/thin3d/VulkanRenderManager.h"
 #include "ext/native/thin3d/VulkanQueueRunner.h"
 
-PipelineManagerVulkan::PipelineManagerVulkan(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(256) {
+PipelineManagerVulkan::PipelineManagerVulkan(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(512) {
 	// The pipeline cache is created on demand (or explicitly through Load).
 }
 

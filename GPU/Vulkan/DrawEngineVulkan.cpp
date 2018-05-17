@@ -58,10 +58,6 @@ enum {
 
 #define VERTEXCACHE_DECIMATION_INTERVAL 17
 
-// Temporarily cut to 1. Handle reuse breaks this when textures get deleted.
-// like MG ACID 2, need set to 1
-#define DESCRIPTORSET_DECIMATION_INTERVAL 60
-
 enum { VAI_KILL_AGE = 120, VAI_UNRELIABLE_KILL_AGE = 240, VAI_UNRELIABLE_KILL_MAX = 4 };
 
 enum {
@@ -303,12 +299,9 @@ void DrawEngineVulkan::BeginFrame() {
 
 	vertexCache_->BeginNoReset();
 
-	if (--descDecimationCounter_ <= 0) {
-		if (frame->descPool != VK_NULL_HANDLE)
-			vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
-		frame->descSets.Clear();
+	if (frame->descPoolSize < frame->descCount + 128 && frame->descPool) {
+		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
 		frame->descCount = 0;
-		descDecimationCounter_ = DESCRIPTORSET_DECIMATION_INTERVAL;
 	}
 
 	if (--decimationCounter_ <= 0) {
@@ -361,16 +354,13 @@ void DrawEngineVulkan::SetLineWidth(float lineWidth) {
 	pipelineManager_->SetLineWidth(lineWidth);
 }
 
-VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame, int newSize) {
+VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame) {
 	// Reallocate this desc pool larger, and "wipe" the cache. We might lose a tiny bit of descriptor set reuse but
 	// only for this frame.
 	if (frame.descPool) {
-		DEBUG_LOG(G3D, "Reallocating desc pool from %d to %d", frame.descPoolSize, newSize);
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
-		frame.descSets.Clear();
 		frame.descCount = 0;
 	}
-	frame.descPoolSize = newSize;
 
 	VkDescriptorPoolSize dpTypes[3];
 	dpTypes[0].descriptorCount = frame.descPoolSize * 3;
@@ -388,29 +378,16 @@ VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame, int newSize)
 	dp.poolSizeCount = ARRAY_SIZE(dpTypes);
 
 	VkResult res = vkCreateDescriptorPool(vulkan_->GetDevice(), &dp, nullptr, &frame.descPool);
+	DEBUG_LOG(G3D, "Reallocating desc pool size %d", frame.descPoolSize);
+
 	return res;
 }
 
 VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView, VkSampler sampler, VkBuffer base, VkBuffer light, VkBuffer bone, bool tess) {
-	DescriptorSetKey key;
-	key.imageView_ = imageView;
-	key.sampler_ = sampler;
-	key.secondaryImageView_ = boundSecondary_;
-	key.depalImageView_ = boundDepal_;
-	key.base_ = base;
-	key.light_ = light;
-	key.bone_ = bone;
-	
 	FrameData &frame = frame_[vulkan_->GetCurFrame()];
-	// See if we already have this descriptor set cached.
-	if (!tess) { // Don't cache descriptors for HW tessellation.
-		VkDescriptorSet d = frame.descSets.Get(key);
-		if (d != VK_NULL_HANDLE)
-			return d;
-	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {
-		VkResult res = RecreateDescriptorPool(frame, frame.descPoolSize * 2);
+		VkResult res = RecreateDescriptorPool(frame);
 		assert(res == VK_SUCCESS);
 	}
 
@@ -429,15 +406,15 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		// There seems to have been a spec revision. Here we should apparently recreate the descriptor pool,
 		// so let's do that. See https://www.khronos.org/registry/vulkan/specs/1.0/man/html/vkAllocateDescriptorSets.html
 		// Fragmentation shouldn't really happen though since we wipe the pool every frame..
-		VkResult res = RecreateDescriptorPool(frame, frame.descPoolSize);
-		_assert_msg_(G3D, res == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to recreate a descriptor pool. sz=%d res=%d", (int)frame.descSets.size(), (int)res);
+		VkResult res = RecreateDescriptorPool(frame);
+		_assert_msg_(G3D, res == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to recreate a descriptor pool. res=%d", (int)res);
 		descAlloc.descriptorPool = frame.descPool;  // Need to update this pointer since we have allocated a new one.
 		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
 		_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to allocate after recreating a descriptor pool. res=%d", (int)result);
 	}
 
 	// Even in release mode, this is bad.
-	_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space in pool. sz=%d res=%d", (int)frame.descSets.size(), (int)result);
+	_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space in pool. res=%d", (int)result);
 
 	// We just don't write to the slots we don't care about, which is fine.
 	VkWriteDescriptorSet writes[7]{};
@@ -572,9 +549,8 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
-	if (!tess) // Again, avoid caching when HW tessellation.
-		frame.descSets.Insert(key, desc);
 	frame.descCount++;
+
 	return desc;
 }
 
@@ -821,7 +797,7 @@ void DrawEngineVulkan::DoFlush() {
 				sampler = nullSampler_;
 
 			// need reset desc pool, zhangwei
-			descDecimationCounter_ = 0;
+			//descDecimationCounter_ = 0;
 		}
 
 		//if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
@@ -924,7 +900,7 @@ void DrawEngineVulkan::DoFlush() {
 					sampler = nullSampler_;
 
 				// need reset desc pool, zhangwei
-				descDecimationCounter_ = 0;
+				//descDecimationCounter_ = 0;
 			}
 			//if (!lastPipeline_ || gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
 				shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, false);  // usehwtransform
