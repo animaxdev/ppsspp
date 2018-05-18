@@ -191,9 +191,9 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 				}
 				bool depalBilinearFiltering = id.Bit(FS_BIT_SHADER_DEPAL_BILINEAR);
 				int depalFormat = id.Bits(FS_BIT_SHADER_DEPAL_FORMAT, 2);
-				WRITE(p, "  vec2 tsize = vec2(textureSize(tex, 0));\n");
-				WRITE(p, "  vec2 fraction;\n");
 				if(depalBilinearFiltering) {
+					WRITE(p, "  vec2 tsize = vec2(textureSize(tex, 0));\n");
+					WRITE(p, "  vec2 fraction;\n");
 					WRITE(p, "    uv_round = uv * tsize - vec2(0.5, 0.5);\n");
 					WRITE(p, "    fraction = fract(uv_round);\n");
 					WRITE(p, "    uv_round = (uv_round - fraction + vec2(0.5, 0.5)) / tsize;\n");  // We want to take our four point samples at pixel centers.
@@ -202,9 +202,11 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 					WRITE(p, "    uv_round = uv;\n");
 				}
 				WRITE(p, "  vec4 t = texture(tex, uv_round);\n");
-				WRITE(p, "  vec4 t1 = textureOffset(tex, uv_round, ivec2(1, 0));\n");
-				WRITE(p, "  vec4 t2 = textureOffset(tex, uv_round, ivec2(0, 1));\n");
-				WRITE(p, "  vec4 t3 = textureOffset(tex, uv_round, ivec2(1, 1));\n");
+				if (depalBilinearFiltering) {
+					WRITE(p, "  vec4 t1 = textureOffset(tex, uv_round, ivec2(1, 0));\n");
+					WRITE(p, "  vec4 t2 = textureOffset(tex, uv_round, ivec2(0, 1));\n");
+					WRITE(p, "  vec4 t3 = textureOffset(tex, uv_round, ivec2(1, 1));\n");
+				}
 				WRITE(p, "  uint depalMask = (base.depal_mask_shift_off_fmt & 0xFF);\n");
 				WRITE(p, "  uint depalShift = (base.depal_mask_shift_off_fmt >> 8) & 0xFF;\n");
 				WRITE(p, "  uint depalOffset = ((base.depal_mask_shift_off_fmt >> 16) & 0xFF) << 4;\n");
@@ -242,28 +244,28 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 					break;
 					//WRITE(p, "  case 2:\n");  // 4444
 				case 2:
-					WRITE(p, "    col = uvec4(t.rgba * vec4(15.99));\n");
+					WRITE(p, "    col = uvec4(t.rgba * 15.99);\n");
 					WRITE(p, "    index0 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					if (depalBilinearFiltering) {
-						WRITE(p, "      col = uvec4(t1.rgba * vec4(15.99));\n");
+						WRITE(p, "      col = uvec4(t1.rgba * 15.99);\n");
 						WRITE(p, "      index1 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t2.rgba * vec4(15.99));\n");
+						WRITE(p, "      col = uvec4(t2.rgba * 15.99);\n");
 						WRITE(p, "      index2 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t3.rgba * vec4(15.99));\n");
+						WRITE(p, "      col = uvec4(t3.rgba * 15.99);\n");
 						WRITE(p, "      index3 = (col.a << 12) | (col.b << 8) | (col.g << 4) | (col.r);\n");
 					}
 					//WRITE(p, "    break;\n");
 					break;
 					//WRITE(p, "  case 3:\n");  // 8888
 				case 3:
-					WRITE(p, "    col = uvec4(t.rgba * vec4(255.99));\n");
+					WRITE(p, "    col = uvec4(t.rgba * 255.99);\n");
 					WRITE(p, "    index0 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					if (depalBilinearFiltering) {
-						WRITE(p, "      col = uvec4(t1.rgba * vec4(255.99));\n");
+						WRITE(p, "      col = uvec4(t1.rgba * 255.99);\n");
 						WRITE(p, "      index1 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t2.rgba * vec4(255.99));\n");
+						WRITE(p, "      col = uvec4(t2.rgba * 255.99);\n");
 						WRITE(p, "      index2 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
-						WRITE(p, "      col = uvec4(t3.rgba * vec4(255.99));\n");
+						WRITE(p, "      col = uvec4(t3.rgba * 255.99);\n");
 						WRITE(p, "      index3 = (col.a << 24) | (col.b << 16) | (col.g << 8) | (col.r);\n");
 					}
 					//WRITE(p, "    break;\n");

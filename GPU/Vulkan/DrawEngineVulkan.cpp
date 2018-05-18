@@ -299,7 +299,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	vertexCache_->BeginNoReset();
 
-	if (frame->descPoolSize < frame->descCount + 128 && frame->descPool) {
+	if (frame->descPoolSize < frame->descCount + 512 && frame->descPool) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
 		frame->descCount = 0;
 	}
@@ -561,7 +561,7 @@ void DrawEngineVulkan::DirtyAllUBOs() {
 	baseBuf = VK_NULL_HANDLE;
 	lightBuf = VK_NULL_HANDLE;
 	boneBuf = VK_NULL_HANDLE;
-	dirtyUniforms_ = DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS | DIRTY_BONE_UNIFORMS;
+	dirtyUniforms_ |= DIRTY_LIGHT_UNIFORMS;
 	imageView = VK_NULL_HANDLE;
 	sampler = VK_NULL_HANDLE;
 	gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
