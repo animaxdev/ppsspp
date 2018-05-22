@@ -22,7 +22,7 @@ class VulkanPushBuffer {
 	};
 
 public:
-	VulkanPushBuffer(VulkanContext *vulkan, size_t size);
+	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage, size_t size);
 	~VulkanPushBuffer();
 
 	void Destroy(VulkanContext *vulkan);
@@ -109,6 +109,7 @@ private:
 	void Defragment(VulkanContext *vulkan);
 
 	VkDevice device_;
+	VkBufferUsageFlags usage_;
 	std::vector<BufInfo> buffers_;
 	size_t buf_;
 	size_t offset_;

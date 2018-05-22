@@ -365,8 +365,8 @@ void GPU_GLES::InitClear() {
 }
 
 void GPU_GLES::BeginHostFrame() {
-	GPUCommon::BeginHostFrame();
-	UpdateCmdInfo();
+	//GPUCommon::BeginHostFrame();
+	//UpdateCmdInfo();
 	if (resized_) {
 		CheckGPUFeatures();
 		framebufferManager_->Resized();
@@ -422,7 +422,7 @@ void GPU_GLES::BeginFrame() {
 	depalShaderCache_.Decimate();
 	fragmentTestCache_.Decimate();
 
-	GPUCommon::BeginFrame();
+	//GPUCommon::BeginFrame();
 
 	// Save the cache from time to time. TODO: How often? We save on exit, so shouldn't need to do this all that often.
 	if (!shaderCachePath_.empty() && (gpuStats.numFlips & 4095) == 0) {

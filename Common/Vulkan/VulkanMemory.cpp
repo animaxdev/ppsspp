@@ -23,9 +23,10 @@
 #include "base/timeutil.h"
 #include "math/math_util.h"
 
-VulkanPushBuffer::VulkanPushBuffer(VulkanContext *vulkan, size_t size) : device_(vulkan->GetDevice()), buf_(0), offset_(0), size_(size), writePtr_(nullptr) {
-	vulkan->MemoryTypeFromProperties(0xFFFFFFFF, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &memoryTypeIndex_);
+VulkanPushBuffer::VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage, size_t size)
+	: device_(vulkan->GetDevice()), usage_(usage), buf_(0), offset_(0), size_(size), writePtr_(nullptr) {
 
+	vulkan->MemoryTypeFromProperties(0xFFFFFFFF, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &memoryTypeIndex_);
 	bool res = AddBuffer();
 	assert(res);
 }
@@ -40,7 +41,7 @@ bool VulkanPushBuffer::AddBuffer() {
 	VkBufferCreateInfo b{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 	b.size = size_;
 	b.flags = 0;
-	b.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	b.usage = usage_;
 	b.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	b.queueFamilyIndexCount = 0;
 	b.pQueueFamilyIndices = nullptr;

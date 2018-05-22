@@ -196,7 +196,8 @@ void ShaderManagerVulkan::Clear() {
 void ShaderManagerVulkan::ClearShaders() {
 	Clear();
 	DirtyShader();
-	gstate_c.Dirty(DIRTY_ALL_UNIFORMS | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
+	//gstate_c.Dirty(DIRTY_ALL_UNIFORMS | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
+	gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE);
 }
 
 void ShaderManagerVulkan::DirtyShader() {

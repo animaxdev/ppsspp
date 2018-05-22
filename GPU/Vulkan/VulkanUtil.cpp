@@ -86,19 +86,6 @@ void Vulkan2D::InitDeviceObjects() {
 	res = vkCreateDescriptorSetLayout(device, &dsl, nullptr, &descriptorSetLayout_);
 	assert(VK_SUCCESS == res);
 
-	VkDescriptorPoolSize dpTypes[1];
-	dpTypes[0].descriptorCount = 3000;
-	dpTypes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-	VkDescriptorPoolCreateInfo dp = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-	dp.flags = 0;   // Don't want to mess around with individually freeing these, let's go fixed each frame and zap the whole array. Might try the dynamic approach later.
-	dp.maxSets = 3000;
-	dp.pPoolSizes = dpTypes;
-	dp.poolSizeCount = ARRAY_SIZE(dpTypes);
-	for (int i = 0; i < ARRAY_SIZE(frameData_); i++) {
-		VkResult res = vkCreateDescriptorPool(vulkan_->GetDevice(), &dp, nullptr, &frameData_[i].descPool);
-		assert(VK_SUCCESS == res);
-	}
 
 	VkPushConstantRange push = {};
 	push.offset = 0;
@@ -126,26 +113,48 @@ void Vulkan2D::DeviceRestore(VulkanContext *vulkan) {
 
 void Vulkan2D::BeginFrame() {
 	int curFrame = vulkan_->GetCurFrame();
-	FrameData &frame = frameData_[curFrame];
-	frame.descSets.clear();
-	vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
+	FrameData& frame = frameData_[curFrame];
+	if (frame.descPoolSize < frame.descCount + 128) {
+		vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
+		frame.descCount = 0;
+	}
 }
 
 void Vulkan2D::EndFrame() {
 }
 
-VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1, VkImageView tex2, VkSampler sampler2) {
-	DescriptorSetKey key;
-	key.imageView[0] = tex1;
-	key.imageView[1] = tex2;
-	key.sampler[0] = sampler1;
-	key.sampler[1] = sampler2;
 
+VkResult Vulkan2D::RecreateDescriptorPool(FrameData &frame) {
+	// Reallocate this desc pool larger, and "wipe" the cache. We might lose a tiny bit of descriptor set reuse but
+	// only for this frame.
+	if (frame.descPool) {
+		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
+		frame.descCount = 0;
+	}
+
+	VkDescriptorPoolSize dpTypes[1];
+	dpTypes[0].descriptorCount = frame.descPoolSize * 2;
+	dpTypes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+	VkDescriptorPoolCreateInfo dp = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	dp.flags = 0;   // Don't want to mess around with individually freeing these, let's go fixed each frame and zap the whole array. Might try the dynamic approach later.
+	dp.maxSets = frame.descPoolSize;
+	dp.pPoolSizes = dpTypes;
+	dp.poolSizeCount = ARRAY_SIZE(dpTypes);
+
+	VkResult res = vkCreateDescriptorPool(vulkan_->GetDevice(), &dp, nullptr, &frame.descPool);
+
+	return res;
+}
+
+
+VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1, VkImageView tex2, VkSampler sampler2) {
 	int curFrame = vulkan_->GetCurFrame();
-	FrameData *frame = &frameData_[curFrame];
-	auto iter = frame->descSets.find(key);
-	if (iter != frame->descSets.end()) {
-		return iter->second;
+	FrameData& frame = frameData_[curFrame];
+
+	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {
+		VkResult res = RecreateDescriptorPool(frame);
+		assert(res == VK_SUCCESS);
 	}
 
 	// Didn't find one in the frame descriptor set cache, let's make a new one.
@@ -154,14 +163,29 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 	VkDescriptorSet desc;
 	VkDescriptorSetAllocateInfo descAlloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	descAlloc.pSetLayouts = &descriptorSetLayout_;
-	descAlloc.descriptorPool = frame->descPool;
+	descAlloc.descriptorPool = frame.descPool;
 	descAlloc.descriptorSetCount = 1;
 	VkResult result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
-	assert(result == VK_SUCCESS);
+	
+
+	if (result == VK_ERROR_FRAGMENTED_POOL || result < 0) {
+		// There seems to have been a spec revision. Here we should apparently recreate the descriptor pool,
+		// so let's do that. See https://www.khronos.org/registry/vulkan/specs/1.0/man/html/vkAllocateDescriptorSets.html
+		// Fragmentation shouldn't really happen though since we wipe the pool every frame..
+		VkResult res = RecreateDescriptorPool(frame);
+		_assert_msg_(G3D, res == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to recreate a descriptor pool. res=%d", (int)res);
+		descAlloc.descriptorPool = frame.descPool;  // Need to update this pointer since we have allocated a new one.
+		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
+		_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to allocate after recreating a descriptor pool. res=%d", (int)result);
+	}
+
+	// Even in release mode, this is bad.
+	_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space in pool. res=%d", (int)result);
+
 
 	// We just don't write to the slots we don't care about.
-	VkWriteDescriptorSet writes[2];
-	memset(writes, 0, sizeof(writes));
+	VkWriteDescriptorSet writes[2]{};
+
 	// Main and sub textures
 	int n = 0;
 	VkDescriptorImageInfo image1 = {};
@@ -202,7 +226,8 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
-	frame->descSets[key] = desc;
+	frame.descCount++;
+
 	return desc;
 }
 

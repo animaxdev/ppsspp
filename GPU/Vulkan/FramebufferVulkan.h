@@ -65,7 +65,6 @@ public:
 
 	virtual void Init() override;
 
-	void BeginFrameVulkan();  // there's a BeginFrame in the base class, which this calls
 	void EndFrame();
 
 	void Resized() override;
