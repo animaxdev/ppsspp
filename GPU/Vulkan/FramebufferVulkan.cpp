@@ -586,10 +586,6 @@ void ConvertFromRGBA8888_Vulkan(u8 *dst, const u8 *src, u32 dstStride, u32 srcSt
 	}
 }
 
-void FramebufferManagerVulkan::BeginFrameVulkan() {
-	BeginFrame();
-}
-
 void FramebufferManagerVulkan::EndFrame() {
 }
 

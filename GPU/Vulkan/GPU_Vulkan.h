@@ -100,12 +100,6 @@ private:
 	// Simple 2D drawing engine.
 	Vulkan2D vulkan2D_;
 
-	struct FrameData {
-		VulkanPushBuffer *push_;
-	};
-
-	FrameData frameData_[VulkanContext::MAX_INFLIGHT_FRAMES]{};
-
 	std::string shaderCachePath_;
 	bool shaderCacheLoaded_ = false;
 };

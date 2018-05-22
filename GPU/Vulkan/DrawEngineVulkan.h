@@ -171,7 +171,7 @@ public:
 	}
 
 	VulkanPushBuffer *GetPushBufferForTextureData() {
-		return frame_[vulkan_->GetCurFrame()].pushUBO;
+		return frame_[vulkan_->GetCurFrame()].pushOther;
 	}
 
 	const DrawEngineVulkanStats &GetStats() const {
@@ -223,15 +223,6 @@ private:
 	int decimationCounter_ = 0;
 	int descDecimationCounter_ = 0;
 
-	struct DescriptorSetKey {
-		VkImageView imageView_;
-		VkImageView secondaryImageView_;
-		VkImageView depalImageView_;
-		VkSampler sampler_;
-		VkBuffer base_, light_, bone_;  // All three UBO slots will be set to this. This will usually be identical
-		// for all draws in a frame, except when the buffer has to grow.
-	};
-
 	// We alternate between these.
 	struct FrameData {
 		FrameData() {}
@@ -241,8 +232,10 @@ private:
 		int descPoolSize = 4096;  // We double this before we allocate so we initialize this to half the size we want.
 
 		VulkanPushBuffer *pushUBO = nullptr;
+		VulkanPushBuffer *pushTess = nullptr;
 		VulkanPushBuffer *pushVertex = nullptr;
 		VulkanPushBuffer *pushIndex = nullptr;
+		VulkanPushBuffer *pushOther = nullptr;
 
 		void Destroy(VulkanContext *vulkan);
 	};

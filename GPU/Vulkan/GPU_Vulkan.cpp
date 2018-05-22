@@ -90,6 +90,8 @@ GPU_Vulkan::GPU_Vulkan(GraphicsContext *gfxCtx, Draw::DrawContext *draw)
 		ERROR_LOG(G3D, "gstate has drifted out of sync!");
 	}
 
+	UpdateCmdInfo();
+
 	BuildReportingInfo();
 	// Update again after init to be sure of any silly driver problems.
 	UpdateVsyncInterval(true);
@@ -253,8 +255,9 @@ void GPU_Vulkan::CheckGPUFeatures() {
 }
 
 void GPU_Vulkan::BeginHostFrame() {
+	//GPUCommon::BeginFrame();
 	drawEngine_.BeginFrame();
-	UpdateCmdInfo();
+	//UpdateCmdInfo();
 
 	if (resized_) {
 		CheckGPUFeatures();
@@ -271,37 +274,17 @@ void GPU_Vulkan::BeginHostFrame() {
 
 	textureCacheVulkan_->StartFrame();
 
-	int curFrame = vulkan_->GetCurFrame();
-	FrameData &frame = frameData_[curFrame];
 
-	frame.push_->Reset();
-	frame.push_->Begin(vulkan_);
-
-	framebufferManagerVulkan_->BeginFrameVulkan();
-	framebufferManagerVulkan_->SetPushBuffer(frameData_[curFrame].push_);
-	depalShaderCache_.SetPushBuffer(frameData_[curFrame].push_);
-	textureCacheVulkan_->SetPushBuffer(frameData_[curFrame].push_);
+	framebufferManagerVulkan_->BeginFrame();
 
 	vulkan2D_.BeginFrame();
 
 	shaderManagerVulkan_->DirtyShader();
 	// this line move to AfterSaveStateAction, zhangwei
 	//gstate_c.Dirty(DIRTY_ALL);
-
-	if (dumpNextFrame_) {
-		NOTICE_LOG(G3D, "DUMPING THIS FRAME");
-		dumpThisFrame_ = true;
-		dumpNextFrame_ = false;
-	} else if (dumpThisFrame_) {
-		dumpThisFrame_ = false;
-	}
 }
 
 void GPU_Vulkan::EndHostFrame() {
-	int curFrame = vulkan_->GetCurFrame();
-	FrameData &frame = frameData_[curFrame];
-	frame.push_->End();
-
 	vulkan2D_.EndFrame();
 
 	drawEngine_.EndFrame();
@@ -454,12 +437,6 @@ void GPU_Vulkan::ExecuteOp(u32 op, u32 diff) {
 
 void GPU_Vulkan::InitDeviceObjects() {
 	ILOG("GPU_Vulkan::InitDeviceObjects");
-	// Initialize framedata
-	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
-		assert(!frameData_[i].push_);
-		frameData_[i].push_ = new VulkanPushBuffer(vulkan_, 64 * 1024);
-	}
-
 	VulkanRenderManager *rm = (VulkanRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
 	uint32_t hacks = 0;
 	if (PSP_CoreParameter().compat.flags().MGS2AcidHack)
@@ -475,14 +452,6 @@ void GPU_Vulkan::InitDeviceObjects() {
 
 void GPU_Vulkan::DestroyDeviceObjects() {
 	ILOG("GPU_Vulkan::DestroyDeviceObjects");
-	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
-		if (frameData_[i].push_) {
-			frameData_[i].push_->Destroy(vulkan_);
-			delete frameData_[i].push_;
-			frameData_[i].push_ = nullptr;
-		}
-	}
-
 	// Need to turn off hacks when shutting down the GPU. Don't want them running in the menu.
 	if (draw_) {
 		VulkanRenderManager *rm = (VulkanRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
