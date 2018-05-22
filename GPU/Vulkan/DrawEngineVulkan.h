@@ -174,6 +174,10 @@ public:
 		return frame_[vulkan_->GetCurFrame()].pushOther;
 	}
 
+	VulkanPushBuffer *GetPushBufferForVertexData() {
+		return frame_[vulkan_->GetCurFrame()].pushVertex;
+	}
+
 	const DrawEngineVulkanStats &GetStats() const {
 		return stats_;
 	}

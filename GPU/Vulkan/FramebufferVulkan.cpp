@@ -269,7 +269,7 @@ void FramebufferManagerVulkan::MakePixelTexture(const u8 *srcPixels, GEBufferFor
 	}
 
 	VkBuffer buffer;
-	size_t offset = push_->Push(data, width * height * 4, &buffer);
+	size_t offset = drawEngineVulkan_->GetPushBufferForTextureData()->Push(data, width * height * 4, &buffer);
 	drawPixelsTex_->UploadMip(initCmd, 0, width, height, buffer, (uint32_t)offset, width);
 	drawPixelsTex_->EndCreate(initCmd);
 
@@ -335,7 +335,7 @@ void FramebufferManagerVulkan::DrawActiveTexture(float x, float y, float w, floa
 		overrideImageView_ = VK_NULL_HANDLE;
 	VkDescriptorSet descSet = vulkan2D_->GetDescriptorSet(view, (flags & DRAWTEX_LINEAR) ? linearSampler_ : nearestSampler_, VK_NULL_HANDLE, VK_NULL_HANDLE);
 	VkBuffer vbuffer;
-	VkDeviceSize offset = push_->Push(vtx, sizeof(vtx), &vbuffer);
+	VkDeviceSize offset = drawEngineVulkan_->GetPushBufferForVertexData()->Push(vtx, sizeof(vtx), &vbuffer);
 	renderManager->BindPipeline(cur2DPipeline_);
 	if (cur2DPipeline_ == pipelinePostShader_) {
 		renderManager->PushConstants(vulkan2D_->GetPipelineLayout(), VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, (int)sizeof(postShaderUniforms_), &postShaderUniforms_);

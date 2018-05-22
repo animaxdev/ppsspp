@@ -136,14 +136,13 @@ void DrawEngineVulkan::InitDeviceObjects() {
 
 	// We are going to use one-shot descriptors in the initial implementation. Might look into caching them
 	// if creating and updating them turns out to be expensive.
-	VkBufferUsageFlags allUsages = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		// We now create descriptor pools on demand, so removed from here.
-		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 2 * 1024 * 1024);
-		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 2 * 1024 * 1024);
-		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 2 * 1024 * 1024);
-		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 1 * 1024 * 1024);
-		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, allUsages, 1 * 1024 * 1024);
+		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 1 * 1024 * 1024);
+		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 4 * 1024 * 1024);
+		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 6 * 1024 * 1024);
+		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 4 * 1024 * 1024);
+		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 4 * 1024 * 1024);
 	}
 
 	VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -281,10 +280,6 @@ void DrawEngineVulkan::BeginFrame() {
 	frame->pushIndex->Begin(vulkan_);
 	frame->pushTess->Begin(vulkan_);
 	frame->pushOther->Begin(vulkan_);
-
-	framebufferManager_->SetPushBuffer(frame->pushOther);
-	//depalShaderCache_.SetPushBuffer();
-	textureCache_->SetPushBuffer(frame->pushOther);
 
 	// TODO: How can we make this nicer...
 	((TessellationDataTransferVulkan *)tessDataTransfer)->SetPushBuffer(frame->pushTess);

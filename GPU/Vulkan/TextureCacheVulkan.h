@@ -78,9 +78,6 @@ public:
 		drawEngine_ = td;
 	}
 	void SetVulkan2D(Vulkan2D *vk2d);
-	void SetPushBuffer(VulkanPushBuffer *push) {
-		push_ = push;
-	}
 
 	void ForgetLastTexture() override {
 		lastBoundTexture = nullptr;
@@ -124,7 +121,6 @@ private:
 
 	VulkanContext *vulkan_ = nullptr;
 	VulkanDeviceAllocator *allocator_ = nullptr;
-	VulkanPushBuffer *push_ = nullptr;
 
 	SamplerCache samplerCache_;
 

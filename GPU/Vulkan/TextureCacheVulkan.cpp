@@ -436,7 +436,7 @@ void TextureCacheVulkan::ApplyTextureFramebuffer(TexCacheEntry *entry, VirtualFr
 		}
 
 		VkBuffer pushed;
-		uint32_t offset = push_->PushAligned(verts, sizeof(verts), 4, &pushed);
+		uint32_t offset = drawEngine_->GetPushBufferForVertexData()->PushAligned(verts, sizeof(verts), 4, &pushed);
 
 		draw_->BindFramebufferAsTexture(framebuffer->fbo, 0, Draw::FB_COLOR_BIT, 0);
 		VkImageView fbo = (VkImageView)draw_->GetNativeObject(Draw::NativeObject::BOUND_TEXTURE0_IMAGEVIEW);
