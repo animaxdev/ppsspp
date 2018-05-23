@@ -1,4 +1,5 @@
 #define VMA_IMPLEMENTATION
+#undef new
 #include "Common/Vulkan/vk_mem_alloc.h"
 
 
