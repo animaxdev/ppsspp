@@ -244,13 +244,21 @@ public:
 	const VulkanDeviceExtensions &DeviceExtensions() { return deviceExtensionsLookup_; }
 
 
+
+	VkDeviceSize GetAllocationOffset(VmaAllocation allocation)
+	{
+		VmaAllocationInfo allocInfo;
+		vmaGetAllocationInfo(allocator_, allocation, &allocInfo);
+		return allocInfo.offset;
+	}
+
 	VkResult AllocBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
 	{
 		VmaAllocationCreateInfo allocCreateInfo = {};
 		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 		allocCreateInfo.flags = 0;
 		allocCreateInfo.pUserData = nullptr;
-		vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
+		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
 	}
 
 	void FreeBuffer(VkBuffer* pBuffer, VmaAllocation* pAllocation)
@@ -264,7 +272,7 @@ public:
 	{
 		VmaAllocationCreateInfo allocCreateInfo = {};
 		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-		allocCreateInfo.flags = 0;
+		allocCreateInfo.flags = VMA_ALLOCATION_CREATE_CAN_BECOME_LOST_BIT;
 		allocCreateInfo.pUserData = nullptr;
 		return vmaCreateImage(allocator_, &imageCreateInfo, &allocCreateInfo, pImage, pAllocation, nullptr);
 	}
@@ -274,6 +282,31 @@ public:
 		vmaDestroyImage(allocator_, *pImage, *pAllocation);
 		*pImage = nullptr;
 		*pAllocation = nullptr;
+	}
+
+	void TouchAllocation(VmaAllocation allocation)
+	{
+		vmaTouchAllocation(allocator_, allocation);
+	}
+
+	VkResult MapMemory(VmaAllocation allocation, void** ppData)
+	{
+		return vmaMapMemory(allocator_, allocation, ppData);
+	}
+
+	void UnmapMemory(VmaAllocation allocation)
+	{
+		vmaUnmapMemory(allocator_, allocation);
+	}
+
+	VkResult Defragment(VmaAllocation* pAllocations, size_t allocationCount)
+	{
+		std::vector<VkBool32> allocationsChanged(allocationCount);
+		VmaDefragmentationInfo defragmentationInfo;
+		defragmentationInfo.maxBytesToMove = VK_WHOLE_SIZE;
+		defragmentationInfo.maxAllocationsToMove = UINT32_MAX;
+		VmaDefragmentationStats defragmentationStats{};
+		return vmaDefragment(allocator_, pAllocations, allocationCount, allocationsChanged.data(), &defragmentationInfo, &defragmentationStats);
 	}
 
 private:

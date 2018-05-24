@@ -177,7 +177,7 @@ void VulkanTexture::EndCreate(VkCommandBuffer cmd, bool vertexTexture) {
 }
 
 void VulkanTexture::Touch() {
-	
+	vulkan_->TouchAllocation(allocation_);
 }
 
 void VulkanTexture::Destroy() {

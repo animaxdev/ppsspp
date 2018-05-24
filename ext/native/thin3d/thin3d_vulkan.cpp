@@ -788,7 +788,7 @@ VKContext::~VKContext() {
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		frame_[i].descSets_.clear();
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame_[i].descriptorPool);
-		frame_[i].pushBuffer->Destroy(vulkan_);
+		frame_[i].pushBuffer->Destroy();
 		delete frame_[i].pushBuffer;
 	}
 	vulkan_->Delete().QueueDeleteDescriptorSetLayout(descriptorSetLayout_);
@@ -804,7 +804,7 @@ void VKContext::BeginFrame() {
 
 	// OK, we now know that nothing is reading from this frame's data pushbuffer,
 	push_->Reset();
-	push_->Begin(vulkan_);
+	push_->Begin();
 
 	frame.descSets_.clear();
 	VkResult result = vkResetDescriptorPool(device_, frame.descriptorPool, 0);

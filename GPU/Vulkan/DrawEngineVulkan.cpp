@@ -185,31 +185,31 @@ void DrawEngineVulkan::FrameData::Destroy(VulkanContext *vulkan) {
 	}
 
 	if (pushUBO) {
-		pushUBO->Destroy(vulkan);
+		pushUBO->Destroy();
 		delete pushUBO;
 		pushUBO = nullptr;
 	}
 
 	if (pushVertex) {
-		pushVertex->Destroy(vulkan);
+		pushVertex->Destroy();
 		delete pushVertex;
 		pushVertex = nullptr;
 	}
 
 	if (pushIndex) {
-		pushIndex->Destroy(vulkan);
+		pushIndex->Destroy();
 		delete pushIndex;
 		pushIndex = nullptr;
 	}
 
 	if (pushTess) {
-		pushTess->Destroy(vulkan);
+		pushTess->Destroy();
 		delete pushTess;
 		pushTess = nullptr;
 	}
 
 	if (pushOther) {
-		pushOther->Destroy(vulkan);
+		pushOther->Destroy();
 		delete pushOther;
 		pushOther = nullptr;
 	}
@@ -236,7 +236,7 @@ void DrawEngineVulkan::DestroyDeviceObjects() {
 		nullTexture_ = nullptr;
 	}
 	if (vertexCache_) {
-		vertexCache_->Destroy(vulkan_);
+		vertexCache_->Destroy();
 		delete vertexCache_;
 		vertexCache_ = nullptr;
 	}
@@ -275,11 +275,11 @@ void DrawEngineVulkan::BeginFrame() {
 	frame->pushTess->Reset();
 	frame->pushOther->Reset();
 
-	frame->pushUBO->Begin(vulkan_);
-	frame->pushVertex->Begin(vulkan_);
-	frame->pushIndex->Begin(vulkan_);
-	frame->pushTess->Begin(vulkan_);
-	frame->pushOther->Begin(vulkan_);
+	frame->pushUBO->Begin();
+	frame->pushVertex->Begin();
+	frame->pushIndex->Begin();
+	frame->pushTess->Begin();
+	frame->pushOther->Begin();
 
 	// TODO: How can we make this nicer...
 	((TessellationDataTransferVulkan *)tessDataTransfer)->SetPushBuffer(frame->pushTess);
@@ -311,7 +311,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	// Wipe the vertex cache if it's grown too large.
 	if (vertexCache_->GetTotalSize() > VERTEX_CACHE_SIZE) {
-		vertexCache_->Destroy(vulkan_);
+		vertexCache_->Destroy();
 		delete vertexCache_;  // orphans the buffers, they'll get deleted once no longer used by an in-flight frame.
 		vertexCache_ = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VERTEX_CACHE_SIZE);
 		vai_.Clear();
