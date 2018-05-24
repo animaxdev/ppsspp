@@ -200,6 +200,8 @@ extern PFN_vkQueuePresentKHR vkQueuePresentKHR;
 extern PFN_vkCreateDebugReportCallbackEXT dyn_vkCreateDebugReportCallbackEXT;
 extern PFN_vkDestroyDebugReportCallbackEXT dyn_vkDestroyDebugReportCallbackEXT;
 
+extern PFN_vkGetImageMemoryRequirements2KHR vkGetImageMemoryRequirements2KHR;
+extern PFN_vkGetBufferMemoryRequirements2KHR vkGetBufferMemoryRequirements2KHR;
 
 // Way to do a quick check before even attempting to load.
 bool VulkanMayBeAvailable();

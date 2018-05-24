@@ -196,6 +196,8 @@ PFN_vkQueuePresentKHR vkQueuePresentKHR;
 PFN_vkCreateDebugReportCallbackEXT dyn_vkCreateDebugReportCallbackEXT;
 PFN_vkDestroyDebugReportCallbackEXT dyn_vkDestroyDebugReportCallbackEXT;
 
+PFN_vkGetImageMemoryRequirements2KHR vkGetImageMemoryRequirements2KHR;
+PFN_vkGetBufferMemoryRequirements2KHR vkGetBufferMemoryRequirements2KHR;
 
 #ifdef _WIN32
 static HINSTANCE vulkanLibrary;
@@ -547,6 +549,9 @@ void VulkanLoadDeviceFunctions(VkDevice device) {
 	LOAD_DEVICE_FUNC(device, vkGetSwapchainImagesKHR);
 	LOAD_DEVICE_FUNC(device, vkAcquireNextImageKHR);
 	LOAD_DEVICE_FUNC(device, vkQueuePresentKHR);
+
+	LOAD_DEVICE_FUNC(device, vkGetImageMemoryRequirements2KHR);
+	LOAD_DEVICE_FUNC(device, vkGetBufferMemoryRequirements2KHR);
 }
 
 void VulkanFree() {

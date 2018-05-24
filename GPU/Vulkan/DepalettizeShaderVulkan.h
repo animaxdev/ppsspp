@@ -63,14 +63,12 @@ public:
 
 	void SetVulkan2D(Vulkan2D *vk2d) { vulkan2D_ = vk2d; }
 	void SetPushBuffer(VulkanPushBuffer *push) { push_ = push; }
-	void SetAllocator(VulkanDeviceAllocator *alloc) { alloc_ = alloc; }
 	void SetVShader(VkShaderModule vshader) { vshader_ = vshader; }
 
 private:
 	Draw::DrawContext *draw_ = nullptr;
 	VulkanContext *vulkan_ = nullptr;
 	VulkanPushBuffer *push_ = nullptr;
-	VulkanDeviceAllocator *alloc_ = nullptr;
 	VkShaderModule vshader_ = VK_NULL_HANDLE;
 	Vulkan2D *vulkan2D_ = nullptr;
 

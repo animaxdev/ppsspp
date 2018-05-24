@@ -286,7 +286,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	if (!nullTexture_) {
 		VkCommandBuffer cmdInit = (VkCommandBuffer)draw_->GetNativeObject(Draw::NativeObject::INIT_COMMANDBUFFER);
-		nullTexture_ = new VulkanTexture(vulkan_, textureCache_->GetAllocator());
+		nullTexture_ = new VulkanTexture(vulkan_);
 		nullTexture_->SetTag("Null");
 		int w = 8;
 		int h = 8;

@@ -3,17 +3,11 @@
 #include "Common/Log.h"
 
 void VulkanTexture::Wipe() {
-	if (image_) {
-		vulkan_->Delete().QueueDeleteImage(image_);
-	}
 	if (view_) {
 		vulkan_->Delete().QueueDeleteImageView(view_);
 	}
-	if (mem_ && !allocator_) {
-		vulkan_->Delete().QueueDeleteDeviceMemory(mem_);
-	} else if (mem_) {
-		allocator_->Free(mem_, offset_);
-		mem_ = VK_NULL_HANDLE;
+	if (image_) {
+		vulkan_->FreeImage(&image_, &allocation_);
 	}
 }
 
@@ -73,33 +67,8 @@ bool VulkanTexture::CreateDirect(VkCommandBuffer cmd, int w, int h, int numMips,
 	VkMemoryRequirements mem_reqs{};
 	vkGetImageMemoryRequirements(vulkan_->GetDevice(), image_, &mem_reqs);
 
-	if (allocator_) {
-		offset_ = allocator_->Allocate(mem_reqs, &mem_, Tag());
-		if (offset_ == VulkanDeviceAllocator::ALLOCATE_FAILED) {
-			return false;
-		}
-	} else {
-		VkMemoryAllocateInfo mem_alloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-		mem_alloc.memoryTypeIndex = 0;
-		mem_alloc.allocationSize = mem_reqs.size;
 
-		// Find memory type - don't specify any mapping requirements
-		bool pass = vulkan_->MemoryTypeFromProperties(mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mem_alloc.memoryTypeIndex);
-		_assert_(pass);
-
-		res = vkAllocateMemory(vulkan_->GetDevice(), &mem_alloc, NULL, &mem_);
-		if (res != VK_SUCCESS) {
-			_assert_msg_(G3D, res != VK_ERROR_TOO_MANY_OBJECTS, "Too many Vulkan memory objects!");
-			_assert_(res == VK_ERROR_OUT_OF_HOST_MEMORY || res == VK_ERROR_OUT_OF_DEVICE_MEMORY || res == VK_ERROR_TOO_MANY_OBJECTS);
-			vkDestroyImage(vulkan_->GetDevice(), image_, nullptr);
-			image_ = VK_NULL_HANDLE;
-			return false;
-		}
-
-		offset_ = 0;
-	}
-
-	res = vkBindImageMemory(vulkan_->GetDevice(), image_, mem_, offset_);
+	res = vulkan_->AllocImage(image_create_info, &image_, &allocation_);
 	if (res != VK_SUCCESS) {
 		// This leaks the image and memory. Should not really happen though...
 		_assert_(res == VK_ERROR_OUT_OF_HOST_MEMORY || res == VK_ERROR_OUT_OF_DEVICE_MEMORY || res == VK_ERROR_TOO_MANY_OBJECTS);
@@ -208,22 +177,14 @@ void VulkanTexture::EndCreate(VkCommandBuffer cmd, bool vertexTexture) {
 }
 
 void VulkanTexture::Touch() {
-	if (allocator_ && mem_ != VK_NULL_HANDLE) {
-		allocator_->Touch(mem_, offset_);
-	}
+	
 }
 
 void VulkanTexture::Destroy() {
 	if (view_ != VK_NULL_HANDLE) {
 		vulkan_->Delete().QueueDeleteImageView(view_);
 	}
-	if (image_ != VK_NULL_HANDLE) {
-		vulkan_->Delete().QueueDeleteImage(image_);
-	}
-	if (mem_ != VK_NULL_HANDLE && !allocator_) {
-		vulkan_->Delete().QueueDeleteDeviceMemory(mem_);
-	} else if (mem_ != VK_NULL_HANDLE) {
-		allocator_->Free(mem_, offset_);
-		mem_ = VK_NULL_HANDLE;
+	if (image_) {
+		vulkan_->FreeImage(&image_, &allocation_);
 	}
 }

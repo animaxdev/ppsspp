@@ -580,6 +580,35 @@ VkResult VulkanContext::CreateDevice() {
 	}
 	ILOG("Device created.\n");
 	VulkanSetAvailable(true);
+
+	//
+	VmaVulkanFunctions VulkanFunctions;
+	VulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+	VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+	VulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+	VulkanFunctions.vkFreeMemory = vkFreeMemory;
+	VulkanFunctions.vkMapMemory = vkMapMemory;
+	VulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+	VulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+	VulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+	VulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+	VulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+	VulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+	VulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+	VulkanFunctions.vkCreateImage = vkCreateImage;
+	VulkanFunctions.vkDestroyImage = vkDestroyImage;
+#if VMA_DEDICATED_ALLOCATION
+	VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
+	VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
+#endif
+
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = physical_devices_[physical_device_];
+	allocatorInfo.device = device_;
+	allocatorInfo.pVulkanFunctions = &VulkanFunctions;
+	allocatorInfo.frameInUseCount = GetInflightFrames();
+	vmaCreateAllocator(&allocatorInfo, &allocator_);
+
 	return res;
 }
 
@@ -936,6 +965,10 @@ void VulkanContext::PerformPendingDeletes() {
 void VulkanContext::DestroyDevice() {
 	ILOG("VulkanContext::DestroyDevice (performing deletes)");
 	PerformPendingDeletes();
+
+	//
+	vmaDestroyAllocator(allocator_);
+	allocator_ = nullptr;
 
 	vkDestroyDevice(device_, nullptr);
 	device_ = nullptr;

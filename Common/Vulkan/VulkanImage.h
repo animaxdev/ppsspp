@@ -2,15 +2,13 @@
 
 #include "Common/Vulkan/VulkanContext.h"
 
-class VulkanDeviceAllocator;
-
 // Wrapper around what you need to use a texture.
 // Not very optimal - if you have many small textures you should use other strategies.
 class VulkanTexture {
 public:
-	VulkanTexture(VulkanContext *vulkan, VulkanDeviceAllocator *allocator)
-		: vulkan_(vulkan), allocator_(allocator) {
+	VulkanTexture(VulkanContext *vulkan) : vulkan_(vulkan) {
 	}
+
 	~VulkanTexture() {
 		Destroy();
 	}
@@ -50,12 +48,12 @@ private:
 	VulkanContext *vulkan_;
 	VkImage image_ = VK_NULL_HANDLE;
 	VkImageView view_ = VK_NULL_HANDLE;
-	VkDeviceMemory mem_ = VK_NULL_HANDLE;
+	
+	VmaAllocation allocation_;
+
 	int32_t width_ = 0;
 	int32_t height_ = 0;
 	int32_t numMips_ = 1;
 	VkFormat format_ = VK_FORMAT_UNDEFINED;
-	VulkanDeviceAllocator *allocator_;
-	size_t offset_ = 0;
 	std::string tag_;
 };

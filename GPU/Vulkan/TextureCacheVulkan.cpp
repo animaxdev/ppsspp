@@ -164,17 +164,6 @@ void TextureCacheVulkan::SetVulkan2D(Vulkan2D *vk2d) {
 void TextureCacheVulkan::DeviceLost() {
 	Clear(true);
 
-	if (allocator_) {
-		allocator_->Destroy();
-
-		// We have to delete on queue, so this can free its queued deletions.
-		vulkan_->Delete().QueueCallback([](void *ptr) {
-			auto allocator = static_cast<VulkanDeviceAllocator *>(ptr);
-			delete allocator;
-		}, allocator_);
-		allocator_ = nullptr;
-	}
-
 	samplerCache_.DeviceLost();
 
 	if (samplerNearest_)
@@ -187,9 +176,6 @@ void TextureCacheVulkan::DeviceRestore(VulkanContext *vulkan, Draw::DrawContext 
 	vulkan_ = vulkan;
 	draw_ = draw;
 
-	assert(!allocator_);
-
-	allocator_ = new VulkanDeviceAllocator(vulkan_, TEXCACHE_MIN_SLAB_SIZE, TEXCACHE_MAX_SLAB_SIZE);
 	samplerCache_.DeviceRestore(vulkan);
 
 	VkSamplerCreateInfo samp{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -268,15 +254,10 @@ void TextureCacheVulkan::StartFrame() {
 			// Since textures are 2D maybe we should square this, but might get too non-aggressive.
 			slabPressureLimit *= g_Config.iTexScalingLevel;
 		}
-		Decimate(allocator_->GetSlabCount() > slabPressureLimit);
 	}
-
-	allocator_->Begin();
 }
 
 void TextureCacheVulkan::EndFrame() {
-	allocator_->End();
-
 	if (texelsScaledThisFrame_) {
 		// INFO_LOG(G3D, "Scaled %i texels", texelsScaledThisFrame_);
 	}
@@ -601,7 +582,7 @@ void TextureCacheVulkan::BuildTexture(TexCacheEntry *const entry) {
 
 	{
 		delete entry->vkTex;
-		entry->vkTex = new VulkanTexture(vulkan_, allocator_);
+		entry->vkTex = new VulkanTexture(vulkan_);
 		VulkanTexture *image = entry->vkTex;
 
 		const VkComponentMapping *mapping;
@@ -883,8 +864,7 @@ bool TextureCacheVulkan::GetCurrentTextureDebug(GPUDebugBuffer &buffer, int leve
 }
 
 void TextureCacheVulkan::GetStats(char *ptr, size_t size) {
-	snprintf(ptr, size, "Alloc: %d slabs\nSlab min/max: %d/%d\nAlloc usage: %d%%",
-		allocator_->GetSlabCount(), allocator_->GetMinSlabSize(), allocator_->GetMaxSlabSize(), allocator_->ComputeUsagePercent());
+	snprintf(ptr, size, "Alloc: %d slabs\nSlab min/max: %d/%d\nAlloc usage: %d%%", 0, 0, 0, 0);
 }
 
 std::vector<std::string> TextureCacheVulkan::DebugGetSamplerIDs() const {

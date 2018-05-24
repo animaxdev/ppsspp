@@ -301,9 +301,9 @@ struct DescriptorSetKey {
 
 class VKTexture : public Texture {
 public:
-	VKTexture(VulkanContext *vulkan, VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc, VulkanDeviceAllocator *alloc)
+	VKTexture(VulkanContext *vulkan, VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc)
 		: vulkan_(vulkan), mipLevels_(desc.mipLevels), format_(desc.format) {
-		bool result = Create(cmd, pushBuffer, desc, alloc);
+		bool result = Create(cmd, pushBuffer, desc);
 		_assert_(result);
 	}
 
@@ -317,7 +317,7 @@ public:
 	}
 
 private:
-	bool Create(VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc, VulkanDeviceAllocator *alloc);
+	bool Create(VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc);
 
 	void Destroy() {
 		if (vkTex_) {
@@ -489,8 +489,6 @@ private:
 
 	VulkanRenderManager renderManager_;
 
-	VulkanDeviceAllocator *allocator_ = nullptr;
-
 	VKPipeline *curPipeline_ = nullptr;
 	VKBuffer *curVBuffers_[4]{};
 	int curVBufferOffsets_[4]{};
@@ -651,7 +649,7 @@ enum class TextureState {
 	PENDING_DESTRUCTION,
 };
 
-bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const TextureDesc &desc, VulkanDeviceAllocator *alloc) {
+bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const TextureDesc &desc) {
 	// Zero-sized textures not allowed.
 	_assert_(desc.width * desc.height * desc.depth > 0);  // remember to set depth to 1!
 	_assert_(push);
@@ -660,7 +658,7 @@ bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const Textur
 	width_ = desc.width;
 	height_ = desc.height;
 	depth_ = desc.depth;
-	vkTex_ = new VulkanTexture(vulkan_, alloc);
+	vkTex_ = new VulkanTexture(vulkan_);
 	vkTex_->SetTag(desc.tag);
 	VkFormat vulkanFormat = DataFormatToVulkan(format_);
 	int stride = desc.width * (int)DataFormatSizeInBytes(format_);
@@ -783,18 +781,9 @@ VKContext::VKContext(VulkanContext *vulkan, bool splitSubmit)
 	assert(VK_SUCCESS == res);
 
 	renderManager_.SetSplitSubmit(splitSubmit);
-
-	allocator_ = new VulkanDeviceAllocator(vulkan_, 256 * 1024, 2048 * 1024);
 }
 
 VKContext::~VKContext() {
-	allocator_->Destroy();
-	// We have to delete on queue, so this can free its queued deletions.
-	vulkan_->Delete().QueueCallback([](void *ptr) {
-		auto allocator = static_cast<VulkanDeviceAllocator *>(ptr);
-		delete allocator;
-	}, allocator_);
-	allocator_ = nullptr;
 	// This also destroys all descriptor sets.
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		frame_[i].descSets_.clear();
@@ -816,7 +805,6 @@ void VKContext::BeginFrame() {
 	// OK, we now know that nothing is reading from this frame's data pushbuffer,
 	push_->Reset();
 	push_->Begin(vulkan_);
-	allocator_->Begin();
 
 	frame.descSets_.clear();
 	VkResult result = vkResetDescriptorPool(device_, frame.descriptorPool, 0);
@@ -830,7 +818,6 @@ void VKContext::WaitRenderCompletion(Framebuffer *fbo) {
 void VKContext::EndFrame() {
 	// Stop collecting data in the frame's data pushbuffer.
 	push_->End();
-	allocator_->End();
 
 	renderManager_.Finish();
 
@@ -1042,7 +1029,7 @@ Texture *VKContext::CreateTexture(const TextureDesc &desc) {
 		return nullptr;
 	}
 	_assert_(renderManager_.GetInitCmd());
-	return new VKTexture(vulkan_, renderManager_.GetInitCmd(), push_, desc, allocator_);
+	return new VKTexture(vulkan_, renderManager_.GetInitCmd(), push_, desc);
 }
 
 static inline void CopySide(VkStencilOpState &dest, const StencilSide &src) {

@@ -7,6 +7,7 @@
 
 #include "base/logging.h"
 #include "Common/Vulkan/VulkanLoader.h"
+#include "Common/Vulkan/vk_mem_alloc.h"
 
 enum {
 	VULKAN_FLAG_VALIDATE = 1,
@@ -242,6 +243,39 @@ public:
 
 	const VulkanDeviceExtensions &DeviceExtensions() { return deviceExtensionsLookup_; }
 
+
+	VkResult AllocBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
+	{
+		VmaAllocationCreateInfo allocCreateInfo = {};
+		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		allocCreateInfo.flags = 0;
+		allocCreateInfo.pUserData = nullptr;
+		vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
+	}
+
+	void FreeBuffer(VkBuffer* pBuffer, VmaAllocation* pAllocation)
+	{
+		vmaDestroyBuffer(allocator_, *pBuffer, *pAllocation);
+		*pBuffer = nullptr;
+		*pAllocation = nullptr;
+	}
+
+	VkResult AllocImage(const VkImageCreateInfo& imageCreateInfo, VkImage* pImage, VmaAllocation* pAllocation)
+	{
+		VmaAllocationCreateInfo allocCreateInfo = {};
+		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		allocCreateInfo.flags = 0;
+		allocCreateInfo.pUserData = nullptr;
+		return vmaCreateImage(allocator_, &imageCreateInfo, &allocCreateInfo, pImage, pAllocation, nullptr);
+	}
+
+	void FreeImage(VkImage* pImage, VmaAllocation* pAllocation)
+	{
+		vmaDestroyImage(allocator_, *pImage, *pAllocation);
+		*pImage = nullptr;
+		*pAllocation = nullptr;
+	}
+
 private:
 	// A layer can expose extensions, keep track of those extensions here.
 	struct LayerProperties {
@@ -319,6 +353,9 @@ private:
 	VkSurfaceCapabilitiesKHR surfCapabilities_{};
 
 	std::vector<VkCommandBuffer> cmdQueue_;
+
+	// vma
+	VmaAllocator allocator_;
 };
 
 // Detailed control.
