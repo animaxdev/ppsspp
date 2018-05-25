@@ -501,7 +501,7 @@ void GPU_Vulkan::GetStats(char *buffer, size_t bufsize) {
 	snprintf(buffer, bufsize - 1,
 		"DL processing time: %0.2f ms\n"
 		"Draw calls: %i, flushes %i, clears %i\n"
-		"Cached Draw calls: %i\n"
+		"Cached Draw calls: %i, numFlips: %i\n"
 		"Num Tracked Vertex Arrays: %i\n"
 		"GPU cycles executed: %d (%f per vertex)\n"
 		"Commands per call level: %i %i %i %i\n"
@@ -514,13 +514,10 @@ void GPU_Vulkan::GetStats(char *buffer, size_t bufsize) {
 		"Pushbuffer space used: UBO %d, Vtx %d, Idx %d\n"
 		"%s\n",
 		gpuStats.msProcessingDisplayLists * 1000.0f,
-		gpuStats.numDrawCalls,
-		gpuStats.numFlushes,
-		gpuStats.numClears,
-		gpuStats.numCachedDrawCalls,
+		gpuStats.numDrawCalls, gpuStats.numFlushes, gpuStats.numClears,
+		gpuStats.numCachedDrawCalls, gpuStats.numFlips,
 		gpuStats.numTrackedVertexArrays,
-		gpuStats.vertexGPUCycles + gpuStats.otherGPUCycles,
-		vertexAverageCycles,
+		gpuStats.vertexGPUCycles + gpuStats.otherGPUCycles, vertexAverageCycles,
 		gpuStats.gpuCommandsAtCallLevel[0], gpuStats.gpuCommandsAtCallLevel[1], gpuStats.gpuCommandsAtCallLevel[2], gpuStats.gpuCommandsAtCallLevel[3],
 		gpuStats.numVertsSubmitted,
 		gpuStats.numCachedVertsDrawn,

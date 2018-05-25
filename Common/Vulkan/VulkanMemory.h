@@ -18,20 +18,13 @@
 // TODO: Make it possible to suballocate pushbuffers from a large DeviceMemory block.
 class VulkanPushBuffer {
 	struct BufInfo {
-		size_t size;
 		VkBuffer buffer;
 		VmaAllocation allocation;
 	};
 
 public:
-	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage)
-		: vulkan_(vulkan), usage_(usage), buf_(0), offset_(0), writePtr_(nullptr) {
-		if (usage_ == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
-			magnify_ = 6;
-		}
-		else {
-			magnify_ = 4;
-		}
+	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage, size_t size)
+		: vulkan_(vulkan), usage_(usage), size_(size), buf_(0), offset_(0), writePtr_(nullptr) {
 	}
 
 	~VulkanPushBuffer() {
@@ -85,8 +78,8 @@ public:
 	size_t Allocate(size_t size, VkBuffer *vkbuf) {
 		size_t out = offset_;
 		offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
-		if (buffers_.empty() || offset_ >= buffers_[buf_].size) {
-			*vkbuf = AddBuffer(size << magnify_);
+		if (buffers_.empty() || offset_ >= size_) {
+			*vkbuf = AddBuffer();
 			out = offset_;
 			offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
 		}
@@ -128,17 +121,16 @@ public:
 
 	size_t GetTotalSize() const {
 		size_t sum = 0;
-		for (auto buf : buffers_) {
-			sum += buf.size;
-		}
+		if (buffers_.size() > 1)
+			sum += size_ * (buffers_.size() - 1);
 		sum += offset_;
 		return sum;
 	}
 
 private:
-	VkBuffer AddBuffer(size_t size) {
+	VkBuffer AddBuffer() {
 		VkBufferCreateInfo b{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-		b.size = size;
+		b.size = size_;
 		b.flags = 0;
 		b.usage = usage_;
 		b.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -158,7 +150,6 @@ private:
 		}
 
 		offset_ = 0;
-		info.size = size;
 		buf_ = buffers_.size();
 		buffers_.push_back(info);
 
@@ -171,7 +162,7 @@ private:
 	VkBufferUsageFlags usage_;
 	std::vector<BufInfo> buffers_;
 	size_t buf_;
+	size_t size_;
 	size_t offset_;
 	uint8_t *writePtr_;
-	size_t magnify_;
 };

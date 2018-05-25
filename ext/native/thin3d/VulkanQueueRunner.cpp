@@ -32,22 +32,44 @@ void VulkanQueueRunner::ResizeReadbackBuffer(VkDeviceSize requiredSize) {
 	if (readbackBuffer_ && requiredSize <= readbackBufferSize_) {
 		return;
 	}
+	if (readbackMemory_) {
+		vulkan_->Delete().QueueDeleteDeviceMemory(readbackMemory_);
+	}
 	if (readbackBuffer_) {
-		vulkan_->FreeBuffer(&readbackBuffer_, &readbackAllocation_);
+		vulkan_->Delete().QueueDeleteBuffer(readbackBuffer_);
 	}
 
-	VkBufferCreateInfo createInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	createInfo.size = readbackBufferSize_;
-	createInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	vulkan_->AllocPullBuffer(createInfo, &readbackBuffer_, &readbackAllocation_);
 	readbackBufferSize_ = requiredSize;
+
+	VkDevice device = vulkan_->GetDevice();
+
+	VkBufferCreateInfo buf{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	buf.size = readbackBufferSize_;
+	buf.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	vkCreateBuffer(device, &buf, nullptr, &readbackBuffer_);
+
+	VkMemoryRequirements reqs{};
+	vkGetBufferMemoryRequirements(device, readbackBuffer_, &reqs);
+
+	VkMemoryAllocateInfo alloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	alloc.allocationSize = reqs.size;
+
+	VkFlags typeReqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	bool success = vulkan_->MemoryTypeFromProperties(reqs.memoryTypeBits, typeReqs, &alloc.memoryTypeIndex);
+	assert(success);
+	vkAllocateMemory(device, &alloc, nullptr, &readbackMemory_);
+
+	uint32_t offset = 0;
+	vkBindBufferMemory(device, readbackBuffer_, readbackMemory_, offset);
 }
 
 void VulkanQueueRunner::DestroyDeviceObjects() {
-	if (readbackBuffer_) {
-		vulkan_->FreeBuffer(&readbackBuffer_, &readbackAllocation_);
-		readbackBufferSize_ = 0;
-	}
+	ILOG("VulkanQueueRunner::DestroyDeviceObjects");
+	VkDevice device = vulkan_->GetDevice();
+	vulkan_->Delete().QueueDeleteDeviceMemory(readbackMemory_);
+	vulkan_->Delete().QueueDeleteBuffer(readbackBuffer_);
+	readbackBufferSize_ = 0;
 
 	renderPasses_.Iterate([&](const RPKey &rpkey, VkRenderPass rp) {
 		_assert_(rp != VK_NULL_HANDLE);
@@ -1318,33 +1340,33 @@ void VulkanQueueRunner::CopyReadbackBuffer(int width, int height, Draw::DataForm
 	void *mappedData;
 	const size_t srcPixelSize = DataFormatSizeInBytes(srcFormat);
 
-	VkResult res = vulkan_->MapMemory(readbackAllocation_, &mappedData);
-	//VkResult res = vkMapMemory(vulkan_->GetDevice(), readbackMemory_, 0, width * height * srcPixelSize, 0, &mappedData);
+	VkResult res = vkMapMemory(vulkan_->GetDevice(), readbackMemory_, 0, width * height * srcPixelSize, 0, &mappedData);
 	if (res != VK_SUCCESS) {
 		ELOG("CopyReadbackBuffer: vkMapMemory failed! result=%d", (int)res);
 		return;
 	}
 	if (srcFormat == Draw::DataFormat::R8G8B8A8_UNORM) {
 		ConvertFromRGBA8888(pixels, (const uint8_t *)mappedData, pixelStride, width, width, height, destFormat);
-	} else if (srcFormat == Draw::DataFormat::B8G8R8A8_UNORM) {
+	}
+	else if (srcFormat == Draw::DataFormat::B8G8R8A8_UNORM) {
 		ConvertFromBGRA8888(pixels, (const uint8_t *)mappedData, pixelStride, width, width, height, destFormat);
-	} else if (srcFormat == destFormat) {
+	}
+	else if (srcFormat == destFormat) {
 		uint8_t *dst = pixels;
 		const uint8_t *src = (const uint8_t *)mappedData;
-		int lineSize = width * srcPixelSize;
-		int dstStep = pixelStride * srcPixelSize;
 		for (int y = 0; y < height; ++y) {
-			memcpy(dst, src, lineSize);
-			src += lineSize;
-			dst += dstStep;
+			memcpy(dst, src, width * srcPixelSize);
+			src += width * srcPixelSize;
+			dst += pixelStride * srcPixelSize;
 		}
-	} else if (destFormat == Draw::DataFormat::D32F) {
+	}
+	else if (destFormat == Draw::DataFormat::D32F) {
 		ConvertToD32F(pixels, (const uint8_t *)mappedData, pixelStride, width, width, height, srcFormat);
-	} else {
+	}
+	else {
 		// TODO: Maybe a depth conversion or something?
 		ELOG("CopyReadbackBuffer: Unknown format");
 		assert(false);
 	}
-	vulkan_->UnmapMemory(readbackAllocation_);
-	//vkUnmapMemory(vulkan_->GetDevice(), readbackMemory_);
+	vkUnmapMemory(vulkan_->GetDevice(), readbackMemory_);
 }
