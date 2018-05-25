@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include "Common/Vulkan/VulkanContext.h"
+//#include "Common/Log.h"
 
 // VulkanMemory
 //
@@ -25,7 +26,12 @@ class VulkanPushBuffer {
 public:
 	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage)
 		: vulkan_(vulkan), usage_(usage), buf_(0), offset_(0), writePtr_(nullptr) {
-
+		if (usage_ == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
+			magnify_ = 6;
+		}
+		else {
+			magnify_ = 4;
+		}
 	}
 
 	~VulkanPushBuffer() {
@@ -80,7 +86,7 @@ public:
 		size_t out = offset_;
 		offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
 		if (buffers_.empty() || offset_ >= buffers_[buf_].size) {
-			*vkbuf = AddBuffer(size << 4);
+			*vkbuf = AddBuffer(size << magnify_);
 			out = offset_;
 			offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
 		}
@@ -140,7 +146,7 @@ private:
 		b.pQueueFamilyIndices = nullptr;
 
 		BufInfo info;
-		VkResult res = vulkan_->AllocBuffer(b, &info.buffer, &info.allocation);
+		VkResult res = vulkan_->AllocPushBuffer(b, &info.buffer, &info.allocation);
 		if (VK_SUCCESS != res) {
 			//_assert_msg_(G3D, false, "vkCreateBuffer failed! result=%d", (int)res);
 			return nullptr;
@@ -167,4 +173,5 @@ private:
 	size_t buf_;
 	size_t offset_;
 	uint8_t *writePtr_;
+	size_t magnify_;
 };

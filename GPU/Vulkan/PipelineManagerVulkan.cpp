@@ -15,7 +15,7 @@
 #include "ext/native/thin3d/VulkanRenderManager.h"
 #include "ext/native/thin3d/VulkanQueueRunner.h"
 
-PipelineManagerVulkan::PipelineManagerVulkan(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(512) {
+PipelineManagerVulkan::PipelineManagerVulkan(VulkanContext *vulkan) : vulkan_(vulkan) {
 	// The pipeline cache is created on demand (or explicitly through Load).
 }
 
@@ -30,13 +30,12 @@ void PipelineManagerVulkan::Clear() {
 	// This could also be an opportunity to store the whole cache to disk. Will need to also
 	// store the keys.
 
-	pipelines_.Iterate([&](const VulkanPipelineKey &key, VulkanPipeline *value) {
-		if (value->pipeline)
-			vulkan_->Delete().QueueDeletePipeline(value->pipeline);
-		delete value;
-	});
-
-	pipelines_.Clear();
+	for (auto it : pipelines_) {
+		if (it.second->pipeline)
+			vulkan_->Delete().QueueDeletePipeline(it.second->pipeline);
+		delete it.second;
+	}
+	pipelines_.clear();
 }
 
 void PipelineManagerVulkan::DeviceLost() {
@@ -328,14 +327,15 @@ VulkanPipeline *PipelineManagerVulkan::GetOrCreatePipeline(VkPipelineLayout layo
 	key.fShader = fs->GetModule();
 	key.vtxFmtId = useHwTransform ? decFmt->id : 0;
 
-	auto iter = pipelines_.Get(key);
-	if (iter)
-		return iter;
+	auto iter = pipelines_.find(key);
+	if (iter != pipelines_.end()) {
+		return iter->second;
+	}
 
 	VulkanPipeline *pipeline = CreateVulkanPipeline(
 		vulkan_->GetDevice(), pipelineCache_, layout, renderPass, 
 		rasterKey, decFmt, vs, fs, useHwTransform, lineWidth_);
-	pipelines_.Insert(key, pipeline);
+	pipelines_[key] = pipeline;
 
 	// Don't return placeholder null pipelines.
 	if (pipeline && pipeline->pipeline) {
@@ -350,11 +350,11 @@ std::vector<std::string> PipelineManagerVulkan::DebugGetObjectIDs(DebugShaderTyp
 	switch (type) {
 	case SHADER_TYPE_PIPELINE:
 	{
-		pipelines_.Iterate([&](const VulkanPipelineKey &key, VulkanPipeline *value) {
+		for (auto iter : pipelines_) {
 			std::string id;
-			key.ToString(&id);
+			iter.first.ToString(&id);
 			ids.push_back(id);
-		});
+		}
 	}
 	break;
 	default:
@@ -450,13 +450,14 @@ std::string PipelineManagerVulkan::DebugGetObjectString(std::string id, DebugSha
 	VulkanPipelineKey pipelineKey;
 	pipelineKey.FromString(id);
 
-	VulkanPipeline *iter = pipelines_.Get(pipelineKey);
-	if (!iter) {
+
+	auto iter = pipelines_.find(pipelineKey);
+	if (iter == pipelines_.end()) {
 		return "";
 	}
 
 	std::string str = pipelineKey.GetDescription(stringType);
-	return StringFromFormat("%p: %s", iter, str.c_str());
+	return StringFromFormat("%p: %s", iter->second, str.c_str());
 }
 
 std::string VulkanPipelineKey::GetDescription(DebugShaderStringType stringType) const {
@@ -532,14 +533,14 @@ void PipelineManagerVulkan::SetLineWidth(float lineWidth) {
 	lineWidth_ = lineWidth;
 
 	// Wipe all line-drawing pipelines.
-	pipelines_.Iterate([&](const VulkanPipelineKey &key, VulkanPipeline *value) {
-		if (value->UsesLines()) {
-			if (value->pipeline)
-				vulkan_->Delete().QueueDeletePipeline(value->pipeline);
-			delete value;
-			pipelines_.Remove(key);
+	for (auto it : pipelines_) {
+		if (it.second->UsesLines()) {
+			if(it.second->pipeline)
+				vulkan_->Delete().QueueDeletePipeline(it.second->pipeline);
+			delete it.second;
+			pipelines_.erase(it.first);
 		}
-	});
+	}
 }
 
 // For some reason this struct is only defined in the spec, not in the headers.
@@ -600,9 +601,11 @@ void PipelineManagerVulkan::SaveCache(FILE *file, bool saveRawPipelineCache, Sha
 	std::set<StoredVulkanPipelineKey> keys;
 
 	// TODO: Use derivative pipelines when possible, helps Mali driver pipeline creation speed at least.
-	pipelines_.Iterate([&](const VulkanPipelineKey &pkey, VulkanPipeline *value) {
+	for (auto it : pipelines_) {
 		if (failed)
 			return;
+		const VulkanPipelineKey &pkey = it.first;
+		VulkanPipeline *value = it.second;
 		VulkanVertexShader *vshader = shaderManager->GetVertexShaderFromModule(pkey.vShader);
 		VulkanFragmentShader *fshader = shaderManager->GetFragmentShaderFromModule(pkey.fShader);
 		if (!vshader || !fshader) {
@@ -622,12 +625,13 @@ void PipelineManagerVulkan::SaveCache(FILE *file, bool saveRawPipelineCache, Sha
 		if (pkey.renderPass == queueRunner->GetBackbufferRenderPass()) {
 			key.backbufferPass = true;
 			key.renderPassKey = {};
-		} else {
+		}
+		else {
 			key.backbufferPass = false;
 			queueRunner->GetRenderPassKey(pkey.renderPass, &key.renderPassKey);
 		}
 		keys.insert(key);
-	});
+	}
 
 	// Write the number of pipelines.
 	size = (uint32_t)keys.size();

@@ -20,7 +20,7 @@
 #include "Common/Vulkan/VulkanContext.h"
 #include "GPU/Vulkan/VulkanUtil.h"
 
-Vulkan2D::Vulkan2D(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(256) {
+Vulkan2D::Vulkan2D(VulkanContext *vulkan) : vulkan_(vulkan) {
 	InitDeviceObjects();
 }
 
@@ -39,11 +39,10 @@ void Vulkan2D::DestroyDeviceObjects() {
 			frameData_[i].descPool = VK_NULL_HANDLE;
 		}
 	}
-
-	pipelines_.Iterate([&](const PipelineKey &key, VkPipeline pipeline) {
-		vulkan_->Delete().QueueDeletePipeline(pipeline);
-	});
-	pipelines_.Clear();
+	for (auto it : pipelines_) {
+		vulkan_->Delete().QueueDeletePipeline(it.second);
+	}
+	pipelines_.clear();
 
 	VkDevice device = vulkan_->GetDevice();
 	if (descriptorSetLayout_ != VK_NULL_HANDLE) {
@@ -241,9 +240,9 @@ VkPipeline Vulkan2D::GetPipeline(VkRenderPass rp, VkShaderModule vs, VkShaderMod
 	key.depthStencilMode = depthStencilMode;
 	key.readVertices = readVertices;
 
-	auto iter = pipelines_.Get(key);
-	if (iter) {
-		return iter;
+	auto iter = pipelines_.find(key);
+	if (iter != pipelines_.end()) {
+		return iter->second;
 	}
 
 	VkPipelineColorBlendAttachmentState blend0 = {};
@@ -365,7 +364,7 @@ VkPipeline Vulkan2D::GetPipeline(VkRenderPass rp, VkShaderModule vs, VkShaderMod
 	VkPipeline pipeline;
 	VkResult result = vkCreateGraphicsPipelines(vulkan_->GetDevice(), pipelineCache_, 1, &pipe, nullptr, &pipeline);
 	if (result == VK_SUCCESS) {
-		pipelines_.Insert(key, pipeline);
+		pipelines_[key] = pipeline;
 		return pipeline;
 	} else {
 		return VK_NULL_HANDLE;

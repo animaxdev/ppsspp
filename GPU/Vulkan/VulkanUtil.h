@@ -17,7 +17,8 @@
 
 #pragma once
 
-#include "Common/Hashmaps.h"
+#include <tuple>
+#include <map>
 
 #include "Common/Vulkan/VulkanContext.h"
 #include "Common/Vulkan/VulkanLoader.h"
@@ -93,6 +94,9 @@ private:
 		VkRenderPass rp;
 		VK2DDepthStencilMode depthStencilMode;
 		bool readVertices;
+		bool operator < (const PipelineKey &other) const {
+			return std::tie(vs, fs, rp, depthStencilMode, readVertices) < std::tie(other.vs, other.fs, other.rp, other.depthStencilMode, other.readVertices);
+		}
 	};
 
 	struct FrameData {
@@ -105,7 +109,7 @@ private:
 
 	FrameData frameData_[VulkanContext::MAX_INFLIGHT_FRAMES];
 
-	DenseHashMap<PipelineKey, VkPipeline, nullptr> pipelines_;
+	std::map<PipelineKey, VkPipeline> pipelines_;
 };
 
 

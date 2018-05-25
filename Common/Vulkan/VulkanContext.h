@@ -287,10 +287,19 @@ public:
 		return allocInfo.offset;
 	}
 
-	VkResult AllocBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
+	VkResult AllocPushBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
 	{
 		VmaAllocationCreateInfo allocCreateInfo = {};
 		allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		allocCreateInfo.flags = 0;
+		allocCreateInfo.pUserData = nullptr;
+		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
+	}
+
+	VkResult AllocPullBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
+	{
+		VmaAllocationCreateInfo allocCreateInfo = {};
+		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
 		allocCreateInfo.flags = 0;
 		allocCreateInfo.pUserData = nullptr;
 		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);

@@ -18,7 +18,8 @@
 #pragma once
 
 #include <cstring>
-#include "Common/Hashmaps.h"
+#include <map>
+//#include "Common/Hashmaps.h"
 
 #include "GPU/Common/VertexDecoderCommon.h"
 #include "GPU/Common/ShaderId.h"
@@ -50,10 +51,16 @@ struct VulkanPipelineKey {
 		str->resize(sizeof(*this));
 		memcpy(&(*str)[0], this, sizeof(*this));
 	}
+	
 	void FromString(const std::string &str) {
 		memcpy(this, &str[0], sizeof(*this));
 	}
+
 	std::string GetDescription(DebugShaderStringType stringType) const;
+
+	bool operator < (const VulkanPipelineKey &other) const {
+		return std::tie(raster, vShader, fShader, vtxFmtId) < std::tie(other.raster, other.vShader, other.fShader, other.vtxFmtId);
+	}
 };
 
 enum PipelineFlags {
@@ -100,7 +107,8 @@ public:
 	bool LoadCache(FILE *file, bool loadRawPipelineCache, ShaderManagerVulkan *shaderManager, Draw::DrawContext *drawContext, VkPipelineLayout layout);
 
 private:
-	DenseHashMap<VulkanPipelineKey, VulkanPipeline *, nullptr> pipelines_;
+	//DenseHashMap<VulkanPipelineKey, VulkanPipeline *, nullptr> pipelines_;
+	std::map<VulkanPipelineKey, VulkanPipeline *> pipelines_;
 	VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
 	VulkanContext *vulkan_;
 	float lineWidth_ = 1.0f;
