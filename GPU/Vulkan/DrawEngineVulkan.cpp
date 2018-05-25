@@ -138,11 +138,11 @@ void DrawEngineVulkan::InitDeviceObjects() {
 	// if creating and updating them turns out to be expensive.
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		// We now create descriptor pools on demand, so removed from here.
-		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 1 * 1024 * 1024);
-		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 6 * 1024 * 1024);
-		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 4 * 1024 * 1024);
+		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 	}
 
 	VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -166,7 +166,7 @@ void DrawEngineVulkan::InitDeviceObjects() {
 	res = vkCreateSampler(device, &samp, nullptr, &nullSampler_);
 	assert(VK_SUCCESS == res);
 
-	vertexCache_ = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VERTEX_CACHE_SIZE);
+	vertexCache_ = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	tessDataTransfer = new TessellationDataTransferVulkan(vulkan_);
 }
@@ -269,12 +269,6 @@ void DrawEngineVulkan::BeginFrame() {
 	// if growing the buffer is needed. Doing it this way will reduce fragmentation if more than one buffer
 	// needs to grow in the same frame. The state where many buffers are reset can also be used to 
 	// defragment memory.
-	frame->pushUBO->Reset();
-	frame->pushVertex->Reset();
-	frame->pushIndex->Reset();
-	frame->pushTess->Reset();
-	frame->pushOther->Reset();
-
 	frame->pushUBO->Begin();
 	frame->pushVertex->Begin();
 	frame->pushIndex->Begin();
@@ -313,7 +307,7 @@ void DrawEngineVulkan::BeginFrame() {
 	if (vertexCache_->GetTotalSize() > VERTEX_CACHE_SIZE) {
 		vertexCache_->Destroy();
 		delete vertexCache_;  // orphans the buffers, they'll get deleted once no longer used by an in-flight frame.
-		vertexCache_ = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VERTEX_CACHE_SIZE);
+		vertexCache_ = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 		vai_.Clear();
 	}
 
@@ -419,13 +413,13 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	// Didn't find one in the frame descriptor set cache, let's make a new one.
 	// We wipe the cache on every frame.
 
-	VkDescriptorSet desc;
+	VkDescriptorSet descSet;
 	VkDescriptorSetAllocateInfo descAlloc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	descAlloc.pNext = nullptr;
 	descAlloc.pSetLayouts = &descriptorSetLayout_;
 	descAlloc.descriptorPool = frame.descPool;
 	descAlloc.descriptorSetCount = 1;
-	VkResult result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
+	VkResult result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &descSet);
 
 	if (result == VK_ERROR_FRAGMENTED_POOL || result < 0) {
 		// There seems to have been a spec revision. Here we should apparently recreate the descriptor pool,
@@ -434,7 +428,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		VkResult res = RecreateDescriptorPool(frame);
 		_assert_msg_(G3D, res == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to recreate a descriptor pool. res=%d", (int)res);
 		descAlloc.descriptorPool = frame.descPool;  // Need to update this pointer since we have allocated a new one.
-		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
+		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &descSet);
 		_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to allocate after recreating a descriptor pool. res=%d", (int)result);
 	}
 
@@ -460,7 +454,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].pImageInfo = &tex[0];
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
 
@@ -478,7 +472,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].pImageInfo = &tex[1];
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
 
@@ -496,7 +490,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].pImageInfo = &tex[2];
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
 
@@ -512,7 +506,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].dstBinding = DRAW_BINDING_DYNUBO_BASE;
 		writes[n].dstArrayElement = 0;
 		writes[n].pBufferInfo = &bufferInfo[0];
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		n++;
@@ -528,7 +522,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].dstBinding = DRAW_BINDING_DYNUBO_LIGHT;
 		writes[n].dstArrayElement = 0;
 		writes[n].pBufferInfo = &bufferInfo[1];
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		n++;
@@ -544,7 +538,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].dstBinding = DRAW_BINDING_DYNUBO_BONE;
 		writes[n].dstArrayElement = 0;
 		writes[n].pBufferInfo = &bufferInfo[2];
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		n++;
@@ -568,7 +562,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 		writes[n].pBufferInfo = &bufferInfo[3];
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
 
@@ -576,7 +570,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 
 	frame.descCount++;
 
-	return desc;
+	return descSet;
 }
 
 void DrawEngineVulkan::DirtyAllUBOs() {
@@ -587,7 +581,6 @@ void DrawEngineVulkan::DirtyAllUBOs() {
 	lightBuf = VK_NULL_HANDLE;
 	boneBuf = VK_NULL_HANDLE;
 	dirtyUniforms_ = DIRTY_BASE_UNIFORMS | DIRTY_LIGHT_UNIFORMS;
-	//dirtyUniforms_ |= DIRTY_LIGHT_UNIFORMS;
 	imageView = VK_NULL_HANDLE;
 	sampler = VK_NULL_HANDLE;
 	gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);

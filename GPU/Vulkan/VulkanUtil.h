@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include <tuple>
-#include <map>
+#include "Common/Hashmaps.h"
 
 #include "Common/Vulkan/VulkanContext.h"
 #include "Common/Vulkan/VulkanLoader.h"
@@ -94,22 +93,19 @@ private:
 		VkRenderPass rp;
 		VK2DDepthStencilMode depthStencilMode;
 		bool readVertices;
-		bool operator < (const PipelineKey &other) const {
-			return std::tie(vs, fs, rp, depthStencilMode, readVertices) < std::tie(other.vs, other.fs, other.rp, other.depthStencilMode, other.readVertices);
-		}
 	};
 
 	struct FrameData {
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 
 		int descCount = 0;
-		int descPoolSize = 2048;
+		int descPoolSize = 256;
 	};
 	VkResult RecreateDescriptorPool(FrameData &frame);
 
 	FrameData frameData_[VulkanContext::MAX_INFLIGHT_FRAMES];
 
-	std::map<PipelineKey, VkPipeline> pipelines_;
+	DenseHashMap<PipelineKey, VkPipeline, nullptr> pipelines_;
 };
 
 

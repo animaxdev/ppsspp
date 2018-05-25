@@ -245,6 +245,41 @@ public:
 
 
 
+	VkResult CreateAllocator()
+	{
+		VmaVulkanFunctions VulkanFunctions;
+		VulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+		VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+		VulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+		VulkanFunctions.vkFreeMemory = vkFreeMemory;
+		VulkanFunctions.vkMapMemory = vkMapMemory;
+		VulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+		VulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+		VulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+		VulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+		VulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+		VulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+		VulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+		VulkanFunctions.vkCreateImage = vkCreateImage;
+		VulkanFunctions.vkDestroyImage = vkDestroyImage;
+#if VMA_DEDICATED_ALLOCATION
+		VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
+		VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
+#endif
+
+		VmaAllocatorCreateInfo allocatorInfo = {};
+		allocatorInfo.physicalDevice = physical_devices_[physical_device_];
+		allocatorInfo.device = device_;
+		allocatorInfo.pVulkanFunctions = &VulkanFunctions;
+		allocatorInfo.frameInUseCount = GetInflightFrames();
+		return vmaCreateAllocator(&allocatorInfo, &allocator_);
+	}
+
+	void AllocationBeginFrame()
+	{
+		vmaSetCurrentFrameIndex(allocator_, curFrame_);
+	}
+
 	VkDeviceSize GetAllocationOffset(VmaAllocation allocation)
 	{
 		VmaAllocationInfo allocInfo;
@@ -255,7 +290,7 @@ public:
 	VkResult AllocBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
 	{
 		VmaAllocationCreateInfo allocCreateInfo = {};
-		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		allocCreateInfo.flags = 0;
 		allocCreateInfo.pUserData = nullptr;
 		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);

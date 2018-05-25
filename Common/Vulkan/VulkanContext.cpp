@@ -238,6 +238,9 @@ void VulkanContext::BeginFrame() {
 	FrameData *frame = &frame_[curFrame_];
 	// Process pending deletes.
 	frame->deleteList.PerformDeletes(device_);
+
+	//
+	AllocationBeginFrame();
 }
 
 void VulkanContext::EndFrame() {
@@ -582,32 +585,7 @@ VkResult VulkanContext::CreateDevice() {
 	VulkanSetAvailable(true);
 
 	//
-	VmaVulkanFunctions VulkanFunctions;
-	VulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-	VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
-	VulkanFunctions.vkAllocateMemory = vkAllocateMemory;
-	VulkanFunctions.vkFreeMemory = vkFreeMemory;
-	VulkanFunctions.vkMapMemory = vkMapMemory;
-	VulkanFunctions.vkUnmapMemory = vkUnmapMemory;
-	VulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
-	VulkanFunctions.vkBindImageMemory = vkBindImageMemory;
-	VulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
-	VulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
-	VulkanFunctions.vkCreateBuffer = vkCreateBuffer;
-	VulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
-	VulkanFunctions.vkCreateImage = vkCreateImage;
-	VulkanFunctions.vkDestroyImage = vkDestroyImage;
-#if VMA_DEDICATED_ALLOCATION
-	VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
-	VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
-#endif
-
-	VmaAllocatorCreateInfo allocatorInfo = {};
-	allocatorInfo.physicalDevice = physical_devices_[physical_device_];
-	allocatorInfo.device = device_;
-	allocatorInfo.pVulkanFunctions = &VulkanFunctions;
-	allocatorInfo.frameInUseCount = GetInflightFrames();
-	vmaCreateAllocator(&allocatorInfo, &allocator_);
+	CreateAllocator();
 
 	return res;
 }

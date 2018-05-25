@@ -20,7 +20,7 @@
 #include "Common/Vulkan/VulkanContext.h"
 #include "GPU/Vulkan/VulkanUtil.h"
 
-Vulkan2D::Vulkan2D(VulkanContext *vulkan) : vulkan_(vulkan) {
+Vulkan2D::Vulkan2D(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(256) {
 	InitDeviceObjects();
 }
 
@@ -39,10 +39,11 @@ void Vulkan2D::DestroyDeviceObjects() {
 			frameData_[i].descPool = VK_NULL_HANDLE;
 		}
 	}
-	for (auto it : pipelines_) {
-		vulkan_->Delete().QueueDeletePipeline(it.second);
-	}
-	pipelines_.clear();
+
+	pipelines_.Iterate([&](const PipelineKey &key, VkPipeline pipeline) {
+		vulkan_->Delete().QueueDeletePipeline(pipeline);
+	});
+	pipelines_.Clear();
 
 	VkDevice device = vulkan_->GetDevice();
 	if (descriptorSetLayout_ != VK_NULL_HANDLE) {
@@ -114,7 +115,7 @@ void Vulkan2D::DeviceRestore(VulkanContext *vulkan) {
 void Vulkan2D::BeginFrame() {
 	int curFrame = vulkan_->GetCurFrame();
 	FrameData& frame = frameData_[curFrame];
-	if (frame.descPoolSize < frame.descCount + 128) {
+	if (frame.descPoolSize < frame.descCount + 64) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
 		frame.descCount = 0;
 	}
@@ -160,12 +161,12 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 	// Didn't find one in the frame descriptor set cache, let's make a new one.
 	// We wipe the cache on every frame.
 
-	VkDescriptorSet desc;
+	VkDescriptorSet descSet;
 	VkDescriptorSetAllocateInfo descAlloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	descAlloc.pSetLayouts = &descriptorSetLayout_;
 	descAlloc.descriptorPool = frame.descPool;
 	descAlloc.descriptorSetCount = 1;
-	VkResult result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
+	VkResult result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &descSet);
 	
 
 	if (result == VK_ERROR_FRAGMENTED_POOL || result < 0) {
@@ -175,7 +176,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 		VkResult res = RecreateDescriptorPool(frame);
 		_assert_msg_(G3D, res == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to recreate a descriptor pool. res=%d", (int)res);
 		descAlloc.descriptorPool = frame.descPool;  // Need to update this pointer since we have allocated a new one.
-		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &desc);
+		result = vkAllocateDescriptorSets(vulkan_->GetDevice(), &descAlloc, &descSet);
 		_assert_msg_(G3D, result == VK_SUCCESS, "Ran out of descriptor space (frag?) and failed to allocate after recreating a descriptor pool. res=%d", (int)result);
 	}
 
@@ -203,9 +204,10 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 		writes[n].pImageInfo = &image1;
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
+
 	if (tex2) {
 		// TODO: Also support LAYOUT_GENERAL to be able to texture from framebuffers without transitioning them?
 #ifdef VULKAN_USE_GENERAL_LAYOUT_FOR_COLOR
@@ -220,7 +222,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 		writes[n].pImageInfo = &image2;
 		writes[n].descriptorCount = 1;
 		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[n].dstSet = desc;
+		writes[n].dstSet = descSet;
 		n++;
 	}
 
@@ -228,7 +230,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 
 	frame.descCount++;
 
-	return desc;
+	return descSet;
 }
 
 VkPipeline Vulkan2D::GetPipeline(VkRenderPass rp, VkShaderModule vs, VkShaderModule fs, bool readVertices, VK2DDepthStencilMode depthStencilMode) {
@@ -239,9 +241,9 @@ VkPipeline Vulkan2D::GetPipeline(VkRenderPass rp, VkShaderModule vs, VkShaderMod
 	key.depthStencilMode = depthStencilMode;
 	key.readVertices = readVertices;
 
-	auto iter = pipelines_.find(key);
-	if (iter != pipelines_.end()) {
-		return iter->second;
+	auto iter = pipelines_.Get(key);
+	if (iter) {
+		return iter;
 	}
 
 	VkPipelineColorBlendAttachmentState blend0 = {};
@@ -363,7 +365,7 @@ VkPipeline Vulkan2D::GetPipeline(VkRenderPass rp, VkShaderModule vs, VkShaderMod
 	VkPipeline pipeline;
 	VkResult result = vkCreateGraphicsPipelines(vulkan_->GetDevice(), pipelineCache_, 1, &pipe, nullptr, &pipeline);
 	if (result == VK_SUCCESS) {
-		pipelines_[key] = pipeline;
+		pipelines_.Insert(key, pipeline);
 		return pipeline;
 	} else {
 		return VK_NULL_HANDLE;
