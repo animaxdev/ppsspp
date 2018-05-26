@@ -100,6 +100,8 @@ public:
 
 	void GetStats(char *ptr, size_t size);
 
+	VulkanDeviceAllocator *GetAllocator() { return allocator_; }
+
 	std::vector<std::string> DebugGetSamplerIDs() const;
 	std::string DebugGetSamplerString(std::string id, DebugShaderStringType stringType);
 
@@ -118,6 +120,7 @@ private:
 	void BuildTexture(TexCacheEntry *const entry) override;
 
 	VulkanContext *vulkan_ = nullptr;
+	VulkanDeviceAllocator *allocator_ = nullptr;
 
 	SamplerCache samplerCache_;
 

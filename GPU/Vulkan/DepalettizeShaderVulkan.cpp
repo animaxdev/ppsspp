@@ -132,7 +132,7 @@ VulkanTexture *DepalShaderCacheVulkan::GetClutTexture(GEPaletteFormat clutFormat
 	VkBuffer pushBuffer;
 	uint32_t pushOffset = push_->PushAligned(rawClut, 1024, 4, &pushBuffer);
 
-	VulkanTexture *vktex = new VulkanTexture(vulkan_);
+	VulkanTexture *vktex = new VulkanTexture(vulkan_, alloc_);
 	vktex->SetTag("DepalClut");
 	VkCommandBuffer cmd = (VkCommandBuffer)draw_->GetNativeObject(Draw::NativeObject::INIT_COMMANDBUFFER);
 	if (!vktex->CreateDirect(cmd, texturePixels, 1, 1, destFormat,

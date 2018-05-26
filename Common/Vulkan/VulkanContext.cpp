@@ -238,9 +238,6 @@ void VulkanContext::BeginFrame() {
 	FrameData *frame = &frame_[curFrame_];
 	// Process pending deletes.
 	frame->deleteList.PerformDeletes(device_);
-
-	//
-	AllocationBeginFrame();
 }
 
 void VulkanContext::EndFrame() {
@@ -583,10 +580,6 @@ VkResult VulkanContext::CreateDevice() {
 	}
 	ILOG("Device created.\n");
 	VulkanSetAvailable(true);
-
-	//
-	CreateAllocator();
-
 	return res;
 }
 
@@ -943,10 +936,6 @@ void VulkanContext::PerformPendingDeletes() {
 void VulkanContext::DestroyDevice() {
 	ILOG("VulkanContext::DestroyDevice (performing deletes)");
 	PerformPendingDeletes();
-
-	//
-	vmaDestroyAllocator(allocator_);
-	allocator_ = nullptr;
 
 	vkDestroyDevice(device_, nullptr);
 	device_ = nullptr;

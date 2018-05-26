@@ -34,9 +34,10 @@ void Vulkan2D::Shutdown() {
 
 void Vulkan2D::DestroyDeviceObjects() {
 	for (int i = 0; i < vulkan_->GetInflightFrames(); i++) {
-		if (frameData_[i].descPool != VK_NULL_HANDLE) {
-			vulkan_->Delete().QueueDeleteDescriptorPool(frameData_[i].descPool);
-			frameData_[i].descPool = VK_NULL_HANDLE;
+		if (frame_[i].descPool != VK_NULL_HANDLE) {
+			vulkan_->Delete().QueueDeleteDescriptorPool(frame_[i].descPool);
+			frame_[i].descPool = VK_NULL_HANDLE;
+			frame_[i].descSets.clear();
 		}
 	}
 	for (auto it : pipelines_) {
@@ -86,6 +87,9 @@ void Vulkan2D::InitDeviceObjects() {
 	res = vkCreateDescriptorSetLayout(device, &dsl, nullptr, &descriptorSetLayout_);
 	assert(VK_SUCCESS == res);
 
+	for (int i = 0; i < ARRAY_SIZE(frame_); i++) {
+		//RecreateDescriptorPool(frame_[i]);
+	}
 
 	VkPushConstantRange push = {};
 	push.offset = 0;
@@ -113,9 +117,10 @@ void Vulkan2D::DeviceRestore(VulkanContext *vulkan) {
 
 void Vulkan2D::BeginFrame() {
 	int curFrame = vulkan_->GetCurFrame();
-	FrameData& frame = frameData_[curFrame];
+	FrameData& frame = frame_[curFrame];
 	if (frame.descPoolSize < frame.descCount + 64) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
+		frame.descSets.clear();
 		frame.descCount = 0;
 	}
 }
@@ -130,6 +135,7 @@ VkResult Vulkan2D::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
+		frame.descSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[1];
@@ -143,14 +149,24 @@ VkResult Vulkan2D::RecreateDescriptorPool(FrameData &frame) {
 	dp.poolSizeCount = ARRAY_SIZE(dpTypes);
 
 	VkResult res = vkCreateDescriptorPool(vulkan_->GetDevice(), &dp, nullptr, &frame.descPool);
+	DEBUG_LOG(G3D, "Vulkan2D Reallocating desc pool size %d", frame.descPoolSize);
 
 	return res;
 }
 
 
 VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1, VkImageView tex2, VkSampler sampler2) {
-	int curFrame = vulkan_->GetCurFrame();
-	FrameData& frame = frameData_[curFrame];
+	FrameData& frame = frame_[vulkan_->GetCurFrame()];
+
+	DescriptorSetKey key;
+	key.imageView[0] = tex1;
+	key.imageView[1] = tex2;
+	key.sampler[0] = sampler1;
+	key.sampler[1] = sampler2;
+	auto iter = frame.descSets.find(key);
+	if (iter != frame.descSets.end()) {
+		//return iter->second;
+	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {
 		VkResult res = RecreateDescriptorPool(frame);
@@ -227,6 +243,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
+	frame.descSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;

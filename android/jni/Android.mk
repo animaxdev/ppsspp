@@ -130,7 +130,6 @@ VULKAN_FILES := \
   $(SRC)/Common/Vulkan/VulkanDebug.cpp \
   $(SRC)/Common/Vulkan/VulkanImage.cpp \
   $(SRC)/Common/Vulkan/VulkanMemory.cpp \
-  $(SRC)/Common/Vulkan/vk_mem_alloc.cpp \
   $(SRC)/GPU/Vulkan/FragmentShaderGeneratorVulkan.cpp \
   $(SRC)/GPU/Vulkan/DrawEngineVulkan.cpp \
   $(SRC)/GPU/Vulkan/FramebufferVulkan.cpp \
