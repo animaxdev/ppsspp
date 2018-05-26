@@ -21,6 +21,25 @@ inline bool KeyEquals(const K &a, const K &b) {
 	return !memcmp(&a, &b, sizeof(K));
 }
 
+
+template<class K>
+struct KeyHasher
+{
+	std::size_t operator()(const K& key) const
+	{
+		return HashKey(key);
+	}
+};
+
+template<class K>
+struct KeyEqualer
+{
+	bool operator()(const K& lhs, const K& rhs) const
+	{
+		return KeyEquals(lhs, rhs);
+	}
+};
+
 enum class BucketState : uint8_t {
 	FREE,
 	TAKEN,

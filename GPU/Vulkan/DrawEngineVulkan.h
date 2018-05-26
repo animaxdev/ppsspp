@@ -32,7 +32,7 @@
 // won't get any bone data, etc.
 
 #include <map>
-#include <unordered_map>
+#include <tuple>
 
 #include "Common/Hashmaps.h"
 #include "Common/Vulkan/VulkanMemory.h"
@@ -227,6 +227,18 @@ private:
 	int decimationCounter_ = 0;
 	int descDecimationCounter_ = 0;
 
+	struct DescriptorSetKey {
+		VkImageView imageView_;
+		VkImageView secondaryImageView_;
+		VkImageView depalImageView_;
+		VkSampler sampler_;
+		VkBuffer base_, light_, bone_;  // All three UBO slots will be set to this. This will usually be identical
+		// for all draws in a frame, except when the buffer has to grow.
+		bool operator < (const DescriptorSetKey &other) const {
+			return std::tie(imageView_, sampler_) < std::tie(other.imageView_, other.sampler_);
+		}
+	};
+
 	// We alternate between these.
 	struct FrameData {
 		FrameData() {}
@@ -240,6 +252,8 @@ private:
 		VulkanPushBuffer *pushVertex = nullptr;
 		VulkanPushBuffer *pushIndex = nullptr;
 		VulkanPushBuffer *pushOther = nullptr;
+		
+		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 
 		void Destroy(VulkanContext *vulkan);
 	};

@@ -182,6 +182,8 @@ DrawEngineVulkan::~DrawEngineVulkan() {
 void DrawEngineVulkan::FrameData::Destroy(VulkanContext *vulkan) {
 	if (descPool != VK_NULL_HANDLE) {
 		vulkan->Delete().QueueDeleteDescriptorPool(descPool);
+		descPool = VK_NULL_HANDLE;
+		descSets.clear();
 	}
 
 	if (pushUBO) {
@@ -280,7 +282,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	if (!nullTexture_) {
 		VkCommandBuffer cmdInit = (VkCommandBuffer)draw_->GetNativeObject(Draw::NativeObject::INIT_COMMANDBUFFER);
-		nullTexture_ = new VulkanTexture(vulkan_);
+		nullTexture_ = new VulkanTexture(vulkan_, textureCache_->GetAllocator());
 		nullTexture_->SetTag("Null");
 		int w = 8;
 		int h = 8;
@@ -313,8 +315,9 @@ void DrawEngineVulkan::BeginFrame() {
 
 	vertexCache_->BeginNoReset();
 
-	if (frame->descPoolSize < frame->descCount + 624 && frame->descPool) {
+	if (frame->descPoolSize < frame->descCount + 624) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
+		frame->descSets.clear();
 		frame->descCount = 0;
 	}
 
@@ -379,6 +382,7 @@ VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
+		frame.descSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[3];
@@ -397,13 +401,30 @@ VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame) {
 	dp.poolSizeCount = ARRAY_SIZE(dpTypes);
 
 	VkResult res = vkCreateDescriptorPool(vulkan_->GetDevice(), &dp, nullptr, &frame.descPool);
-	DEBUG_LOG(G3D, "Reallocating desc pool size %d", frame.descPoolSize);
+	DEBUG_LOG(G3D, "DrawEngineVulkan Reallocating desc pool size %d", frame.descPoolSize);
 
 	return res;
 }
 
 VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView, VkSampler sampler, VkBuffer base, VkBuffer light, VkBuffer bone, bool tess) {
 	FrameData &frame = frame_[vulkan_->GetCurFrame()];
+	
+	DescriptorSetKey key;
+	key.imageView_ = imageView;
+	key.sampler_ = sampler;
+	key.secondaryImageView_ = boundSecondary_;
+	key.depalImageView_ = boundDepal_;
+	key.base_ = base;
+	key.light_ = light;
+	key.bone_ = bone;
+
+	// See if we already have this descriptor set cached.
+	if (!tess) { // Don't cache descriptors for HW tessellation.
+		auto iter = frame.descSets.find(key);
+		if (iter != frame.descSets.end()) {
+			//return iter->second;
+		}
+	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {
 		VkResult res = RecreateDescriptorPool(frame);
@@ -568,6 +589,8 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
+	if (!tess) // Again, avoid caching when HW tessellation.
+		frame.descSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;

@@ -88,6 +88,18 @@ private:
 	VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 	VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
 
+	// Yes, another one...
+	struct DescriptorSetKey {
+		VkImageView imageView[2];
+		VkSampler sampler[2];
+
+		bool operator < (const DescriptorSetKey &other) const {
+			//return memcmp(this, &other, sizeof(DescriptorSetKey)) < 0;
+			return std::tie(imageView[0], imageView[1], sampler[0], sampler[1]) <
+				std::tie(other.imageView[0], other.imageView[1], other.sampler[0], other.sampler[1]);
+		}
+	};
+
 	struct PipelineKey {
 		VkShaderModule vs;
 		VkShaderModule fs;
@@ -101,13 +113,13 @@ private:
 
 	struct FrameData {
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
-
+		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 		int descCount = 0;
 		int descPoolSize = 256;
 	};
 	VkResult RecreateDescriptorPool(FrameData &frame);
 
-	FrameData frameData_[VulkanContext::MAX_INFLIGHT_FRAMES];
+	FrameData frame_[VulkanContext::MAX_INFLIGHT_FRAMES];
 
 	std::map<PipelineKey, VkPipeline> pipelines_;
 };

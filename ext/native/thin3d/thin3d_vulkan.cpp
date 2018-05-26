@@ -286,11 +286,22 @@ class VKTexture;
 class VKBuffer;
 class VKSamplerState;
 
+struct DescriptorSetKey {
+	VKTexture *texture;
+	VKSamplerState *sampler;
+	VkBuffer buffer;
+
+	bool operator < (const DescriptorSetKey &other) const {
+		//return memcmp(this, &other, sizeof(DescriptorSetKey)) < 0;
+		return std::tie(texture, sampler, buffer) < std::tie(other.texture, other.sampler, other.buffer);
+	}
+};
+
 class VKTexture : public Texture {
 public:
-	VKTexture(VulkanContext *vulkan, VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc)
+	VKTexture(VulkanContext *vulkan, VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc, VulkanDeviceAllocator *alloc)
 		: vulkan_(vulkan), mipLevels_(desc.mipLevels), format_(desc.format) {
-		bool result = Create(cmd, pushBuffer, desc);
+		bool result = Create(cmd, pushBuffer, desc, alloc);
 		_assert_(result);
 	}
 
@@ -304,7 +315,7 @@ public:
 	}
 
 private:
-	bool Create(VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc);
+	bool Create(VkCommandBuffer cmd, VulkanPushBuffer *pushBuffer, const TextureDesc &desc, VulkanDeviceAllocator *alloc);
 
 	void Destroy() {
 		if (vkTex_) {
@@ -476,6 +487,8 @@ private:
 
 	VulkanRenderManager renderManager_;
 
+	VulkanDeviceAllocator *allocator_ = nullptr;
+
 	VKPipeline *curPipeline_ = nullptr;
 	VKBuffer *curVBuffers_[4]{};
 	int curVBufferOffsets_[4]{};
@@ -504,7 +517,7 @@ private:
 		// Per-frame descriptor set cache. As it's per frame and reset every frame, we don't need to
 		// worry about invalidating descriptors pointing to deleted textures.
 		// However! ARM is not a fan of doing it this way.
-		//std::map<DescriptorSetKey, VkDescriptorSet> descSets_;
+		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 		int descCount = 0;
@@ -641,7 +654,7 @@ enum class TextureState {
 	PENDING_DESTRUCTION,
 };
 
-bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const TextureDesc &desc) {
+bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const TextureDesc &desc, VulkanDeviceAllocator *alloc) {
 	// Zero-sized textures not allowed.
 	_assert_(desc.width * desc.height * desc.depth > 0);  // remember to set depth to 1!
 	_assert_(push);
@@ -650,7 +663,7 @@ bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushBuffer *push, const Textur
 	width_ = desc.width;
 	height_ = desc.height;
 	depth_ = desc.depth;
-	vkTex_ = new VulkanTexture(vulkan_);
+	vkTex_ = new VulkanTexture(vulkan_, alloc);
 	vkTex_->SetTag(desc.tag);
 	VkFormat vulkanFormat = DataFormatToVulkan(format_);
 	int stride = desc.width * (int)DataFormatSizeInBytes(format_);
@@ -720,7 +733,8 @@ VKContext::VKContext(VulkanContext *vulkan, bool splitSubmit)
 	VkBufferUsageFlags allUsages = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		// must 8 * 1024 * 1024
-		frame_[i].pushBuffer = new VulkanPushBuffer(vulkan_, allUsages, 8 * 1024 * 1024);
+		frame_[i].pushBuffer = new VulkanPushBuffer(vulkan_, allUsages, 1024 * 1024);
+		//RecreateDescriptorPool(frame_[i]);
 	}
 
 	// binding 0 - uniform data
@@ -756,12 +770,24 @@ VKContext::VKContext(VulkanContext *vulkan, bool splitSubmit)
 	assert(VK_SUCCESS == res);
 
 	renderManager_.SetSplitSubmit(splitSubmit);
+
+	allocator_ = new VulkanDeviceAllocator(vulkan_, 256 * 1024, 2048 * 1024);
 }
 
 VKContext::~VKContext() {
+	allocator_->Destroy();
+	// We have to delete on queue, so this can free its queued deletions.
+	vulkan_->Delete().QueueCallback([](void *ptr) {
+		auto allocator = static_cast<VulkanDeviceAllocator *>(ptr);
+		delete allocator;
+	}, allocator_);
+	allocator_ = nullptr;
 	// This also destroys all descriptor sets.
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame_[i].descPool);
+		frame_[i].descPool = VK_NULL_HANDLE;
+		frame_[i].descSets.clear();
+
 		frame_[i].pushBuffer->Destroy();
 		delete frame_[i].pushBuffer;
 	}
@@ -778,10 +804,13 @@ void VKContext::BeginFrame() {
 
 	// OK, we now know that nothing is reading from this frame's data pushbuffer,
 	push_->Begin();
+	allocator_->Begin();
+
 
 	if (frame.descPoolSize < frame.descCount + 64) {
-		VkResult result = vkResetDescriptorPool(device_, frame.descPool, 0);
-		assert(result == VK_SUCCESS);
+		vkResetDescriptorPool(device_, frame.descPool, 0);
+		frame.descCount = 0;
+		frame.descSets.clear();
 	}
 }
 
@@ -808,6 +837,7 @@ VkResult VKContext::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
+		frame.descSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[2];
@@ -827,12 +857,23 @@ VkResult VKContext::RecreateDescriptorPool(FrameData &frame) {
 	p.queueFamilyIndex = vulkan_->GetGraphicsQueueFamilyIndex();
 
 	VkResult res = vkCreateDescriptorPool(device_, &dp, nullptr, &frame.descPool);
+	DEBUG_LOG(G3D, "VKContext Reallocating desc pool size %d", frame.descPoolSize);
 
 	return res;
 }
 
 VkDescriptorSet VKContext::GetOrCreateDescriptorSet(VkBuffer buf) {
 	FrameData& frame = frame_[vulkan_->GetCurFrame()];
+
+	DescriptorSetKey key;
+	key.texture = boundTextures_[0];
+	key.sampler = boundSamplers_[0];
+	key.buffer = buf;
+
+	auto iter = frame.descSets.find(key);
+	if (iter != frame.descSets.end()) {
+		//return iter->second;
+	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {
 		VkResult res = RecreateDescriptorPool(frame);
@@ -900,6 +941,7 @@ VkDescriptorSet VKContext::GetOrCreateDescriptorSet(VkBuffer buf) {
 
 	vkUpdateDescriptorSets(device_, 2, writes, 0, nullptr);
 
+	frame.descSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;
@@ -1043,7 +1085,7 @@ Texture *VKContext::CreateTexture(const TextureDesc &desc) {
 		return nullptr;
 	}
 	_assert_(renderManager_.GetInitCmd());
-	return new VKTexture(vulkan_, renderManager_.GetInitCmd(), push_, desc);
+	return new VKTexture(vulkan_, renderManager_.GetInitCmd(), push_, desc, allocator_);
 }
 
 static inline void CopySide(VkStencilOpState &dest, const StencilSide &src) {

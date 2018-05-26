@@ -245,7 +245,6 @@
     <ClInclude Include="Thunk.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="Vulkan\SPIRVDisasm.h" />
-    <ClInclude Include="Vulkan\vk_mem_alloc.h" />
     <ClInclude Include="Vulkan\VulkanContext.h" />
     <ClInclude Include="Vulkan\VulkanDebug.h" />
     <ClInclude Include="Vulkan\VulkanImage.h" />
@@ -318,7 +317,6 @@
     <ClCompile Include="Thunk.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="Vulkan\SPIRVDisasm.cpp" />
-    <ClCompile Include="Vulkan\vk_mem_alloc.cpp" />
     <ClCompile Include="Vulkan\VulkanContext.cpp" />
     <ClCompile Include="Vulkan\VulkanDebug.cpp" />
     <ClCompile Include="Vulkan\VulkanImage.cpp" />

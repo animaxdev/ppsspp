@@ -3,7 +3,6 @@
 #include <vector>
 #include <unordered_map>
 #include "Common/Vulkan/VulkanContext.h"
-//#include "Common/Log.h"
 
 // VulkanMemory
 //
@@ -19,150 +18,202 @@
 class VulkanPushBuffer {
 	struct BufInfo {
 		VkBuffer buffer;
-		VmaAllocation allocation;
+		VkDeviceMemory deviceMemory;
 	};
 
 public:
-	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage, size_t size)
-		: vulkan_(vulkan), usage_(usage), size_(size), buf_(0), offset_(0), writePtr_(nullptr) {
-	}
+	VulkanPushBuffer(VulkanContext *vulkan, VkBufferUsageFlags usage, size_t size);
+	~VulkanPushBuffer();
 
-	~VulkanPushBuffer() {
-		assert(buffers_.empty());
-	}
+	void Destroy();
 
-	void Destroy() {
-		if (writePtr_) {
-			Unmap();
-		}
-		for (BufInfo &info : buffers_) {
-			vulkan_->FreeBuffer(&info.buffer, &info.allocation);
-		}
-		buffers_.clear();
-	}
+	void Reset() { offset_ = 0; }
 
 	// Needs context in case of defragment.
 	void Begin() {
-		Destroy();
 		buf_ = 0;
 		offset_ = 0;
 		// Note: we must defrag because some buffers may be smaller than size_.
-		//Defragment();
+		Defragment();
+		Map();
 	}
 
 	void BeginNoReset() {
-		
+		Map();
 	}
 
 	void End() {
-		if (writePtr_) {
-			Unmap();
-		}
+		Unmap();
 	}
 
-	void Map() {
-		//_dbg_assert_(G3D, !writePtr_);
-		VkResult res = vulkan_->MapMemory(buffers_[buf_].allocation, (void **)(&writePtr_));
-		//_dbg_assert_(G3D, writePtr_);
-		assert(VK_SUCCESS == res);
-	}
+	void Map();
 
-	void Unmap() {
-		//_dbg_assert_(G3D, writePtr_ != 0);
-		vulkan_->UnmapMemory(buffers_[buf_].allocation);
-		writePtr_ = nullptr;
-	}
+	void Unmap();
 
 	// When using the returned memory, make sure to bind the returned vkbuf.
 	// This will later allow for handling overflow correctly.
-	size_t Allocate(size_t size, VkBuffer *vkbuf) {
+	size_t Allocate(size_t numBytes, VkBuffer *vkbuf) {
 		size_t out = offset_;
-		offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
-		if (buffers_.empty() || offset_ >= size_) {
-			*vkbuf = AddBuffer();
+		offset_ += (numBytes + 3) & ~3;  // Round up to 4 bytes.
+
+		if (offset_ >= size_) {
+			NextBuffer(numBytes);
 			out = offset_;
-			offset_ += (size + 3) & ~3;  // Round up to 4 bytes.
+			offset_ += (numBytes + 3) & ~3;
 		}
-		else {
-			*vkbuf = buffers_[buf_].buffer;
-		}
+		*vkbuf = buffers_[buf_].buffer;
 		return out;
 	}
 
 	// Returns the offset that should be used when binding this buffer to get this data.
 	size_t Push(const void *data, size_t size, VkBuffer *vkbuf) {
+		assert(writePtr_);
 		size_t off = Allocate(size, vkbuf);
 		memcpy(writePtr_ + off, data, size);
 		return off;
 	}
 
 	uint32_t PushAligned(const void *data, size_t size, int align, VkBuffer *vkbuf) {
+		assert(writePtr_);
 		offset_ = (offset_ + align - 1) & ~(align - 1);
 		size_t off = Allocate(size, vkbuf);
 		memcpy(writePtr_ + off, data, size);
 		return (uint32_t)off;
 	}
 
+	size_t GetOffset() const {
+		return offset_;
+	}
 
 	// "Zero-copy" variant - you can write the data directly as you compute it.
 	// Recommended.
 	void *Push(size_t size, uint32_t *bindOffset, VkBuffer *vkbuf) {
+		assert(writePtr_);
 		size_t off = Allocate(size, vkbuf);
 		*bindOffset = (uint32_t)off;
 		return writePtr_ + off;
 	}
-
 	void *PushAligned(size_t size, uint32_t *bindOffset, VkBuffer *vkbuf, int align) {
+		assert(writePtr_);
 		offset_ = (offset_ + align - 1) & ~(align - 1);
 		size_t off = Allocate(size, vkbuf);
 		*bindOffset = (uint32_t)off;
 		return writePtr_ + off;
 	}
 
-	size_t GetTotalSize() const {
-		size_t sum = 0;
-		if (buffers_.size() > 1)
-			sum += size_ * (buffers_.size() - 1);
-		sum += offset_;
-		return sum;
-	}
+	size_t GetTotalSize() const;
 
 private:
-	VkBuffer AddBuffer() {
-		VkBufferCreateInfo b{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-		b.size = size_;
-		b.flags = 0;
-		b.usage = usage_;
-		b.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		b.queueFamilyIndexCount = 0;
-		b.pQueueFamilyIndices = nullptr;
-
-		BufInfo info;
-		VkResult res = vulkan_->AllocPushBuffer(b, &info.buffer, &info.allocation);
-		if (VK_SUCCESS != res) {
-			//_assert_msg_(G3D, false, "vkCreateBuffer failed! result=%d", (int)res);
-			return nullptr;
-		}
-
-		if (writePtr_ != nullptr)
-		{
-			Unmap();
-		}
-
-		offset_ = 0;
-		buf_ = buffers_.size();
-		buffers_.push_back(info);
-
-		Map();
-
-		return info.buffer;
-	}
+	bool AddBuffer();
+	void NextBuffer(size_t minSize);
+	void Defragment();
 
 	VulkanContext *vulkan_;
-	VkBufferUsageFlags usage_;
+	VkDevice device_;
 	std::vector<BufInfo> buffers_;
 	size_t buf_;
-	size_t size_;
 	size_t offset_;
+	VkBufferUsageFlags usage_;
+	size_t size_;
+	uint32_t memoryTypeIndex_;
 	uint8_t *writePtr_;
+};
+
+// VulkanDeviceAllocator
+//
+// Implements a slab based allocator that manages suballocations inside the slabs.
+// Bitmaps are used to handle allocation state, with a 1KB grain.
+class VulkanDeviceAllocator {
+public:
+	// Slab sizes start at minSlabSize and double until maxSlabSize.
+	// Total slab count is unlimited, as long as there's free memory.
+	VulkanDeviceAllocator(VulkanContext *vulkan, size_t minSlabSize, size_t maxSlabSize);
+	~VulkanDeviceAllocator();
+
+	// Requires all memory be free beforehand (including all pending deletes.)
+	void Destroy();
+
+	void Begin() {
+		Decimate();
+	}
+
+	void End() {
+	}
+
+	// May return ALLOCATE_FAILED if the allocation fails.
+	size_t Allocate(const VkMemoryRequirements &reqs, VkDeviceMemory *deviceMemory, const std::string &tag);
+
+	// Crashes on a double or misfree.
+	void Free(VkDeviceMemory deviceMemory, size_t offset);
+
+	inline void Touch(VkDeviceMemory deviceMemory, size_t offset) {
+		if (TRACK_TOUCH) {
+			DoTouch(deviceMemory, offset);
+		}
+	}
+
+	static const size_t ALLOCATE_FAILED = -1;
+	// Set to true to report potential leaks / long held textures.
+	static const bool TRACK_TOUCH = false;
+
+	int GetSlabCount() const { return (int)slabs_.size(); }
+	int GetMinSlabSize() const { return (int)minSlabSize_; }
+	int GetMaxSlabSize() const { return (int)maxSlabSize_; }
+
+	int ComputeUsagePercent() const;
+	std::vector<uint8_t> GetSlabUsage(int slab) const;
+
+private:
+	static const size_t SLAB_GRAIN_SIZE = 1024;
+	static const uint8_t SLAB_GRAIN_SHIFT = 10;
+	static const uint32_t UNDEFINED_MEMORY_TYPE = -1;
+
+	struct UsageInfo {
+		std::string tag;
+		float created;
+		float touched;
+	};
+
+	struct Slab {
+		VkDeviceMemory deviceMemory;
+		std::vector<uint8_t> usage;
+		std::unordered_map<size_t, size_t> allocSizes;
+		std::unordered_map<size_t, UsageInfo> tags;
+		size_t nextFree;
+		size_t totalUsage;
+
+		size_t Size() {
+			return usage.size() * SLAB_GRAIN_SIZE;
+		}
+	};
+
+	struct FreeInfo {
+		explicit FreeInfo(VulkanDeviceAllocator *a, VkDeviceMemory d, size_t o)
+			: allocator(a), deviceMemory(d), offset(o) {
+		}
+
+		VulkanDeviceAllocator *allocator;
+		VkDeviceMemory deviceMemory;
+		size_t offset;
+	};
+
+	static void DispatchFree(void *userdata) {
+		auto freeInfo = static_cast<FreeInfo *>(userdata);
+		freeInfo->allocator->ExecuteFree(freeInfo);  // this deletes freeInfo
+	}
+
+	bool AllocateSlab(VkDeviceSize minBytes);
+	bool AllocateFromSlab(Slab &slab, size_t &start, size_t blocks, const std::string &tag);
+	void Decimate();
+	void DoTouch(VkDeviceMemory deviceMemory, size_t offset);
+	void ExecuteFree(FreeInfo *userdata);
+	void ReportOldUsage();
+
+	VulkanContext *const vulkan_;
+	std::vector<Slab> slabs_;
+	size_t lastSlab_ = 0;
+	size_t minSlabSize_;
+	const size_t maxSlabSize_;
+	uint32_t memoryTypeIndex_ = UNDEFINED_MEMORY_TYPE;
+	bool destroyed_ = false;
 };

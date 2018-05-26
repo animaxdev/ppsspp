@@ -7,7 +7,6 @@
 
 #include "base/logging.h"
 #include "Common/Vulkan/VulkanLoader.h"
-#include "Common/Vulkan/vk_mem_alloc.h"
 
 enum {
 	VULKAN_FLAG_VALIDATE = 1,
@@ -243,116 +242,6 @@ public:
 
 	const VulkanDeviceExtensions &DeviceExtensions() { return deviceExtensionsLookup_; }
 
-
-
-	VkResult CreateAllocator()
-	{
-		VmaVulkanFunctions VulkanFunctions;
-		VulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-		VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
-		VulkanFunctions.vkAllocateMemory = vkAllocateMemory;
-		VulkanFunctions.vkFreeMemory = vkFreeMemory;
-		VulkanFunctions.vkMapMemory = vkMapMemory;
-		VulkanFunctions.vkUnmapMemory = vkUnmapMemory;
-		VulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
-		VulkanFunctions.vkBindImageMemory = vkBindImageMemory;
-		VulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
-		VulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
-		VulkanFunctions.vkCreateBuffer = vkCreateBuffer;
-		VulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
-		VulkanFunctions.vkCreateImage = vkCreateImage;
-		VulkanFunctions.vkDestroyImage = vkDestroyImage;
-#if VMA_DEDICATED_ALLOCATION
-		VulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
-		VulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
-#endif
-
-		VmaAllocatorCreateInfo allocatorInfo = {};
-		allocatorInfo.physicalDevice = physical_devices_[physical_device_];
-		allocatorInfo.device = device_;
-		allocatorInfo.pVulkanFunctions = &VulkanFunctions;
-		allocatorInfo.frameInUseCount = GetInflightFrames();
-		return vmaCreateAllocator(&allocatorInfo, &allocator_);
-	}
-
-	void AllocationBeginFrame()
-	{
-		vmaSetCurrentFrameIndex(allocator_, curFrame_);
-	}
-
-	VkDeviceSize GetAllocationOffset(VmaAllocation allocation)
-	{
-		VmaAllocationInfo allocInfo;
-		vmaGetAllocationInfo(allocator_, allocation, &allocInfo);
-		return allocInfo.offset;
-	}
-
-	VkResult AllocPushBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
-	{
-		VmaAllocationCreateInfo allocCreateInfo = {};
-		allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		allocCreateInfo.flags = 0;
-		allocCreateInfo.pUserData = nullptr;
-		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
-	}
-
-	VkResult AllocPullBuffer(const VkBufferCreateInfo& bufferCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation)
-	{
-		VmaAllocationCreateInfo allocCreateInfo = {};
-		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
-		allocCreateInfo.flags = 0;
-		allocCreateInfo.pUserData = nullptr;
-		return vmaCreateBuffer(allocator_, &bufferCreateInfo, &allocCreateInfo, pBuffer, pAllocation, nullptr);
-	}
-
-	void FreeBuffer(VkBuffer* pBuffer, VmaAllocation* pAllocation)
-	{
-		vmaDestroyBuffer(allocator_, *pBuffer, *pAllocation);
-		*pBuffer = nullptr;
-		*pAllocation = nullptr;
-	}
-
-	VkResult AllocImage(const VkImageCreateInfo& imageCreateInfo, VkImage* pImage, VmaAllocation* pAllocation)
-	{
-		VmaAllocationCreateInfo allocCreateInfo = {};
-		allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-		allocCreateInfo.flags = VMA_ALLOCATION_CREATE_CAN_BECOME_LOST_BIT;
-		allocCreateInfo.pUserData = nullptr;
-		return vmaCreateImage(allocator_, &imageCreateInfo, &allocCreateInfo, pImage, pAllocation, nullptr);
-	}
-
-	void FreeImage(VkImage* pImage, VmaAllocation* pAllocation)
-	{
-		vmaDestroyImage(allocator_, *pImage, *pAllocation);
-		*pImage = nullptr;
-		*pAllocation = nullptr;
-	}
-
-	void TouchAllocation(VmaAllocation allocation)
-	{
-		vmaTouchAllocation(allocator_, allocation);
-	}
-
-	VkResult MapMemory(VmaAllocation allocation, void** ppData)
-	{
-		return vmaMapMemory(allocator_, allocation, ppData);
-	}
-
-	void UnmapMemory(VmaAllocation allocation)
-	{
-		vmaUnmapMemory(allocator_, allocation);
-	}
-
-	VkResult Defragment(VmaAllocation* pAllocations, size_t allocationCount)
-	{
-		std::vector<VkBool32> allocationsChanged(allocationCount);
-		VmaDefragmentationInfo defragmentationInfo;
-		defragmentationInfo.maxBytesToMove = VK_WHOLE_SIZE;
-		defragmentationInfo.maxAllocationsToMove = UINT32_MAX;
-		VmaDefragmentationStats defragmentationStats{};
-		return vmaDefragment(allocator_, pAllocations, allocationCount, allocationsChanged.data(), &defragmentationInfo, &defragmentationStats);
-	}
-
 private:
 	// A layer can expose extensions, keep track of those extensions here.
 	struct LayerProperties {
@@ -430,9 +319,6 @@ private:
 	VkSurfaceCapabilitiesKHR surfCapabilities_{};
 
 	std::vector<VkCommandBuffer> cmdQueue_;
-
-	// vma
-	VmaAllocator allocator_;
 };
 
 // Detailed control.
