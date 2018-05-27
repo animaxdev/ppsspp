@@ -87,10 +87,6 @@ void Vulkan2D::InitDeviceObjects() {
 	res = vkCreateDescriptorSetLayout(device, &dsl, nullptr, &descriptorSetLayout_);
 	assert(VK_SUCCESS == res);
 
-	for (int i = 0; i < ARRAY_SIZE(frame_); i++) {
-		//RecreateDescriptorPool(frame_[i]);
-	}
-
 	VkPushConstantRange push = {};
 	push.offset = 0;
 	push.size = 48;
@@ -120,9 +116,10 @@ void Vulkan2D::BeginFrame() {
 	FrameData& frame = frame_[curFrame];
 	if (frame.descPoolSize < frame.descCount + 64) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
-		frame.descSets.clear();
 		frame.descCount = 0;
 	}
+	// cache must reset per frame
+	frame.descSets.clear();
 }
 
 void Vulkan2D::EndFrame() {
@@ -165,7 +162,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 	key.sampler[1] = sampler2;
 	auto iter = frame.descSets.find(key);
 	if (iter != frame.descSets.end()) {
-		//return iter->second;
+		return iter->second;
 	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {

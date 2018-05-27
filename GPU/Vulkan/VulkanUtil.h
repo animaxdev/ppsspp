@@ -94,7 +94,6 @@ private:
 		VkSampler sampler[2];
 
 		bool operator < (const DescriptorSetKey &other) const {
-			//return memcmp(this, &other, sizeof(DescriptorSetKey)) < 0;
 			return std::tie(imageView[0], imageView[1], sampler[0], sampler[1]) <
 				std::tie(other.imageView[0], other.imageView[1], other.sampler[0], other.sampler[1]);
 		}
