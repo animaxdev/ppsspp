@@ -838,9 +838,6 @@ void DrawEngineVulkan::DoFlush() {
 				imageView = nullTexture_->GetImageView();
 			if (sampler == VK_NULL_HANDLE)
 				sampler = nullSampler_;
-
-			// need reset desc pool, zhangwei
-			//descDecimationCounter_ = 0;
 		}
 
 		//if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
@@ -941,9 +938,6 @@ void DrawEngineVulkan::DoFlush() {
 					imageView = nullTexture_->GetImageView();
 				if (sampler == VK_NULL_HANDLE)
 					sampler = nullSampler_;
-
-				// need reset desc pool, zhangwei
-				//descDecimationCounter_ = 0;
 			}
 			//if (!lastPipeline_ || gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
 				shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, false);  // usehwtransform
@@ -1013,6 +1007,8 @@ void DrawEngineVulkan::DoFlush() {
 			}
 		}
 	}
+
+	boneBuf = nullptr;
 
 	gpuStats.numDrawCalls += numDrawCalls;
 	gpuStats.numVertsSubmitted += vertexCountInDrawCalls_;
