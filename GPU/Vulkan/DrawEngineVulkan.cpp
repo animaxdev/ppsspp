@@ -317,9 +317,10 @@ void DrawEngineVulkan::BeginFrame() {
 
 	if (frame->descPoolSize < frame->descCount + 624) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
-		frame->descSets.clear();
 		frame->descCount = 0;
 	}
+	// cache must reset per frame
+	frame->descSets.clear();
 
 	if (--decimationCounter_ <= 0) {
 		decimationCounter_ = VERTEXCACHE_DECIMATION_INTERVAL;
@@ -348,9 +349,9 @@ void DrawEngineVulkan::BeginFrame() {
 void DrawEngineVulkan::EndFrame() {
 	FrameData *frame = &frame_[vulkan_->GetCurFrame()];
 	
-	//stats_.pushUBOSpaceUsed = (int)frame->pushUBO->GetOffset();
-	//stats_.pushVertexSpaceUsed = (int)frame->pushVertex->GetOffset();
-	//stats_.pushIndexSpaceUsed = (int)frame->pushIndex->GetOffset();
+	stats_.pushUBOSpaceUsed = (int)frame->pushUBO->GetOffset();
+	stats_.pushVertexSpaceUsed = (int)frame->pushVertex->GetOffset();
+	stats_.pushIndexSpaceUsed = (int)frame->pushIndex->GetOffset();
 
 	frame->pushUBO->End();
 	frame->pushVertex->End();
@@ -422,7 +423,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	if (!tess) { // Don't cache descriptors for HW tessellation.
 		auto iter = frame.descSets.find(key);
 		if (iter != frame.descSets.end()) {
-			//return iter->second;
+			return iter->second;
 		}
 	}
 
@@ -837,9 +838,6 @@ void DrawEngineVulkan::DoFlush() {
 				imageView = nullTexture_->GetImageView();
 			if (sampler == VK_NULL_HANDLE)
 				sampler = nullSampler_;
-
-			// need reset desc pool, zhangwei
-			//descDecimationCounter_ = 0;
 		}
 
 		//if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
@@ -940,9 +938,6 @@ void DrawEngineVulkan::DoFlush() {
 					imageView = nullTexture_->GetImageView();
 				if (sampler == VK_NULL_HANDLE)
 					sampler = nullSampler_;
-
-				// need reset desc pool, zhangwei
-				//descDecimationCounter_ = 0;
 			}
 			//if (!lastPipeline_ || gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
 				shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, false);  // usehwtransform
@@ -1013,6 +1008,8 @@ void DrawEngineVulkan::DoFlush() {
 		}
 	}
 
+	boneBuf = nullptr;
+
 	gpuStats.numDrawCalls += numDrawCalls;
 	gpuStats.numVertsSubmitted += vertexCountInDrawCalls_;
 
@@ -1032,7 +1029,9 @@ void DrawEngineVulkan::DoFlush() {
 	gstate_c.vertBounds.maxU = 0;
 	gstate_c.vertBounds.maxV = 0;
 
+#ifndef MOBILE_DEVICE
 	host->GPUNotifyDraw();
+#endif
 }
 
 void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {

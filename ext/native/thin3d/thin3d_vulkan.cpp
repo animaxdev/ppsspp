@@ -292,7 +292,6 @@ struct DescriptorSetKey {
 	VkBuffer buffer;
 
 	bool operator < (const DescriptorSetKey &other) const {
-		//return memcmp(this, &other, sizeof(DescriptorSetKey)) < 0;
 		return std::tie(texture, sampler, buffer) < std::tie(other.texture, other.sampler, other.buffer);
 	}
 };
@@ -732,9 +731,7 @@ VKContext::VKContext(VulkanContext *vulkan, bool splitSubmit)
 
 	VkBufferUsageFlags allUsages = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
-		// must 8 * 1024 * 1024
 		frame_[i].pushBuffer = new VulkanPushBuffer(vulkan_, allUsages, 1024 * 1024);
-		//RecreateDescriptorPool(frame_[i]);
 	}
 
 	// binding 0 - uniform data
@@ -810,8 +807,9 @@ void VKContext::BeginFrame() {
 	if (frame.descPoolSize < frame.descCount + 64) {
 		vkResetDescriptorPool(device_, frame.descPool, 0);
 		frame.descCount = 0;
-		frame.descSets.clear();
 	}
+	// cache must reset per frame
+	frame.descSets.clear();
 }
 
 void VKContext::WaitRenderCompletion(Framebuffer *fbo) {
@@ -872,7 +870,7 @@ VkDescriptorSet VKContext::GetOrCreateDescriptorSet(VkBuffer buf) {
 
 	auto iter = frame.descSets.find(key);
 	if (iter != frame.descSets.end()) {
-		//return iter->second;
+		return iter->second;
 	}
 
 	if (!frame.descPool || frame.descPoolSize < frame.descCount + 1) {

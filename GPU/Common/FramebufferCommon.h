@@ -313,9 +313,6 @@ protected:
 	virtual void Bind2DShader() = 0;
 	virtual void BindPostShader(const PostShaderUniforms &uniforms) = 0;
 
-	// Cardboard Settings Calculator
-	void GetCardboardSettings(CardboardSettings *cardboardSettings);
-
 	bool UpdateSize();
 	void SetNumExtraFBOs(int num);
 

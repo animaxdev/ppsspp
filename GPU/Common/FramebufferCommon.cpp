@@ -773,9 +773,6 @@ void FramebufferManagerCommon::DrawFramebufferToOutput(const u8 *srcPixels, GEBu
 	float v0 = 0.0f, v1 = 1.0f;
 	MakePixelTexture(srcPixels, srcPixelFormat, srcStride, 512, 272, u1, v1);
 
-	struct CardboardSettings cardboardSettings;
-	GetCardboardSettings(&cardboardSettings);
-
 	// This might draw directly at the backbuffer (if so, applyPostShader is set) so if there's a post shader, we need to apply it here.
 	// Should try to unify this path with the regular path somehow, but this simple solution works for most of the post shaders 
 	// (it always runs at output resolution so FXAA may look odd).
@@ -800,18 +797,9 @@ void FramebufferManagerCommon::DrawFramebufferToOutput(const u8 *srcPixels, GEBu
 		std::swap(v0, v1);
 
 	DrawTextureFlags flags = g_Config.iBufFilter == SCALE_LINEAR ? DRAWTEX_LINEAR : DRAWTEX_NEAREST;
-	if (cardboardSettings.enabled) {
-		// Left Eye Image
-		SetViewport2D(cardboardSettings.leftEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-		DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags | DRAWTEX_KEEP_TEX);
-		// Right Eye Image
-		SetViewport2D(cardboardSettings.rightEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-		DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags);
-	} else {
-		// Fullscreen Image
-		SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
-		DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
-	}
+	// Fullscreen Image
+	SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
+	DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
 
 	gstate_c.Dirty(DIRTY_BLEND_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_RASTER_STATE);
 }
@@ -853,9 +841,6 @@ void FramebufferManagerCommon::CopyDisplayToOutput() {
 
 	u32 offsetX = 0;
 	u32 offsetY = 0;
-
-	CardboardSettings cardboardSettings;
-	GetCardboardSettings(&cardboardSettings);
 
 	VirtualFramebuffer *vfb = GetVFBAt(displayFramebufPtr_);
 	if (!vfb) {
@@ -971,19 +956,9 @@ void FramebufferManagerCommon::CopyDisplayToOutput() {
 			Bind2DShader();
 			if (needBackBufferYSwap_)
 				std::swap(v0, v1);
-			if (cardboardSettings.enabled) {
-				// Left Eye Image
-				SetViewport2D(cardboardSettings.leftEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags | DRAWTEX_KEEP_TEX);
-
-				// Right Eye Image
-				SetViewport2D(cardboardSettings.rightEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags);
-			} else {
-				// Fullscreen Image
-				SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
-			}
+			// Fullscreen Image
+			SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
+			DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
 		} else if (usePostShader_ && extraFBOs_.size() == 1 && !postShaderAtOutputResolution_) {
 			// An additional pass, post-processing shader to the extra FBO.
 			draw_->BindFramebufferAsRenderTarget(extraFBOs_[0], { Draw::RPAction::DONT_CARE, Draw::RPAction::DONT_CARE, Draw::RPAction::DONT_CARE });
@@ -1016,19 +991,9 @@ void FramebufferManagerCommon::CopyDisplayToOutput() {
 				std::swap(v0, v1);
 			Bind2DShader();
 			flags = (!postShaderIsUpscalingFilter_ && g_Config.iBufFilter == SCALE_LINEAR) ? DRAWTEX_LINEAR : DRAWTEX_NEAREST;
-			if (g_Config.bEnableCardboard) {
-				// Left Eye Image
-				SetViewport2D(cardboardSettings.leftEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags | DRAWTEX_KEEP_TEX);
-
-				// Right Eye Image
-				SetViewport2D(cardboardSettings.rightEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags);
-			} else {
-				// Fullscreen Image
-				SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
-			}
+			// Fullscreen Image
+			SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
+			DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
 		} else {
 			draw_->BindFramebufferAsRenderTarget(nullptr, { Draw::RPAction::CLEAR, Draw::RPAction::CLEAR, Draw::RPAction::CLEAR });
 			draw_->BindFramebufferAsTexture(vfb->fbo, 0, Draw::FB_COLOR_BIT, 0);
@@ -1043,19 +1008,9 @@ void FramebufferManagerCommon::CopyDisplayToOutput() {
 			PostShaderUniforms uniforms{};
 			CalculatePostShaderUniforms(vfb->bufferWidth, vfb->bufferHeight, vfb->renderWidth, vfb->renderHeight, &uniforms);
 			BindPostShader(uniforms);
-			if (g_Config.bEnableCardboard) {
-				// Left Eye Image
-				SetViewport2D(cardboardSettings.leftEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags | DRAWTEX_KEEP_TEX);
-
-				// Right Eye Image
-				SetViewport2D(cardboardSettings.rightEyeXPosition, cardboardSettings.screenYPosition, cardboardSettings.screenWidth, cardboardSettings.screenHeight);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, ROTATION_LOCKED_HORIZONTAL, flags);
-			} else {
-				// Fullscreen Image
-				SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
-				DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
-			}
+			// Fullscreen Image
+			SetViewport2D(0, 0, pixelWidth_, pixelHeight_);
+			DrawActiveTexture(x, y, w, h, (float)pixelWidth_, (float)pixelHeight_, u0, v0, u1, v1, uvRotation, flags);
 		}
 	}
 	else if (useBufferedRendering_) {
@@ -1816,27 +1771,6 @@ void FramebufferManagerCommon::CalculatePostShaderUniforms(int bufferWidth, int 
 	uniforms->pixelDelta[1] = v_pixel_delta;
 	memcpy(uniforms->time, time, 4 * sizeof(float));
 	uniforms->video = textureCache_->VideoIsPlaying();
-}
-
-void FramebufferManagerCommon::GetCardboardSettings(CardboardSettings *cardboardSettings) {
-	// Calculate Cardboard Settings
-	float cardboardScreenScale = g_Config.iCardboardScreenSize / 100.0f;
-	float cardboardScreenWidth = pixelWidth_ / 2.0f * cardboardScreenScale;
-	float cardboardScreenHeight = pixelHeight_ / 2.0f * cardboardScreenScale;
-	float cardboardMaxXShift = (pixelWidth_ / 2.0f - cardboardScreenWidth) / 2.0f;
-	float cardboardUserXShift = g_Config.iCardboardXShift / 100.0f * cardboardMaxXShift;
-	float cardboardLeftEyeX = cardboardMaxXShift + cardboardUserXShift;
-	float cardboardRightEyeX = pixelWidth_ / 2.0f + cardboardMaxXShift - cardboardUserXShift;
-	float cardboardMaxYShift = pixelHeight_ / 2.0f - cardboardScreenHeight / 2.0f;
-	float cardboardUserYShift = g_Config.iCardboardYShift / 100.0f * cardboardMaxYShift;
-	float cardboardScreenY = cardboardMaxYShift + cardboardUserYShift;
-
-	cardboardSettings->enabled = g_Config.bEnableCardboard;
-	cardboardSettings->leftEyeXPosition = cardboardLeftEyeX;
-	cardboardSettings->rightEyeXPosition = cardboardRightEyeX;
-	cardboardSettings->screenYPosition = cardboardScreenY;
-	cardboardSettings->screenWidth = cardboardScreenWidth;
-	cardboardSettings->screenHeight = cardboardScreenHeight;
 }
 
 Draw::Framebuffer *FramebufferManagerCommon::GetTempFBO(TempFBO reason, u16 w, u16 h, Draw::FBColorDepth depth) {

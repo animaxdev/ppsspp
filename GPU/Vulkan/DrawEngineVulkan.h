@@ -235,7 +235,7 @@ private:
 		VkBuffer base_, light_, bone_;  // All three UBO slots will be set to this. This will usually be identical
 		// for all draws in a frame, except when the buffer has to grow.
 		bool operator < (const DescriptorSetKey &other) const {
-			return std::tie(imageView_, sampler_) < std::tie(other.imageView_, other.sampler_);
+			return std::tie(imageView_, depalImageView_, sampler_) < std::tie(other.imageView_, other.depalImageView_, other.sampler_);
 		}
 	};
 
