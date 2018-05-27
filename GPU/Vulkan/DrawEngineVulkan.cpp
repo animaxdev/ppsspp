@@ -1029,7 +1029,9 @@ void DrawEngineVulkan::DoFlush() {
 	gstate_c.vertBounds.maxU = 0;
 	gstate_c.vertBounds.maxV = 0;
 
+#ifndef MOBILE_DEVICE
 	host->GPUNotifyDraw();
+#endif
 }
 
 void DrawEngineVulkan::UpdateUBOs(FrameData *frame) {
