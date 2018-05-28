@@ -840,8 +840,7 @@ void DrawEngineVulkan::DoFlush() {
 				sampler = nullSampler_;
 		}
 
-		//if (!lastPipeline_ || !gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
-			//PROFILE_THIS_SCOPE("f2");
+		//if (!lastPipeline_ || gstate_c.IsDirty(DIRTY_BLEND_STATE | DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_RASTER_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE) || prim != lastPrim_) {
 			shaderManager_->GetShaders(prim, lastVType_, &vshader, &fshader, true);  // usehwtransform
 			_dbg_assert_msg_(G3D, vshader->UseHWTransform(), "Bad vshader");
 
