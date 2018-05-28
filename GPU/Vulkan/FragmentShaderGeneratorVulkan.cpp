@@ -437,7 +437,7 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 		}
 
 		if (replaceBlend == REPLACE_BLEND_COPY_FBO) {
-			WRITE(p, "  lowp vec4 destColor = texelFetch(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n");
+			WRITE(p, "  vec4 destColor = texelFetch(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n");
 
 			const char *srcFactor = "vec3(1.0)";
 			const char *dstFactor = "vec3(0.0)";
@@ -572,7 +572,7 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 	if (gstate_c.Supports(GPU_ROUND_FRAGMENT_DEPTH_TO_16BIT)) {
 		const double scale = DepthSliceFactor() * 65535.0;
 
-		WRITE(p, "  highp float z = gl_FragCoord.z;\n");
+		WRITE(p, "  float z = gl_FragCoord.z;\n");
 		if (gstate_c.Supports(GPU_SUPPORTS_ACCURATE_DEPTH)) {
 			// We center the depth with an offset, but only its fraction matters.
 			// When (DepthSliceFactor() - 1) is odd, it will be 0.5, otherwise 0.
