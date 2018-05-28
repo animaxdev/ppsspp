@@ -410,6 +410,7 @@ void VulkanRenderManager::BindFramebufferAsRenderTarget(VKRFramebuffer *fb, VKRR
 	step->render.clearDepth = clearDepth;
 	step->render.clearStencil = clearStencil;
 	step->render.numDraws = 0;
+	step->render.numReads = 0;
 	step->render.finalColorLayout = !fb ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
 	steps_.push_back(step);
 
@@ -419,6 +420,13 @@ void VulkanRenderManager::BindFramebufferAsRenderTarget(VKRFramebuffer *fb, VKRR
 }
 
 bool VulkanRenderManager::CopyFramebufferToMemorySync(VKRFramebuffer *src, int aspectBits, int x, int y, int w, int h, Draw::DataFormat destFormat, uint8_t *pixels, int pixelStride) {
+	for (int i = (int)steps_.size() - 1; i >= 0; i--) {
+		if (steps_[i]->stepType == VKRStepType::RENDER && steps_[i]->render.framebuffer == src) {
+			steps_[i]->render.numReads++;
+			break;
+		}
+	}
+
 	VKRStep *step = new VKRStep{ VKRStepType::READBACK };
 	step->readback.aspectMask = aspectBits;
 	step->readback.src = src;
@@ -713,6 +721,7 @@ void VulkanRenderManager::CopyFramebuffer(VKRFramebuffer *src, VkRect2D srcRect,
 			if (steps_[i]->render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
 				steps_[i]->render.finalColorLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 			}
+			steps_[i]->render.numReads++;
 			break;
 		}
 	}
@@ -755,6 +764,13 @@ void VulkanRenderManager::BlitFramebuffer(VKRFramebuffer *src, VkRect2D srcRect,
 	_dbg_assert_msg_(G3D, dstRect.extent.width > 0, "blit dstwidth == 0");
 	_dbg_assert_msg_(G3D, dstRect.extent.height > 0, "blit dstheight == 0");
 
+	for (int i = (int)steps_.size() - 1; i >= 0; i--) {
+		if (steps_[i]->stepType == VKRStepType::RENDER && steps_[i]->render.framebuffer == src) {
+			steps_[i]->render.numReads++;
+			break;
+		}
+	}
+
 	VKRStep *step = new VKRStep{ VKRStepType::BLIT };
 
 	step->blit.aspectMask = aspectMask;
@@ -777,6 +793,7 @@ VkImageView VulkanRenderManager::BindFramebufferAsTexture(VKRFramebuffer *fb, in
 			if (steps_[i]->render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
 				steps_[i]->render.finalColorLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			}
+			steps_[i]->render.numReads++;
 			break;
 		}
 	}

@@ -123,6 +123,8 @@ struct VKRStep {
 			float clearDepth;
 			int clearStencil;
 			int numDraws;
+			// Downloads and textures from this pass.
+			int numReads;
 			VkImageLayout finalColorLayout;
 		} render;
 		struct {

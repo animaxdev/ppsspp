@@ -370,60 +370,16 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 		}
 	}
 
-
 	int size = steps.size();
 
-	PROFILE_THIS_QUEUE(steps);
-
 	for (int i = 0; i < size; ++i) {
-		// Push down empty "Clear/Store" renderpasses, and merge them with the first "Load/Store" to the same framebuffer.
-		// Actually let's just bother with the first one for now. This affects Wipeout Pure.
-		if (steps[i]->stepType == VKRStepType::RENDER) {
-			if (steps[i]->render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
-				// Just leave it at color_optimal.
-				steps[i]->render.finalColorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			}
-
-			if (steps[i]->render.numDraws == 0 &&
-				steps[i]->render.color == VKRRenderPassAction::CLEAR &&
-				steps[i]->render.stencil == VKRRenderPassAction::CLEAR &&
-				steps[i]->render.depth == VKRRenderPassAction::CLEAR) {
-
-				// Drop the first step, and merge it into the next step that touches the same framebuffer.
-				for (int j = i + 1; j < size; ++j) {
-					if (steps[j]->stepType == VKRStepType::RENDER &&
-						steps[j]->render.framebuffer == steps[i]->render.framebuffer) {
-						if (steps[j]->render.color != VKRRenderPassAction::CLEAR) {
-							steps[j]->render.color = VKRRenderPassAction::CLEAR;
-							steps[j]->render.clearColor = steps[i]->render.clearColor;
-						}
-						if (steps[j]->render.depth != VKRRenderPassAction::CLEAR) {
-							steps[j]->render.depth = VKRRenderPassAction::CLEAR;
-							steps[j]->render.clearDepth = steps[i]->render.clearDepth;
-						}
-						if (steps[j]->render.stencil != VKRRenderPassAction::CLEAR) {
-							steps[j]->render.stencil = VKRRenderPassAction::CLEAR;
-							steps[j]->render.clearStencil = steps[i]->render.clearStencil;
-						}
-						// Cheaply skip the first step.
-						steps[i]->stepType = VKRStepType::RENDER_SKIP;
-						break;
-					}
-					else if (steps[j]->stepType == VKRStepType::COPY &&
-						steps[j]->copy.src == steps[i]->render.framebuffer) {
-						// Can't eliminate the clear if a game copies from it before it's
-						// rendered to. However this should be rare.
-						break;
-					}
-				}
-			}
-		}
-
-		//
-		const VKRStep &step = *steps[i];
-		PROFILE_THIS_STEP(step);
+		VKRStep &step = *steps[i];
 		switch (step.stepType) {
 		case VKRStepType::RENDER:
+			if (step.render.finalColorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
+				// Just leave it at color_optimal.
+				step.render.finalColorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
 			PerformRenderPass(step, cmd);
 			break;
 		case VKRStepType::COPY:
