@@ -573,7 +573,7 @@ void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 }
 
 ShaderManagerGLES::ShaderManagerGLES(GLRenderManager *render)
-		: render_(render), lastShader_(nullptr), shaderSwitchDirtyUniforms_(0), diskCacheDirty_(false), fsCache_(16), vsCache_(16) {
+		: render_(render), lastShader_(nullptr), shaderSwitchDirtyUniforms_(0), diskCacheDirty_(false) {
 	codeBuffer_ = new char[16384];
 	lastFSID_.set_invalid();
 	lastVSID_.set_invalid();
@@ -585,18 +585,22 @@ ShaderManagerGLES::~ShaderManagerGLES() {
 
 void ShaderManagerGLES::Clear() {
 	DirtyLastShader();
+
 	for (auto iter = linkedShaderCache_.begin(); iter != linkedShaderCache_.end(); ++iter) {
 		delete iter->ls;
 	}
-	fsCache_.Iterate([&](const FShaderID &key, Shader *shader) {
-		delete shader;
-	});
-	vsCache_.Iterate([&](const VShaderID &key, Shader *shader) {
-		delete shader;
-	});
 	linkedShaderCache_.clear();
-	fsCache_.Clear();
-	vsCache_.Clear();
+
+	for (auto it : fsCache_) {
+		delete it.second;
+	}
+	fsCache_.clear();
+
+	for (auto it : vsCache_) {
+		delete it.second;
+	}
+	vsCache_.clear();
+
 	DirtyShader();
 }
 
@@ -664,34 +668,37 @@ Shader *ShaderManagerGLES::ApplyVertexShader(int prim, u32 vertType, VShaderID *
 	}
 	lastVSID_ = *VSID;
 
-	Shader *vs = vsCache_.Get(*VSID);
-	if (!vs)	{
-		// Vertex shader not in cache. Let's compile it.
-		vs = CompileVertexShader(*VSID);
-		if (vs->Failed()) {
-			I18NCategory *gr = GetI18NCategory("Graphics");
-			ERROR_LOG(G3D, "Shader compilation failed, falling back to software transform");
-			if (!g_Config.bHideSlowWarnings) {
-				host->NotifyUserMessage(gr->T("hardware transform error - falling back to software"), 2.5f, 0xFF3030FF);
-			}
-			delete vs;
-
-			// TODO: Look for existing shader with the appropriate ID, use that instead of generating a new one - however, need to make sure
-			// that that shader ID is not used when computing the linked shader ID below, because then IDs won't match
-			// next time and we'll do this over and over...
-
-			// Can still work with software transform.
-			VShaderID vsidTemp;
-			ComputeVertexShaderID(&vsidTemp, vertType, false);
-			uint32_t attrMask;
-			uint64_t uniformMask;
-			GenerateVertexShader(vsidTemp, codeBuffer_, &attrMask, &uniformMask);
-			vs = new Shader(render_, codeBuffer_, VertexShaderDesc(vsidTemp), GL_VERTEX_SHADER, false, attrMask, uniformMask);
-		}
-
-		vsCache_.Insert(*VSID, vs);
-		diskCacheDirty_ = true;
+	auto iter = vsCache_.find(*VSID);
+	if (iter != vsCache_.end()) {
+		return iter->second;
 	}
+
+	// Vertex shader not in cache. Let's compile it.
+	Shader * vs = CompileVertexShader(*VSID);
+	if (vs->Failed()) {
+		I18NCategory *gr = GetI18NCategory("Graphics");
+		ERROR_LOG(G3D, "Shader compilation failed, falling back to software transform");
+		if (!g_Config.bHideSlowWarnings) {
+			host->NotifyUserMessage(gr->T("hardware transform error - falling back to software"), 2.5f, 0xFF3030FF);
+		}
+		delete vs;
+
+		// TODO: Look for existing shader with the appropriate ID, use that instead of generating a new one - however, need to make sure
+		// that that shader ID is not used when computing the linked shader ID below, because then IDs won't match
+		// next time and we'll do this over and over...
+
+		// Can still work with software transform.
+		VShaderID vsidTemp;
+		ComputeVertexShaderID(&vsidTemp, vertType, false);
+		uint32_t attrMask;
+		uint64_t uniformMask;
+		GenerateVertexShader(vsidTemp, codeBuffer_, &attrMask, &uniformMask);
+		vs = new Shader(render_, codeBuffer_, VertexShaderDesc(vsidTemp), GL_VERTEX_SHADER, false, attrMask, uniformMask);
+	}
+
+	vsCache_[*VSID] = vs;
+	diskCacheDirty_ = true;
+
 	return vs;
 }
 
@@ -711,11 +718,15 @@ LinkedShader *ShaderManagerGLES::ApplyFragmentShader(VShaderID VSID, Shader *vs,
 
 	lastFSID_ = FSID;
 
-	Shader *fs = fsCache_.Get(FSID);
-	if (!fs)	{
+	Shader *fs = nullptr;
+	auto iter = fsCache_.find(FSID);
+	if (iter != fsCache_.end()) {
+		fs = iter->second;
+	}
+	else {
 		// Fragment shader not in cache. Let's compile it.
 		fs = CompileFragmentShader(FSID);
-		fsCache_.Insert(FSID, fs);
+		fsCache_[FSID] = fs;
 		diskCacheDirty_ = true;
 	}
 
@@ -769,21 +780,21 @@ std::vector<std::string> ShaderManagerGLES::DebugGetShaderIDs(DebugShaderType ty
 	std::vector<std::string> ids;
 	switch (type) {
 	case SHADER_TYPE_VERTEX:
-		{
-			vsCache_.Iterate([&](const VShaderID &id, Shader *shader) {
-				std::string idstr;
-				id.ToString(&idstr);
-				ids.push_back(idstr);
-			});
+		for (auto it : vsCache_) {
+			const VShaderID &id = it.first;
+			Shader *shader = it.second;
+			std::string idstr;
+			id.ToString(&idstr);
+			ids.push_back(idstr);
 		}
 		break;
 	case SHADER_TYPE_FRAGMENT:
-		{
-			fsCache_.Iterate([&](const FShaderID &id, Shader *shader) {
-				std::string idstr;
-				id.ToString(&idstr);
-				ids.push_back(idstr);
-			});
+		for (auto it : fsCache_) {
+			const FShaderID &id = it.first;
+			Shader *shader = it.second;
+			std::string idstr;
+			id.ToString(&idstr);
+			ids.push_back(idstr);
 		}
 		break;
 	default:
@@ -798,14 +809,24 @@ std::string ShaderManagerGLES::DebugGetShaderString(std::string id, DebugShaderT
 	switch (type) {
 	case SHADER_TYPE_VERTEX:
 	{
-		Shader *vs = vsCache_.Get(VShaderID(shaderId));
-		return vs ? vs->GetShaderString(stringType, shaderId) : "";
+		auto iter = vsCache_.find(VShaderID(shaderId));
+		if (iter != vsCache_.end()) {
+			return iter->second->GetShaderString(stringType, shaderId);
+		}
+		else {
+			return "";
+		}
 	}
 
 	case SHADER_TYPE_FRAGMENT:
 	{
-		Shader *fs = fsCache_.Get(FShaderID(shaderId));
-		return fs->GetShaderString(stringType, shaderId);
+		auto iter = fsCache_.find(FShaderID(shaderId));
+		if (iter != fsCache_.end()) {
+			return iter->second->GetShaderString(stringType, shaderId);
+		}
+		else {
+			return "";
+		}
 	}
 	default:
 		return "N/A";
@@ -917,7 +938,8 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 		}
 
 		const VShaderID &id = pending.vert[i];
-		if (!vsCache_.Get(id)) {
+		auto iter = vsCache_.find(id);
+		if (iter == vsCache_.end()) {
 			if (id.Bit(VS_BIT_IS_THROUGH) && id.Bit(VS_BIT_USE_HW_TRANSFORM)) {
 				// Clearly corrupt, bailing.
 				ERROR_LOG_REPORT(G3D, "Corrupt shader cache: Both IS_THROUGH and USE_HW_TRANSFORM set.");
@@ -934,7 +956,7 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 				pending.Clear();
 				return false;
 			}
-			vsCache_.Insert(id, vs);
+			vsCache_[id] = vs;
 		} else {
 			WARN_LOG(G3D, "Duplicate vertex shader found in GL shader cache, ignoring");
 		}
@@ -947,8 +969,9 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 		}
 
 		const FShaderID &id = pending.frag[i];
-		if (!fsCache_.Get(id)) {
-			fsCache_.Insert(id, CompileFragmentShader(id));
+		auto iter = fsCache_.find(id);
+		if (iter == fsCache_.end()) {
+			fsCache_[id] = CompileFragmentShader(id);
 		} else {
 			WARN_LOG(G3D, "Duplicate fragment shader found in GL shader cache, ignoring");
 		}
@@ -962,9 +985,11 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 
 		const VShaderID &vsid = pending.link[i].first;
 		const FShaderID &fsid = pending.link[i].second;
-		Shader *vs = vsCache_.Get(vsid);
-		Shader *fs = fsCache_.Get(fsid);
-		if (vs && fs) {
+		auto iter0 = vsCache_.find(vsid);
+		auto iter1 = fsCache_.find(fsid);
+		if (iter0 != vsCache_.end() && iter1 != fsCache_.end()) {
+			Shader * vs = iter0->second;
+			Shader * fs = iter1->second;
 			LinkedShader *ls = new LinkedShader(render_, vsid, vs, fsid, fs, vs->UseHWTransform(), true);
 			LinkedShaderCacheEntry entry(vs, fs, ls);
 			linkedShaderCache_.push_back(entry);
@@ -1004,23 +1029,33 @@ void ShaderManagerGLES::Save(const std::string &filename) {
 	header.numFragmentShaders = GetNumFragmentShaders();
 	header.numLinkedPrograms = GetNumPrograms();
 	fwrite(&header, 1, sizeof(header), f);
-	vsCache_.Iterate([&](const ShaderID &id, Shader *shader) {
+
+	for (auto it : vsCache_) {
+		const ShaderID &id = it.first;
+		Shader *shader = it.second;
 		fwrite(&id, 1, sizeof(id), f);
-	});
-	fsCache_.Iterate([&](const ShaderID &id, Shader *shader) {
+	}
+
+	for (auto it : fsCache_) {
+		const ShaderID &id = it.first;
+		Shader *shader = it.second;
 		fwrite(&id, 1, sizeof(id), f);
-	});
+	}
+
 	for (auto iter : linkedShaderCache_) {
 		ShaderID vsid, fsid;
-		vsCache_.Iterate([&](const ShaderID &id, Shader *shader) {
-			if (iter.vs == shader)
-				vsid = id;
-		});
-		fsCache_.Iterate([&](const ShaderID &id, Shader *shader) {
-			if (iter.fs == shader)
-				fsid = id;
-		});
+		for (auto it : vsCache_) {
+			if (it.second == iter.vs) {
+				vsid = it.first;
+			}
+		}
 		fwrite(&vsid, 1, sizeof(vsid), f);
+
+		for (auto it : fsCache_) {
+			if (it.second == iter.fs) {
+				fsid = it.first;
+			}
+		}
 		fwrite(&fsid, 1, sizeof(fsid), f);
 	}
 	fclose(f);

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <vector>
+#include <map>
 
 #include "base/basictypes.h"
 #include "Common/Hashmaps.h"
@@ -181,6 +182,8 @@ private:
 	Shader *CompileFragmentShader(FShaderID id);
 	Shader *CompileVertexShader(VShaderID id);
 
+	GLRenderManager *render_;
+
 	struct LinkedShaderCacheEntry {
 		LinkedShaderCacheEntry(Shader *vs_, Shader *fs_, LinkedShader *ls_)
 			: vs(vs_), fs(fs_), ls(ls_) { }
@@ -189,10 +192,7 @@ private:
 		Shader *fs;
 		LinkedShader *ls;
 	};
-	typedef std::vector<LinkedShaderCacheEntry> LinkedShaderCache;
-
-	GLRenderManager *render_;
-	LinkedShaderCache linkedShaderCache_;
+	std::vector<LinkedShaderCacheEntry> linkedShaderCache_;
 
 	bool lastVShaderSame_;
 
@@ -203,11 +203,10 @@ private:
 	u64 shaderSwitchDirtyUniforms_;
 	char *codeBuffer_;
 
-	typedef DenseHashMap<FShaderID, Shader *, nullptr> FSCache;
-	FSCache fsCache_;
 
-	typedef DenseHashMap<VShaderID, Shader *, nullptr> VSCache;
-	VSCache vsCache_;
+	std::map<FShaderID, Shader *> fsCache_;
+	std::map<VShaderID, Shader *> vsCache_;
+
 
 	bool diskCacheDirty_;
 	struct {

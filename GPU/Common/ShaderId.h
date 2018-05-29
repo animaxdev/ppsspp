@@ -92,36 +92,26 @@ enum {
 };
 
 struct ShaderID {
+	uint32_t d[2];
+
 	ShaderID() {
 		clear();
 	}
 	void clear() {
-		for (size_t i = 0; i < ARRAY_SIZE(d); i++) {
-			d[i] = 0;
-		}
+		d[0] = 0;
+		d[1] = 0;
 	}
 	void set_invalid() {
-		for (size_t i = 0; i < ARRAY_SIZE(d); i++) {
-			d[i] = 0xFFFFFFFF;
-		}
+		d[0] = 0xFFFFFFFF;
+		d[1] = 0xFFFFFFFF;
 	}
 
-	uint32_t d[2];
+	
 	bool operator < (const ShaderID &other) const {
-		for (size_t i = 0; i < sizeof(d) / sizeof(uint32_t); i++) {
-			if (d[i] < other.d[i])
-				return true;
-			if (d[i] > other.d[i])
-				return false;
-		}
-		return false;
+		return d[0] != other.d[0] ? d[0] < other.d[0] : d[1] < other.d[1];
 	}
 	bool operator == (const ShaderID &other) const {
-		for (size_t i = 0; i < sizeof(d) / sizeof(uint32_t); i++) {
-			if (d[i] != other.d[i])
-				return false;
-		}
-		return true;
+		return d[0] == other.d[0] && d[1] == other.d[1];
 	}
 	bool operator != (const ShaderID &other) const {
 		return !(*this == other);
