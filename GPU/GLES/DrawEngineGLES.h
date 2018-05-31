@@ -30,6 +30,8 @@
 #include "gfx/gl_common.h"
 #include "thin3d/GLRenderManager.h"
 
+#include "GPU/Common/ShaderUniforms.h"
+
 class LinkedShader;
 class ShaderManagerGLES;
 class TextureCacheGLES;
@@ -183,6 +185,7 @@ private:
 	void MarkUnreliable(VertexArrayInfo *vai);
 
 	struct FrameData {
+		GLPushBuffer *pushLight;
 		GLPushBuffer *pushVertex;
 		GLPushBuffer *pushIndex;
 	};
@@ -194,6 +197,12 @@ private:
 
 	GLRInputLayout *softwareInputLayout_ = nullptr;
 	GLRenderManager *render_;
+
+	int uboAlignment_ = 512;
+	UB_VS_Lights ub_lights;
+	uint32_t lightUBOOffset;
+	GLRBuffer *lightBuf = nullptr;
+	bool needRebindLight = false;
 
 	// Other
 	ShaderManagerGLES *shaderManager_ = nullptr;

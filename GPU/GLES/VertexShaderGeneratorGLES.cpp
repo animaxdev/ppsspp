@@ -34,6 +34,8 @@
 #include "GPU/Common/ShaderId.h"
 #include "GPU/Common/VertexDecoderCommon.h"
 
+#include "GPU/Common/ShaderUniforms.h"
+
 #undef WRITE
 
 #define WRITE p+=sprintf
@@ -99,7 +101,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
-				WRITE(p, "#version 330\n");
+				WRITE(p, "#version 420\n");
 				texelFetch = "texelFetch";
 			} else if (gl_extensions.VersionGEThan(3, 0, 0)) {
 				WRITE(p, "#version 130\n");
@@ -152,6 +154,9 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	bool hasColorTess = id.Bit(VS_BIT_HAS_COLOR_TESS);
 	bool hasTexcoordTess = id.Bit(VS_BIT_HAS_TEXCOORD_TESS);
 	bool flipNormalTess = id.Bit(VS_BIT_NORM_REVERSE_TESS);
+
+	if (enableLighting || doShadeMapping)
+		WRITE(p, "layout (std140, binding = 0) uniform lightVars {\n%s} light;\n", ub_vs_lightsStr);
 
 	const char *shading = doFlatShading ? "flat" : "";
 
@@ -245,7 +250,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		for (int i = 0; i < 4; i++) {
 			if (doLight[i] != LIGHT_OFF) {
 				// This is needed for shade mapping
-				WRITE(p, "uniform vec3 u_lightpos%i;\n", i);
+				//WRITE(p, "uniform vec3 u_lightpos%i;\n", i);
 				*uniformMask |= DIRTY_LIGHT0 << i;
 			}
 			if (doLight[i] == LIGHT_FULL) {
@@ -254,29 +259,29 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				GELightComputation comp = static_cast<GELightComputation>(id.Bits(VS_BIT_LIGHT0_COMP + 4 * i, 2));
 
 				if (type != GE_LIGHTTYPE_DIRECTIONAL)
-					WRITE(p, "uniform vec3 u_lightatt%i;\n", i);
+					//WRITE(p, "uniform vec3 u_lightatt%i;\n", i);
 
 				if (type == GE_LIGHTTYPE_SPOT || type == GE_LIGHTTYPE_UNKNOWN) {
-					WRITE(p, "uniform vec3 u_lightdir%i;\n", i);
-					WRITE(p, "uniform vec2 u_lightangle_spotCoef%i;\n", i);
+					//WRITE(p, "uniform vec3 u_lightdir%i;\n", i);
+					//WRITE(p, "uniform vec2 u_lightangle_spotCoef%i;\n", i);
 				}
-				WRITE(p, "uniform vec3 u_lightambient%i;\n", i);
-				WRITE(p, "uniform vec3 u_lightdiffuse%i;\n", i);
+				//WRITE(p, "uniform vec3 u_lightambient%i;\n", i);
+				//WRITE(p, "uniform vec3 u_lightdiffuse%i;\n", i);
 
 				if (comp != GE_LIGHTCOMP_ONLYDIFFUSE) {
-					WRITE(p, "uniform vec3 u_lightspecular%i;\n", i);
+					//WRITE(p, "uniform vec3 u_lightspecular%i;\n", i);
 				}
 			}
 		}
 		if (enableLighting) {
-			WRITE(p, "uniform vec4 u_ambient;\n");
+			//WRITE(p, "uniform vec4 u_ambient;\n");
 			*uniformMask |= DIRTY_AMBIENT;
 			if ((matUpdate & 2) == 0 || !hasColor) {
-				WRITE(p, "uniform vec3 u_matdiffuse;\n");
+				//WRITE(p, "uniform vec3 u_matdiffuse;\n");
 				*uniformMask |= DIRTY_MATDIFFUSE;
 			}
-			WRITE(p, "uniform vec4 u_matspecular;\n");  // Specular coef is contained in alpha
-			WRITE(p, "uniform vec3 u_matemissive;\n");
+			//WRITE(p, "uniform vec4 u_matspecular;\n");  // Specular coef is contained in alpha
+			//WRITE(p, "uniform vec3 u_matemissive;\n");
 			*uniformMask |= DIRTY_MATSPECULAR | DIRTY_MATEMISSIVE;
 		}
 	}
@@ -635,12 +640,12 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		// TODO: Declare variables for dots for shade mapping if needed.
 
 		const char *ambientStr = (matUpdate & 1) && hasColor ? "color0" : "u_matambientalpha";
-		const char *diffuseStr = (matUpdate & 2) && hasColor ? "color0.rgb" : "u_matdiffuse";
-		const char *specularStr = (matUpdate & 4) && hasColor ? "color0.rgb" : "u_matspecular.rgb";
+		const char *diffuseStr = (matUpdate & 2) && hasColor ? "color0.rgb" : "light.matdiffuse";
+		const char *specularStr = (matUpdate & 4) && hasColor ? "color0.rgb" : "light.matspecular.rgb";
 		if (doBezier || doSpline) {
 			ambientStr = (matUpdate & 1) && hasColor ? "col" : "u_matambientalpha";
-			diffuseStr = (matUpdate & 2) && hasColor ? "col.rgb" : "u_matdiffuse";
-			specularStr = (matUpdate & 4) && hasColor ? "col.rgb" : "u_matspecular.rgb";
+			diffuseStr = (matUpdate & 2) && hasColor ? "col.rgb" : "light.matdiffuse";
+			specularStr = (matUpdate & 4) && hasColor ? "col.rgb" : "light.matspecular.rgb";
 		}
 
 		bool diffuseIsZero = true;
@@ -648,7 +653,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 		bool distanceNeeded = false;
 		bool anySpots = false;
 		if (enableLighting) {
-			WRITE(p, "  vec4 lightSum0 = u_ambient * %s + vec4(u_matemissive, 0.0);\n", ambientStr);
+			WRITE(p, "  vec4 lightSum0 = light.u_ambient * %s + vec4(light.matemissive, 0.0);\n", ambientStr);
 
 			for (int i = 0; i < 4; i++) {
 				GELightType type = static_cast<GELightType>(id.Bits(VS_BIT_LIGHT0_TYPE + 4*i, 2));
@@ -692,9 +697,9 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 
 			if (type == GE_LIGHTTYPE_DIRECTIONAL) {
 				// We prenormalize light positions for directional lights.
-				WRITE(p, "  toLight = u_lightpos%i;\n", i);
+				WRITE(p, "  toLight = light.pos[%i];\n", i);
 			} else {
-				WRITE(p, "  toLight = u_lightpos%i - worldpos;\n", i);
+				WRITE(p, "  toLight = light.pos[%i] - worldpos;\n", i);
 				WRITE(p, "  distance = length(toLight);\n");
 				WRITE(p, "  toLight /= distance;\n");
 			}
@@ -706,10 +711,10 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 			if (poweredDiffuse) {
 				// pow(0.0, 0.0) may be undefined, but the PSP seems to treat it as 1.0.
 				// Seen in Tales of the World: Radiant Mythology (#2424.)
-				WRITE(p, "  if (ldot == 0.0 && u_matspecular.a == 0.0) {\n");
+				WRITE(p, "  if (ldot == 0.0 && light.matspecular.a == 0.0) {\n");
 				WRITE(p, "    ldot = 1.0;\n");
 				WRITE(p, "  } else {\n");
-				WRITE(p, "    ldot = pow(ldot, u_matspecular.a);\n");
+				WRITE(p, "    ldot = pow(ldot, light.matspecular.a);\n");
 				WRITE(p, "  }\n");
 			}
 
@@ -721,13 +726,13 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				timesLightScale = "";
 				break;
 			case GE_LIGHTTYPE_POINT:
-				WRITE(p, "  lightScale = clamp(1.0 / dot(u_lightatt%i, vec3(1.0, distance, distance*distance)), 0.0, 1.0);\n", i);
+				WRITE(p, "  lightScale = clamp(1.0 / dot(light.att[%i], vec3(1.0, distance, distance*distance)), 0.0, 1.0);\n", i);
 				break;
 			case GE_LIGHTTYPE_SPOT:
 			case GE_LIGHTTYPE_UNKNOWN:
-				WRITE(p, "  angle = dot(normalize(u_lightdir%i), toLight);\n", i);
-				WRITE(p, "  if (angle >= u_lightangle_spotCoef%i.x) {\n", i);
-				WRITE(p, "    lightScale = clamp(1.0 / dot(u_lightatt%i, vec3(1.0, distance, distance*distance)), 0.0, 1.0) * pow(angle, u_lightangle_spotCoef%i.y);\n", i, i);
+				WRITE(p, "  angle = dot(normalize(light.dir[%i]), toLight);\n", i);
+				WRITE(p, "  if (angle >= light.angle_spotCoef[%i].x) {\n", i);
+				WRITE(p, "    lightScale = clamp(1.0 / dot(light.att[%i], vec3(1.0, distance, distance*distance)), 0.0, 1.0) * pow(angle, light.angle_spotCoef[%i].y);\n", i, i);
 				WRITE(p, "  } else {\n");
 				WRITE(p, "    lightScale = 0.0;\n");
 				WRITE(p, "  }\n");
@@ -737,13 +742,13 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				break;
 			}
 
-			WRITE(p, "  diffuse = (u_lightdiffuse%i * %s) * ldot;\n", i, diffuseStr);
+			WRITE(p, "  diffuse = (light.diffuse[%i] * %s) * ldot;\n", i, diffuseStr);
 			if (doSpecular) {
 				WRITE(p, "  ldot = dot(normalize(toLight + vec3(0.0, 0.0, 1.0)), worldnormal);\n");
 				WRITE(p, "  if (ldot > 0.0)\n");
-				WRITE(p, "    lightSum1 += u_lightspecular%i * %s * (pow(ldot, u_matspecular.a) %s);\n", i, specularStr, timesLightScale);
+				WRITE(p, "    lightSum1 += light.specular[%i] * %s * (pow(ldot, light.matspecular.a) %s);\n", i, specularStr, timesLightScale);
 			}
-			WRITE(p, "  lightSum0.rgb += (u_lightambient%i * %s.rgb + diffuse)%s;\n", i, ambientStr, timesLightScale);
+			WRITE(p, "  lightSum0.rgb += (light.ambient[%i] * %s.rgb + diffuse)%s;\n", i, ambientStr, timesLightScale);
 		}
 
 		if (enableLighting) {
@@ -841,7 +846,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				break;
 
 			case GE_TEXMAP_ENVIRONMENT_MAP:  // Shade mapping - use dots from light sources.
-				WRITE(p, "  v_texcoord = vec3(u_uvscaleoffset.xy * vec2(1.0 + dot(normalize(u_lightpos%i), worldnormal), 1.0 + dot(normalize(u_lightpos%i), worldnormal)) * 0.5, 1.0);\n", ls0, ls1);
+				WRITE(p, "  v_texcoord = vec3(u_uvscaleoffset.xy * vec2(1.0 + dot(normalize(light.pos[%i]), worldnormal), 1.0 + dot(normalize(light.pos[%i]), worldnormal)) * 0.5, 1.0);\n", ls0, ls1);
 				break;
 
 			default:

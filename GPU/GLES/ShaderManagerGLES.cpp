@@ -126,16 +126,16 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 #endif
 
 	// Lighting, texturing
-	queries.push_back({ &u_ambient, "u_ambient" });
+	//queries.push_back({ &u_ambient, "u_ambient" });
 	queries.push_back({ &u_matambientalpha, "u_matambientalpha" });
-	queries.push_back({ &u_matdiffuse, "u_matdiffuse" });
-	queries.push_back({ &u_matspecular, "u_matspecular" });
-	queries.push_back({ &u_matemissive, "u_matemissive" });
+	//queries.push_back({ &u_matdiffuse, "u_matdiffuse" });
+	//queries.push_back({ &u_matspecular, "u_matspecular" });
+	//queries.push_back({ &u_matemissive, "u_matemissive" });
 	queries.push_back({ &u_uvscaleoffset, "u_uvscaleoffset" });
 	queries.push_back({ &u_texclamp, "u_texclamp" });
 	queries.push_back({ &u_texclampoff, "u_texclampoff" });
 
-	for (int i = 0; i < 4; i++) {
+	/*for (int i = 0; i < 4; i++) {
 		static const char * const lightPosNames[4] = { "u_lightpos0", "u_lightpos1", "u_lightpos2", "u_lightpos3", };
 		queries.push_back({ &u_lightpos[i], lightPosNames[i] });
 		static const char * const lightdir_names[4] = { "u_lightdir0", "u_lightdir1", "u_lightdir2", "u_lightdir3", };
@@ -151,7 +151,7 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 		queries.push_back({ &u_lightdiffuse[i], lightdiffuse_names[i] });
 		static const char * const lightspecular_names[4] = { "u_lightspecular0", "u_lightspecular1", "u_lightspecular2", "u_lightspecular3", };
 		queries.push_back({ &u_lightspecular[i], lightspecular_names[i] });
-	}
+	}*/
 
 	// We need to fetch these unconditionally, gstate_c.spline or bezier will not be set if we
 	// create this shader at load time from the shader cache.
@@ -280,7 +280,7 @@ void LinkedShader::use(const ShaderID &VSID) {
 	// Note that we no longer track attr masks here - we do it for the input layouts instead.
 }
 
-void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
+u64 LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 	u64 dirty = dirtyUniforms & availableUniforms;
 	dirtyUniforms = 0;
 
@@ -516,11 +516,11 @@ void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 	}
 
 	// Lighting
-	if (dirty & DIRTY_AMBIENT) {
-		SetColorUniform3Alpha(render_, &u_ambient, gstate.ambientcolor, gstate.getAmbientA());
-	}
 	if (dirty & DIRTY_MATAMBIENTALPHA) {
 		SetColorUniform3Alpha(render_, &u_matambientalpha, gstate.materialambient, gstate.getMaterialAmbientA());
+	}
+	/*if (dirty & DIRTY_AMBIENT) {
+		SetColorUniform3Alpha(render_, &u_ambient, gstate.ambientcolor, gstate.getAmbientA());
 	}
 	if (dirty & DIRTY_MATDIFFUSE) {
 		SetColorUniform3(render_, &u_matdiffuse, gstate.materialdiffuse);
@@ -559,7 +559,7 @@ void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 			if (u_lightdiffuse[i] != -1) SetColorUniform3(render_, &u_lightdiffuse[i], gstate.lcolor[i * 3 + 1]);
 			if (u_lightspecular[i] != -1) SetColorUniform3(render_, &u_lightspecular[i], gstate.lcolor[i * 3 + 2]);
 		}
-	}
+	}*/
 
 	if (dirty & DIRTY_BEZIERSPLINE) {
 		render_->SetUniformI1(&u_spline_count_u, gstate_c.spline_count_u);
@@ -570,6 +570,8 @@ void LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 		if (u_spline_type_v != -1)
 			render_->SetUniformI1(&u_spline_type_v, gstate_c.spline_type_v);
 	}
+
+	return dirty;
 }
 
 ShaderManagerGLES::ShaderManagerGLES(Draw::DrawContext *draw)
@@ -721,7 +723,6 @@ LinkedShader *ShaderManagerGLES::ApplyFragmentShader(VShaderID VSID, Shader *vs,
 	}
 
 	if (lastVShaderSame_ && FSID == lastFSID_) {
-		lastShader_->UpdateUniforms(vertType, VSID);
 		return lastShader_;
 	}
 
@@ -742,7 +743,7 @@ LinkedShader *ShaderManagerGLES::ApplyFragmentShader(VShaderID VSID, Shader *vs,
 	// Okay, we have both shaders. Let's see if there's a linked one.
 	LinkedShader *ls = nullptr;
 
-	u64 switchDirty = shaderSwitchDirtyUniforms_;
+	u64 switchDirty = shaderSwitchDirtyUniforms_ & ~DIRTY_LIGHT_UNIFORMS;
 	for (auto iter = linkedShaderCache_.begin(); iter != linkedShaderCache_.end(); ++iter) {
 		// Deferred dirtying! Let's see if we can make this even more clever later.
 		iter->ls->dirtyUniforms |= switchDirty;

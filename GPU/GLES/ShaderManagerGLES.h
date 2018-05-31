@@ -49,7 +49,7 @@ public:
 	~LinkedShader();
 
 	void use(const ShaderID &VSID);
-	void UpdateUniforms(u32 vertType, const ShaderID &VSID);
+	u64 UpdateUniforms(u32 vertType, const ShaderID &VSID);
 
 	GLRenderManager *render_;
 	Shader *vs_;
@@ -103,18 +103,18 @@ public:
 	int u_texclampoff;
 
 	// Lighting
-	int u_ambient;
+	//int u_ambient;
 	int u_matambientalpha;
-	int u_matdiffuse;
-	int u_matspecular;
-	int u_matemissive;
-	int u_lightpos[4];
-	int u_lightdir[4];
-	int u_lightatt[4];  // attenuation
-	int u_lightangle_spotCoef[4]; // spotlight cone angle (cosine) (x), spotlight dropoff (y)
-	int u_lightdiffuse[4];  // each light consist of vec4[3]
-	int u_lightspecular[4];  // attenuation
-	int u_lightambient[4];  // attenuation
+	//int u_matdiffuse;
+	//int u_matspecular;
+	//int u_matemissive;
+	//int u_lightpos[4];
+	//int u_lightdir[4];
+	//int u_lightatt[4];  // attenuation
+	//int u_lightangle_spotCoef[4]; // spotlight cone angle (cosine) (x), spotlight dropoff (y)
+	//int u_lightdiffuse[4];  // each light consist of vec4[3]
+	//int u_lightspecular[4];  // attenuation
+	//int u_lightambient[4];  // attenuation
 
 	int u_tess_pos_tex;
 	int u_tess_tex_tex;

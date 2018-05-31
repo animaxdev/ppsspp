@@ -53,6 +53,7 @@ enum class GLRRenderCommand : uint8_t {
 	BIND_FB_TEXTURE,
 	BIND_VERTEX_BUFFER,
 	BIND_BUFFER,
+	BING_BUFFER_RANGE,
 	GENMIPS,
 	DRAW,
 	DRAW_INDEXED,
@@ -155,6 +156,12 @@ struct GLRRenderData {
 			GLRBuffer *buffer;
 			size_t offset;
 		} bindVertexBuffer;
+		struct {
+			GLRBuffer *buffer;
+			int slot;
+			size_t offset;
+			size_t size;
+		} bindBufferRange;
 		struct {
 			int slot;
 			GLenum wrapS;

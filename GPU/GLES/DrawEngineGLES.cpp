@@ -113,9 +113,13 @@ void DrawEngineGLES::InitDeviceObjects() {
 	_assert_msg_(G3D, render_ != nullptr, "Render manager must be set");
 
 	for (int i = 0; i < GLRenderManager::MAX_INFLIGHT_FRAMES; i++) {
+		frameData_[i].pushLight = render_->CreatePushBuffer(i, GL_UNIFORM_BUFFER, 64 * 1024);
 		frameData_[i].pushVertex = render_->CreatePushBuffer(i, GL_ARRAY_BUFFER, 1024 * 1024);
 		frameData_[i].pushIndex = render_->CreatePushBuffer(i, GL_ELEMENT_ARRAY_BUFFER, 256 * 1024);
 	}
+
+	//glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uboAlignment_);
+	//DEBUG_LOG(G3D, "InitDeviceObjects uboAlignment_: %d", uboAlignment_);
 
 	int vertexSize = sizeof(TransformedVertex);
 	std::vector<GLRInputLayout::Entry> entries;
@@ -129,15 +133,18 @@ void DrawEngineGLES::InitDeviceObjects() {
 void DrawEngineGLES::DestroyDeviceObjects() {
 	// Beware: this could be called twice in a row, sometimes.
 	for (int i = 0; i < GLRenderManager::MAX_INFLIGHT_FRAMES; i++) {
-		if (!frameData_[i].pushVertex && !frameData_[i].pushIndex)
-			continue;
-
-		if (frameData_[i].pushVertex)
+		if (frameData_[i].pushVertex) {
 			render_->DeletePushBuffer(frameData_[i].pushVertex);
-		if (frameData_[i].pushIndex)
+			frameData_[i].pushVertex = nullptr;
+		}
+		if (frameData_[i].pushIndex) {
 			render_->DeletePushBuffer(frameData_[i].pushIndex);
-		frameData_[i].pushVertex = nullptr;
-		frameData_[i].pushIndex = nullptr;
+			frameData_[i].pushIndex = nullptr;
+		}
+		if (frameData_[i].pushLight) {
+			render_->DeletePushBuffer(frameData_[i].pushLight);
+			frameData_[i].pushLight = nullptr;
+		}
 	}
 
 	ClearTrackedVertexArrays();
@@ -158,14 +165,21 @@ void DrawEngineGLES::ClearInputLayoutMap() {
 
 void DrawEngineGLES::BeginFrame() {
 	FrameData &frameData = frameData_[render_->GetCurFrame()];
+	frameData.pushLight->Begin();
 	frameData.pushIndex->Begin();
 	frameData.pushVertex->Begin();
+	if (lightBuf) {
+		needRebindLight = true;
+	}
+	lightBuf = nullptr;
 }
 
 void DrawEngineGLES::EndFrame() {
 	FrameData &frameData = frameData_[render_->GetCurFrame()];
+	frameData.pushLight->End();
 	frameData.pushIndex->End();
 	frameData.pushVertex->End();
+
 	tessDataTransfer->EndFrame();
 }
 
@@ -511,6 +525,18 @@ rotateVBO:
 		
 		LinkedShader *program = shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 		GLRInputLayout *inputLayout = SetupDecFmtForDraw(program, dec_->GetDecVtxFmt());
+		u64 dirtyUniforms = program->UpdateUniforms(lastVType_, vsid);
+		if (dirtyUniforms & DIRTY_LIGHT_UNIFORMS) {
+			LightUpdateUniforms(&ub_lights, dirtyUniforms);
+			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
+			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
+		}
+		else if (needRebindLight) {
+			LightUpdateUniforms(&ub_lights, DIRTY_LIGHT_UNIFORMS);
+			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
+			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
+		}
+
 		render_->BindVertexBuffer(inputLayout, vertexBuffer, vertexBufferOffset);
 		if (useElements) {
 			if (!indexBuffer) {
@@ -570,7 +596,18 @@ rotateVBO:
 
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
-		shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
+		LinkedShader *program = shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
+		u64 dirtyUniforms = program->UpdateUniforms(lastVType_, vsid);
+		if (dirtyUniforms & DIRTY_LIGHT_UNIFORMS) {
+			LightUpdateUniforms(&ub_lights, dirtyUniforms);
+			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
+			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
+		}
+		else if (needRebindLight) {
+			LightUpdateUniforms(&ub_lights, DIRTY_LIGHT_UNIFORMS);
+			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
+			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
+		}
 
 		if (result.action == SW_DRAW_PRIMITIVES) {
 			if (drawIndexed) {

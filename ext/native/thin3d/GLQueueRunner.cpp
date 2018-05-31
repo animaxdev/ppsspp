@@ -24,7 +24,6 @@ extern void bindDefaultFBO();
 GLuint g_defaultFBO = 0;
 
 void GLQueueRunner::CreateDeviceObjects() {
-	CHECK_GL_ERROR_IF_DEBUG();
 	if (gl_extensions.EXT_texture_filter_anisotropic) {
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropyLevel_);
 	} else {
@@ -53,11 +52,9 @@ void GLQueueRunner::CreateDeviceObjects() {
 	if (!gl_extensions.IsCoreContext) {  // Not OK to query this in core profile!
 		populate(GL_EXTENSIONS);
 	}
-	CHECK_GL_ERROR_IF_DEBUG();
 }
 
 void GLQueueRunner::DestroyDeviceObjects() {
-	CHECK_GL_ERROR_IF_DEBUG();
 	if (!nameCache_.empty()) {
 		glDeleteTextures((GLsizei)nameCache_.size(), &nameCache_[0]);
 		nameCache_.clear();
@@ -69,7 +66,6 @@ void GLQueueRunner::DestroyDeviceObjects() {
 	readbackBufferSize_ = 0;
 	delete[] tempBuffer_;
 	tempBufferSize_ = 0;
-	CHECK_GL_ERROR_IF_DEBUG();
 }
 
 void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps) {
@@ -87,7 +83,6 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps) {
 			glGenTextures(1, &tex->texture);
 			glBindTexture(tex->target, tex->texture);
 			boundTexture = tex->texture;
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRInitStepType::CREATE_BUFFER:
@@ -96,17 +91,15 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps) {
 			glGenBuffers(1, &buffer->buffer);
 			glBindBuffer(buffer->target_, buffer->buffer);
 			glBufferData(buffer->target_, step.create_buffer.size, nullptr, step.create_buffer.usage);
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRInitStepType::BUFFER_SUBDATA:
 		{
 			GLRBuffer *buffer = step.buffer_subdata.buffer;
-			glBindBuffer(GL_ARRAY_BUFFER, buffer->buffer);
-			glBufferSubData(GL_ARRAY_BUFFER, step.buffer_subdata.offset, step.buffer_subdata.size, step.buffer_subdata.data);
+			glBindBuffer(buffer->target_, buffer->buffer);
+			glBufferSubData(buffer->target_, step.buffer_subdata.offset, step.buffer_subdata.size, step.buffer_subdata.data);
 			if (step.buffer_subdata.deleteData)
 				delete[] step.buffer_subdata.data;
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRInitStepType::CREATE_PROGRAM:
@@ -439,7 +432,6 @@ void GLQueueRunner::InitCreateFramebuffer(const GLRInitStep &step) {
 }
 
 void GLQueueRunner::RunSteps(const std::vector<GLRStep *> &steps) {
-	CHECK_GL_ERROR_IF_DEBUG();
 	for (size_t i = 0; i < steps.size(); i++) {
 		const GLRStep &step = *steps[i];
 		switch (step.stepType) {
@@ -464,7 +456,6 @@ void GLQueueRunner::RunSteps(const std::vector<GLRStep *> &steps) {
 		}
 		delete steps[i];
 	}
-	CHECK_GL_ERROR_IF_DEBUG();
 }
 
 void GLQueueRunner::LogSteps(const std::vector<GLRStep *> &steps) {
@@ -473,7 +464,6 @@ void GLQueueRunner::LogSteps(const std::vector<GLRStep *> &steps) {
 
 
 void GLQueueRunner::PerformBlit(const GLRStep &step) {
-	CHECK_GL_ERROR_IF_DEBUG();
 	// Without FBO_ARB / GLES3, this will collide with bind_for_read, but there's nothing
 	// in ES 2.0 that actually separate them anyway of course, so doesn't matter.
 	fbo_bind_fb_target(false, step.blit.dst->handle);
@@ -502,7 +492,6 @@ void GLQueueRunner::PerformBlit(const GLRStep &step) {
 }
 
 void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
-	CHECK_GL_ERROR_IF_DEBUG();
 	// Don't execute empty renderpasses.
 	if (step.commands.empty()) {
 		// Nothing to do.
@@ -594,7 +583,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				glDisable(GL_STENCIL_TEST);
 				stencilEnabled = false;
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		case GLRRenderCommand::STENCILOP:
 			glStencilOp(c.stencilOp.sFail, c.stencilOp.zFail, c.stencilOp.pass);
@@ -620,7 +608,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				glColorMask(c.blend.mask & 1, (c.blend.mask >> 1) & 1, (c.blend.mask >> 2) & 1, (c.blend.mask >> 3) & 1);
 				colorMask = c.blend.mask;
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		case GLRRenderCommand::LOGICOP:
 #ifndef USING_GLES2
@@ -637,7 +624,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				logicEnabled = false;
 			}
 #endif
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		case GLRRenderCommand::CLEAR:
 			// Scissor test is on, and should be on after leaving this case. If we disable it,
@@ -670,7 +656,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			if (c.clear.scissorW == 0) {
 				glEnable(GL_SCISSOR_TEST);
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		case GLRRenderCommand::INVALIDATE:
 		{
@@ -683,7 +668,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			if (c.clear.clearMask & GL_STENCIL_BUFFER_BIT)
 				attachments[count++] = GL_STENCIL_BUFFER_BIT;
 			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::BLENDCOLOR:
@@ -702,7 +686,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 #else
 			glDepthRangef(c.viewport.vp.minZ, c.viewport.vp.maxZ);
 #endif
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::SCISSOR:
@@ -711,7 +694,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			if (!curFB_)
 				y = curFBHeight_ - y - c.scissor.rc.h;
 			glScissor(c.scissor.rc.x, y, c.scissor.rc.w, c.scissor.rc.h);
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::UNIFORM4F:
@@ -736,7 +718,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 					break;
 				}
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::UNIFORM4I:
@@ -761,7 +742,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 					break;
 				}
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::UNIFORMMATRIX:
@@ -773,7 +753,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			if (loc >= 0) {
 				glUniformMatrix4fv(loc, 1, false, c.uniformMatrix4.m);
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::BINDTEXTURE:
@@ -819,7 +798,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				glUseProgram(c.program.program->program);
 				curProgram = c.program.program;
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
 		case GLRRenderCommand::BIND_VERTEX_BUFFER:
@@ -869,6 +847,12 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
+		case GLRRenderCommand::BING_BUFFER_RANGE:
+		{
+			GLRBuffer *buffer = c.bindBufferRange.buffer;
+			glBindBufferRange(buffer->target_, c.bindBufferRange.slot, buffer->buffer, c.bindBufferRange.offset, c.bindBufferRange.size);
+			break;
+		}
 		case GLRRenderCommand::GENMIPS:
 			// TODO: Should we include the texture handle in the command?
 			// Also, should this not be an init command?
@@ -883,7 +867,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			} else {
 				glDrawElementsInstanced(c.drawIndexed.mode, c.drawIndexed.count, c.drawIndexed.indexType, c.drawIndexed.indices, c.drawIndexed.instances);
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		case GLRRenderCommand::TEXTURESAMPLER:
 		{
@@ -972,7 +955,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				glDisable(GL_DITHER);
 				ditherEnabled = false;
 			}
-			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		default:
 			Crash();
@@ -990,7 +972,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 		glActiveTexture(GL_TEXTURE0);
 		activeSlot = 0;  // doesn't matter, just nice.
 	}
-	CHECK_GL_ERROR_IF_DEBUG();
 
 	// Wipe out the current state.
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -1011,7 +992,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 }
 
 void GLQueueRunner::PerformCopy(const GLRStep &step) {
-	CHECK_GL_ERROR_IF_DEBUG();
 	GLuint srcTex = 0;
 	GLuint dstTex = 0;
 	GLuint target = GL_TEXTURE_2D;
@@ -1073,7 +1053,6 @@ void GLQueueRunner::PerformCopy(const GLRStep &step) {
 
 void GLQueueRunner::PerformReadback(const GLRStep &pass) {
 	using namespace Draw;
-	CHECK_GL_ERROR_IF_DEBUG();
 
 	GLRFramebuffer *fb = pass.readback.src;
 
@@ -1176,7 +1155,6 @@ void GLQueueRunner::PerformBindFramebufferAsRenderTarget(const GLRStep &pass) {
 		fbo_unbind();
 		// Backbuffer is now bound.
 	}
-	CHECK_GL_ERROR_IF_DEBUG();
 }
 
 void GLQueueRunner::CopyReadbackBuffer(int width, int height, Draw::DataFormat srcFormat, Draw::DataFormat destFormat, int pixelStride, uint8_t *pixels) {
@@ -1201,7 +1179,6 @@ GLuint GLQueueRunner::AllocTextureName() {
 	}
 	u32 name = nameCache_.back();
 	nameCache_.pop_back();
-	CHECK_GL_ERROR_IF_DEBUG();
 	return name;
 }
 
@@ -1211,8 +1188,6 @@ GLuint GLQueueRunner::AllocTextureName() {
 #ifndef USING_GLES2
 void GLQueueRunner::fbo_ext_create(const GLRInitStep &step) {
 	GLRFramebuffer *fbo = step.create_framebuffer.framebuffer;
-
-	CHECK_GL_ERROR_IF_DEBUG();
 
 	// Color texture is same everywhere
 	glGenFramebuffersEXT(1, &fbo->handle);
@@ -1265,8 +1240,6 @@ void GLQueueRunner::fbo_ext_create(const GLRInitStep &step) {
 	// Unbind state we don't need
 	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-	CHECK_GL_ERROR_IF_DEBUG();
 
 	currentDrawHandle_ = fbo->handle;
 	currentReadHandle_ = fbo->handle;
@@ -1333,7 +1306,6 @@ void GLQueueRunner::fbo_unbind() {
 }
 
 GLRFramebuffer::~GLRFramebuffer() {
-	CHECK_GL_ERROR_IF_DEBUG();
 	if (gl_extensions.ARB_framebuffer_object || gl_extensions.IsGLES) {
 		if (handle) {
 			glBindFramebuffer(GL_FRAMEBUFFER, handle);
@@ -1365,5 +1337,4 @@ GLRFramebuffer::~GLRFramebuffer() {
 			glDeleteRenderbuffers(1, &stencil_buffer);
 #endif
 	}
-	CHECK_GL_ERROR_IF_DEBUG();
 }

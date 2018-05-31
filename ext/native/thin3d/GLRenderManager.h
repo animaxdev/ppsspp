@@ -225,7 +225,7 @@ public:
 	// This will later allow for handling overflow correctly.
 	size_t Allocate(size_t numBytes, GLRBuffer **vkbuf) {
 		size_t out = offset_;
-		if (offset_ + ((numBytes + 3) & ~3) >= size_) {
+		if (offset_ + ((numBytes + 3) & ~3) > size_) {
 			NextBuffer(numBytes);
 			out = offset_;
 			offset_ += (numBytes + 3) & ~3;
@@ -555,6 +555,15 @@ public:
 		GLRRenderData data{ GLRRenderCommand::BIND_BUFFER};
 		data.bind_buffer.buffer = buffer;
 		data.bind_buffer.target = GL_ELEMENT_ARRAY_BUFFER;
+		curRenderStep_->commands.push_back(data);
+	}
+
+	void BindBufferRange(GLRBuffer *buffer, int slot, size_t offset, size_t size) {
+		GLRRenderData data{ GLRRenderCommand::BING_BUFFER_RANGE };
+		data.bindBufferRange.buffer = buffer;
+		data.bindBufferRange.slot = slot;
+		data.bindBufferRange.offset = offset;
+		data.bindBufferRange.size = size;
 		curRenderStep_->commands.push_back(data);
 	}
 
