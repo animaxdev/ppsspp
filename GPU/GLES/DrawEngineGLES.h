@@ -198,11 +198,11 @@ private:
 	GLRInputLayout *softwareInputLayout_ = nullptr;
 	GLRenderManager *render_;
 
+	// light ubo
 	int uboAlignment_ = 512;
 	UB_VS_Lights ub_lights;
 	uint32_t lightUBOOffset;
 	GLRBuffer *lightBuf = nullptr;
-	bool needRebindLight = false;
 
 	// Other
 	ShaderManagerGLES *shaderManager_ = nullptr;

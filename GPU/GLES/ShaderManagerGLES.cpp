@@ -158,10 +158,10 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 	queries.push_back({ &u_tess_pos_tex, "u_tess_pos_tex" });
 	queries.push_back({ &u_tess_tex_tex, "u_tess_tex_tex" });
 	queries.push_back({ &u_tess_col_tex, "u_tess_col_tex" });
-	queries.push_back({ &u_spline_count_u, "u_spline_count_u" });
-	queries.push_back({ &u_spline_count_v, "u_spline_count_v" });
-	queries.push_back({ &u_spline_type_u, "u_spline_type_u" });
-	queries.push_back({ &u_spline_type_v, "u_spline_type_v" });
+	queries.push_back({ &u_spline_counts, "u_spline_counts" });
+	//queries.push_back({ &u_spline_count_v, "u_spline_count_v" });
+	//queries.push_back({ &u_spline_type_u, "u_spline_type_u" });
+	//queries.push_back({ &u_spline_type_v, "u_spline_type_v" });
 	queries.push_back({ &u_depal, "u_depal" });
 
 	attrMask = vs->GetAttrMask();
@@ -562,13 +562,8 @@ u64 LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 	}*/
 
 	if (dirty & DIRTY_BEZIERSPLINE) {
-		render_->SetUniformI1(&u_spline_count_u, gstate_c.spline_count_u);
-		if (u_spline_count_v != -1)
-			render_->SetUniformI1(&u_spline_count_v, gstate_c.spline_count_v);
-		if (u_spline_type_u != -1)
-			render_->SetUniformI1(&u_spline_type_u, gstate_c.spline_type_u);
-		if (u_spline_type_v != -1)
-			render_->SetUniformI1(&u_spline_type_v, gstate_c.spline_type_v);
+		uint32_t spline_counts = BytesToUint32(gstate_c.spline_count_u, gstate_c.spline_count_v, gstate_c.spline_type_u, gstate_c.spline_type_v);
+		render_->SetUniformI1(&u_spline_counts, spline_counts);
 	}
 
 	return dirty;
@@ -743,7 +738,7 @@ LinkedShader *ShaderManagerGLES::ApplyFragmentShader(VShaderID VSID, Shader *vs,
 	// Okay, we have both shaders. Let's see if there's a linked one.
 	LinkedShader *ls = nullptr;
 
-	u64 switchDirty = shaderSwitchDirtyUniforms_ & ~DIRTY_LIGHT_UNIFORMS;
+	u64 switchDirty = shaderSwitchDirtyUniforms_;
 	for (auto iter = linkedShaderCache_.begin(); iter != linkedShaderCache_.end(); ++iter) {
 		// Deferred dirtying! Let's see if we can make this even more clever later.
 		iter->ls->dirtyUniforms |= switchDirty;
@@ -768,7 +763,6 @@ LinkedShader *ShaderManagerGLES::ApplyFragmentShader(VShaderID VSID, Shader *vs,
 	} else {
 		ls->use(VSID);
 	}
-	ls->UpdateUniforms(vertType, VSID);
 
 	lastShader_ = ls;
 	return ls;

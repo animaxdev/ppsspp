@@ -119,10 +119,10 @@ public:
 	int u_tess_pos_tex;
 	int u_tess_tex_tex;
 	int u_tess_col_tex;
-	int u_spline_count_u;
-	int u_spline_count_v;
-	int u_spline_type_u;
-	int u_spline_type_v;
+	int u_spline_counts;
+	//int u_spline_count_v;
+	//int u_spline_type_u;
+	//int u_spline_type_v;
 };
 
 // Real public interface

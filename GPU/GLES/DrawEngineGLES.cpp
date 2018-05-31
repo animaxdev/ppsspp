@@ -168,10 +168,6 @@ void DrawEngineGLES::BeginFrame() {
 	frameData.pushLight->Begin();
 	frameData.pushIndex->Begin();
 	frameData.pushVertex->Begin();
-	if (lightBuf) {
-		needRebindLight = true;
-	}
-	lightBuf = nullptr;
 }
 
 void DrawEngineGLES::EndFrame() {
@@ -531,11 +527,6 @@ rotateVBO:
 			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
 			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
 		}
-		else if (needRebindLight) {
-			LightUpdateUniforms(&ub_lights, DIRTY_LIGHT_UNIFORMS);
-			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
-			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
-		}
 
 		render_->BindVertexBuffer(inputLayout, vertexBuffer, vertexBufferOffset);
 		if (useElements) {
@@ -598,18 +589,13 @@ rotateVBO:
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
 		LinkedShader *program = shaderManager_->ApplyFragmentShader(vsid, vshader, lastVType_, prim);
 		u64 dirtyUniforms = program->UpdateUniforms(lastVType_, vsid);
-		if (dirtyUniforms & DIRTY_LIGHT_UNIFORMS) {
-			LightUpdateUniforms(&ub_lights, dirtyUniforms);
-			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
-			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
-		}
-		else if (needRebindLight) {
-			LightUpdateUniforms(&ub_lights, DIRTY_LIGHT_UNIFORMS);
-			lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
-			render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
-		}
 
 		if (result.action == SW_DRAW_PRIMITIVES) {
+			if (dirtyUniforms & DIRTY_LIGHT_UNIFORMS) {
+				LightUpdateUniforms(&ub_lights, dirtyUniforms);
+				lightUBOOffset = frameData.pushLight->PushAligned(&ub_lights, sizeof(ub_lights), uboAlignment_, &lightBuf);
+				render_->BindBufferRange(lightBuf, 0, lightUBOOffset, sizeof(ub_lights));
+			}
 			if (drawIndexed) {
 				vertexBufferOffset = (uint32_t)frameData.pushVertex->Push(drawBuffer, maxIndex * sizeof(TransformedVertex), &vertexBuffer);
 				indexBufferOffset = (uint32_t)frameData.pushIndex->Push(inds, sizeof(uint16_t) * numTrans, &indexBuffer);
