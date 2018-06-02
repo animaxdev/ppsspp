@@ -437,7 +437,7 @@ bool GenerateVulkanGLSLFragmentShader(const FShaderID &id, char *buffer) {
 		}
 
 		if (replaceBlend == REPLACE_BLEND_COPY_FBO) {
-			WRITE(p, "  vec4 destColor = texelFetch(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n");
+			WRITE(p, " lowp vec4 destColor = texelFetch(fbotex, ivec2(gl_FragCoord.x, gl_FragCoord.y), 0);\n");
 
 			const char *srcFactor = "vec3(1.0)";
 			const char *dstFactor = "vec3(0.0)";
