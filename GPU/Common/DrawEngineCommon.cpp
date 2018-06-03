@@ -518,7 +518,12 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		// Decode the verts and apply morphing. Simple.
 		dec_->DecodeVerts(dest + decodedVerts * (int)dec_->GetDecVtxFmt().stride, dc.verts, indexLowerBound, indexUpperBound);
 		decodedVerts += indexUpperBound - indexLowerBound + 1;
-		indexGen.AddPrim(dc.prim, dc.vertexCount);
+
+		bool clockwise = true;
+		if (dc.cullMode != -1 && gstate.isCullEnabled() && gstate.getCullMode() != dc.cullMode) {
+			clockwise = false;
+		}
+		indexGen.AddPrim(dc.prim, dc.vertexCount, clockwise);
 	} 
 	else {
 		// It's fairly common that games issue long sequences of PRIM calls, with differing
