@@ -106,7 +106,7 @@ void VagDecoder::DecodeBlock(u8 *&read_pointer) {
 	s_2 = s2;
 	curSample = 0;
 	curBlock_++;
-	if (curBlock_ == numBlocks_ - 1) {
+	if (curBlock_ == numBlocks_) {
 		end_ = true;
 	}
 
