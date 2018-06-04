@@ -539,17 +539,17 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				}
 				WRITE(p, "  vec3 worldpos = (u_world * vec4(pos.xyz, 1.0)).xyz;\n");
 				if (hasNormal) {
-					WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(%snrm, 0.0)).xyz);\n", flipNormalTess ? "-" : "");
+					WRITE(p, " mediump vec3 worldnormal = normalize((u_world * vec4(%snrm, 0.0)).xyz);\n", flipNormalTess ? "-" : "");
 				} else {
-					WRITE(p, "  vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
+					WRITE(p, " mediump vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
 				}
 			} else {
 				// No skinning, just standard T&L.
 				WRITE(p, "  vec3 worldpos = (u_world * vec4(position.xyz, 1.0)).xyz;\n");
 				if (hasNormal)
-					WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(%snormal, 0.0)).xyz);\n", flipNormal ? "-" : "");
+					WRITE(p, " mediump vec3 worldnormal = normalize((u_world * vec4(%snormal, 0.0)).xyz);\n", flipNormal ? "-" : "");
 				else
-					WRITE(p, "  vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
+					WRITE(p, " mediump vec3 worldnormal = vec3(0.0, 0.0, 1.0);\n");
 			}
 		} else {
 			static const char *rescale[4] = {"", " * 1.9921875", " * 1.999969482421875", ""}; // 2*127.5f/128.f, 2*32767.5f/32768.f, 1.0f};
@@ -621,11 +621,11 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 			WRITE(p, "  vec3 worldpos = (u_world * vec4(skinnedpos, 1.0)).xyz;\n");
 
 			if (hasNormal) {
-				WRITE(p, "  vec3 skinnednormal = (skinMatrix * vec4(%snormal, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
+				WRITE(p, " mediump vec3 skinnednormal = (skinMatrix * vec4(%snormal, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
 			} else {
-				WRITE(p, "  vec3 skinnednormal = (skinMatrix * vec4(0.0, 0.0, %s1.0, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
+				WRITE(p, " mediump vec3 skinnednormal = (skinMatrix * vec4(0.0, 0.0, %s1.0, 0.0)).xyz %s;\n", flipNormal ? "-" : "", factor);
 			}
-			WRITE(p, "  vec3 worldnormal = normalize((u_world * vec4(skinnednormal, 0.0)).xyz);\n");
+			WRITE(p, " mediump vec3 worldnormal = normalize((u_world * vec4(skinnednormal, 0.0)).xyz);\n");
 		}
 
 		WRITE(p, "  vec4 viewPos = u_view * vec4(worldpos, 1.0);\n");
@@ -680,7 +680,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				WRITE(p, "  float distance;\n");
 				WRITE(p, "  float lightScale;\n");
 			}
-			WRITE(p, "  float ldot;\n");
+			WRITE(p, " mediump float ldot;\n");
 			if (anySpots) {
 				WRITE(p, "  float angle;\n");
 			}
