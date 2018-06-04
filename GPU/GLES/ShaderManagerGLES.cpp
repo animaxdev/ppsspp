@@ -76,15 +76,10 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 
 
 	std::vector<GLRProgram::Semantic> semantics;
-	//semantics.push_back({ ATTR_POSITION, "position" });
-	//semantics.push_back({ ATTR_TEXCOORD, "texcoord" });
-	//semantics.push_back({ ATTR_NORMAL, "normal" });
-	//semantics.push_back({ ATTR_W1, "w1" });
-	//semantics.push_back({ ATTR_W2, "w2" });
-	//semantics.push_back({ ATTR_COLOR0, "color0" });
-	//semantics.push_back({ ATTR_COLOR1, "color1" });
-
 	std::vector<GLRProgram::UniformLocQuery> queries;
+	std::vector<GLRProgram::Initializer> initialize;
+
+
 	queries.push_back({ &u_tex, "tex" });
 	queries.push_back({ &u_proj, "u_proj" });
 	queries.push_back({ &u_proj_through, "u_proj_through" });
@@ -103,79 +98,63 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 	queries.push_back({ &u_blendFixA, "u_blendFixA" });
 	queries.push_back({ &u_blendFixB, "u_blendFixB" });
 	queries.push_back({ &u_fbotexSize, "u_fbotexSize" });
-	queries.push_back({ &u_pal, "pal" });
+	
+	queries.push_back({ &u_depthRange, "u_depthRange" });
 
 	// Transform
 	queries.push_back({ &u_view, "u_view" });
 	queries.push_back({ &u_world, "u_world" });
 	queries.push_back({ &u_texmtx, "u_texmtx" });
 
-	if (VSID.Bit(VS_BIT_ENABLE_BONES))
+	if (VSID.Bit(VS_BIT_ENABLE_BONES)) {
 		numBones = TranslateNumBones(VSID.Bits(VS_BIT_BONES, 3) + 1);
-	else
-		numBones = 0;
-	queries.push_back({ &u_depthRange, "u_depthRange" });
 
 #ifdef USE_BONE_ARRAY
-	queries.push_back({ &u_bone, "u_bone" });
+		queries.push_back({ &u_bone, "u_bone" });
 #else
-	static const char * const boneNames[8] = { "u_bone0", "u_bone1", "u_bone2", "u_bone3", "u_bone4", "u_bone5", "u_bone6", "u_bone7", };
-	for (int i = 0; i < 8; i++) {
-		queries.push_back({ &u_bone[i], boneNames[i] });
-	}
+		static const char * const boneNames[8] = { "u_bone0", "u_bone1", "u_bone2", "u_bone3", "u_bone4", "u_bone5", "u_bone6", "u_bone7", };
+		for (int i = 0; i < 8; i++) {
+			queries.push_back({ &u_bone[i], boneNames[i] });
+		}
 #endif
+	}
+	else {
+		numBones = 0;
+	}
 
 	// Lighting, texturing
-	//queries.push_back({ &u_ambient, "u_ambient" });
 	queries.push_back({ &u_matambientalpha, "u_matambientalpha" });
-	//queries.push_back({ &u_matdiffuse, "u_matdiffuse" });
-	//queries.push_back({ &u_matspecular, "u_matspecular" });
-	//queries.push_back({ &u_matemissive, "u_matemissive" });
 	queries.push_back({ &u_uvscaleoffset, "u_uvscaleoffset" });
 	queries.push_back({ &u_texclamp, "u_texclamp" });
 	queries.push_back({ &u_texclampoff, "u_texclampoff" });
 
-	/*for (int i = 0; i < 4; i++) {
-		static const char * const lightPosNames[4] = { "u_lightpos0", "u_lightpos1", "u_lightpos2", "u_lightpos3", };
-		queries.push_back({ &u_lightpos[i], lightPosNames[i] });
-		static const char * const lightdir_names[4] = { "u_lightdir0", "u_lightdir1", "u_lightdir2", "u_lightdir3", };
-		queries.push_back({ &u_lightdir[i], lightdir_names[i] });
-		static const char * const lightatt_names[4] = { "u_lightatt0", "u_lightatt1", "u_lightatt2", "u_lightatt3", };
-		queries.push_back({ &u_lightatt[i], lightatt_names[i] });
-		static const char * const lightangle_spotCoef_names[4] = { "u_lightangle_spotCoef0", "u_lightangle_spotCoef1", "u_lightangle_spotCoef2", "u_lightangle_spotCoef3", };
-		queries.push_back({ &u_lightangle_spotCoef[i], lightangle_spotCoef_names[i] });
-
-		static const char * const lightambient_names[4] = { "u_lightambient0", "u_lightambient1", "u_lightambient2", "u_lightambient3", };
-		queries.push_back({ &u_lightambient[i], lightambient_names[i] });
-		static const char * const lightdiffuse_names[4] = { "u_lightdiffuse0", "u_lightdiffuse1", "u_lightdiffuse2", "u_lightdiffuse3", };
-		queries.push_back({ &u_lightdiffuse[i], lightdiffuse_names[i] });
-		static const char * const lightspecular_names[4] = { "u_lightspecular0", "u_lightspecular1", "u_lightspecular2", "u_lightspecular3", };
-		queries.push_back({ &u_lightspecular[i], lightspecular_names[i] });
-	}*/
-
 	// We need to fetch these unconditionally, gstate_c.spline or bezier will not be set if we
 	// create this shader at load time from the shader cache.
-	queries.push_back({ &u_tess_pos_tex, "u_tess_pos_tex" });
-	queries.push_back({ &u_tess_tex_tex, "u_tess_tex_tex" });
-	queries.push_back({ &u_tess_col_tex, "u_tess_col_tex" });
-	queries.push_back({ &u_spline_counts, "u_spline_counts" });
-	//queries.push_back({ &u_spline_count_v, "u_spline_count_v" });
-	//queries.push_back({ &u_spline_type_u, "u_spline_type_u" });
-	//queries.push_back({ &u_spline_type_v, "u_spline_type_v" });
-	queries.push_back({ &u_depal, "u_depal" });
+	if(VSID.Bit(VS_BIT_BEZIER) || VSID.Bit(VS_BIT_SPLINE)) {
+		queries.push_back({ &u_tess_pos_tex, "u_tess_pos_tex" });
+		queries.push_back({ &u_tess_tex_tex, "u_tess_tex_tex" });
+		queries.push_back({ &u_tess_col_tex, "u_tess_col_tex" });
+		queries.push_back({ &u_spline_counts, "u_spline_counts" });
+
+		initialize.push_back({ &u_tess_pos_tex, 0, 4 }); // Texture unit 4
+		initialize.push_back({ &u_tess_tex_tex, 0, 5 }); // Texture unit 5
+		initialize.push_back({ &u_tess_col_tex, 0, 6 }); // Texture unit 6
+	}
+
+	if(FSID.Bit(FS_BIT_SHADER_DEPAL)) {
+		queries.push_back({ &u_pal, "pal" });
+		queries.push_back({ &u_depal, "u_depal" });
+
+		initialize.push_back({ &u_pal,          0, 3 }); // CLUT
+	}
 
 	attrMask = vs->GetAttrMask();
 	availableUniforms = vs->GetUniformMask() | fs->GetUniformMask();
 
-	std::vector<GLRProgram::Initializer> initialize;
 	initialize.push_back({ &u_tex,          0, 0 });
 	initialize.push_back({ &u_fbotex,       0, 1 });
 	initialize.push_back({ &u_testtex,      0, 2 });
-	initialize.push_back({ &u_pal,          0, 3 }); // CLUT
-	initialize.push_back({ &u_tess_pos_tex, 0, 4 }); // Texture unit 4
-	initialize.push_back({ &u_tess_tex_tex, 0, 5 }); // Texture unit 5
-	initialize.push_back({ &u_tess_col_tex, 0, 6 }); // Texture unit 6
-
+	
 	program = render->CreateProgram(shaders, semantics, queries, initialize, gstate_c.featureFlags & GPU_SUPPORTS_DUALSOURCE_BLEND);
 
 	// The rest, use the "dirty" mechanism.
@@ -519,47 +498,6 @@ u64 LinkedShader::UpdateUniforms(u32 vertType, const ShaderID &vsid) {
 	if (dirty & DIRTY_MATAMBIENTALPHA) {
 		SetColorUniform3Alpha(render_, &u_matambientalpha, gstate.materialambient, gstate.getMaterialAmbientA());
 	}
-	/*if (dirty & DIRTY_AMBIENT) {
-		SetColorUniform3Alpha(render_, &u_ambient, gstate.ambientcolor, gstate.getAmbientA());
-	}
-	if (dirty & DIRTY_MATDIFFUSE) {
-		SetColorUniform3(render_, &u_matdiffuse, gstate.materialdiffuse);
-	}
-	if (dirty & DIRTY_MATEMISSIVE) {
-		SetColorUniform3(render_, &u_matemissive, gstate.materialemissive);
-	}
-	if (dirty & DIRTY_MATSPECULAR) {
-		SetColorUniform3ExtraFloat(render_, &u_matspecular, gstate.materialspecular, getFloat24(gstate.materialspecularcoef));
-	}
-
-	for (int i = 0; i < 4; i++) {
-		if (dirty & (DIRTY_LIGHT0 << i)) {
-			if (gstate.isDirectionalLight(i)) {
-				// Prenormalize
-				float x = getFloat24(gstate.lpos[i * 3 + 0]);
-				float y = getFloat24(gstate.lpos[i * 3 + 1]);
-				float z = getFloat24(gstate.lpos[i * 3 + 2]);
-				float len = sqrtf(x*x + y*y + z*z);
-				if (len == 0.0f)
-					len = 1.0f;
-				else
-					len = 1.0f / len;
-				float vec[3] = { x * len, y * len, z * len };
-				render_->SetUniformF(&u_lightpos[i], 3, vec);
-			} else {
-				SetFloat24Uniform3(render_, &u_lightpos[i], &gstate.lpos[i * 3]);
-			}
-			if (u_lightdir[i] != -1) SetFloat24Uniform3(render_, &u_lightdir[i], &gstate.ldir[i * 3]);
-			if (u_lightatt[i] != -1) SetFloat24Uniform3(render_, &u_lightatt[i], &gstate.latt[i * 3]);
-			if (u_lightangle_spotCoef[i] != -1) {
-				float lightangle_spotCoef[2] = { getFloat24(gstate.lcutoff[i]), getFloat24(gstate.lconv[i]) };
-				SetFloatUniform2(render_, &u_lightangle_spotCoef[i], lightangle_spotCoef);
-			}
-			if (u_lightambient[i] != -1) SetColorUniform3(render_, &u_lightambient[i], gstate.lcolor[i * 3]);
-			if (u_lightdiffuse[i] != -1) SetColorUniform3(render_, &u_lightdiffuse[i], gstate.lcolor[i * 3 + 1]);
-			if (u_lightspecular[i] != -1) SetColorUniform3(render_, &u_lightspecular[i], gstate.lcolor[i * 3 + 2]);
-		}
-	}*/
 
 	if (dirty & DIRTY_BEZIERSPLINE) {
 		uint32_t spline_counts = BytesToUint32(gstate_c.spline_count_u, gstate_c.spline_count_v, gstate_c.spline_type_u, gstate_c.spline_type_v);
@@ -604,10 +542,12 @@ void ShaderManagerGLES::Clear() {
 
 void ShaderManagerGLES::ClearCache(bool deleteThem) {
 	// TODO: Recreate all from the diskcache when we come back.
+	DEBUG_LOG(G3D, "ShaderManagerGLES ClearCache");
 	Clear();
 }
 
 void ShaderManagerGLES::DeviceLost() {
+	DEBUG_LOG(G3D, "ShaderManagerGLES DeviceLost");
 	Clear();
 }
 
@@ -864,13 +804,16 @@ void ShaderManagerGLES::Load(const std::string &filename) {
 	File::IOFile f(filename, "rb");
 	u64 sz = f.GetSize();
 	if (!f.IsOpen()) {
+		DEBUG_LOG(G3D, "Loading IsOpen return");
 		return;
 	}
 	CacheHeader header;
 	if (!f.ReadArray(&header, 1)) {
+		DEBUG_LOG(G3D, "Loading header return");
 		return;
 	}
 	if (header.magic != CACHE_HEADER_MAGIC || header.version != CACHE_VERSION || header.featureFlags != gstate_c.featureFlags) {
+		DEBUG_LOG(G3D, "Loading magic return");
 		return;
 	}
 	time_update();
@@ -884,18 +827,19 @@ void ShaderManagerGLES::Load(const std::string &filename) {
 	}
 
 	// Also make sure the size makes sense, in case there's corruption.
-	u64 expectedSize = sizeof(header);
+	/*u64 expectedSize = sizeof(header);
 	expectedSize += header.numVertexShaders * sizeof(VShaderID);
 	expectedSize += header.numFragmentShaders * sizeof(FShaderID);
 	expectedSize += header.numLinkedPrograms * (sizeof(VShaderID) + sizeof(FShaderID));
 	if (sz != expectedSize) {
 		ERROR_LOG(G3D, "Shader cache file is wrong size: %lld instead of %lld", sz, expectedSize);
 		return;
-	}
+	}*/
 
 	diskCachePending_.vert.resize(header.numVertexShaders);
 	if (!f.ReadArray(&diskCachePending_.vert[0], header.numVertexShaders)) {
 		diskCachePending_.vert.clear();
+		DEBUG_LOG(G3D, "Loading vert return");
 		return;
 	}
 
@@ -903,19 +847,32 @@ void ShaderManagerGLES::Load(const std::string &filename) {
 	if (!f.ReadArray(&diskCachePending_.frag[0], header.numFragmentShaders)) {
 		diskCachePending_.vert.clear();
 		diskCachePending_.frag.clear();
+		DEBUG_LOG(G3D, "Loading frag return");
 		return;
 	}
 
 	for (int i = 0; i < header.numLinkedPrograms; i++) {
-		VShaderID vsid;
-		FShaderID fsid;
-		if (!f.ReadArray(&vsid, 1)) {
+		LinkBinaryProgram lbp;
+		if (!f.ReadArray(&lbp.vsid, 1)) {
 			return;
 		}
-		if (!f.ReadArray(&fsid, 1)) {
+		if (!f.ReadArray(&lbp.fsid, 1)) {
 			return;
 		}
-		diskCachePending_.link.push_back(std::make_pair(vsid, fsid));
+		if (!f.ReadArray(&lbp.binaryFormat, 1)) {
+			return;
+		}
+		size_t length;
+		if (!f.ReadArray(&length, 1)) {
+			return;
+		}
+		lbp.binaryProgram.resize(length);
+		if (!f.ReadArray(const_cast<char *>(lbp.binaryProgram.data()), length)) {
+			lbp.binaryFormat = 0;
+			return;
+		}
+		DEBUG_LOG(G3D, "Loading binaryProgram: %x, length: %d", lbp.binaryFormat, length);
+		diskCachePending_.link.push_back(lbp);
 	}
 
 	// Actual compilation happens in ContinuePrecompile(), called by GPU_GLES's IsReady.
@@ -987,14 +944,19 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 			return false;
 		}
 
-		const VShaderID &vsid = pending.link[i].first;
-		const FShaderID &fsid = pending.link[i].second;
+		const GLenum binaryFormat = pending.link[i].binaryFormat;
+		const std::string& binaryProgram = pending.link[i].binaryProgram;
+
+		const VShaderID &vsid = pending.link[i].vsid;
+		const FShaderID &fsid = pending.link[i].fsid;
 		auto iter0 = vsCache_.find(vsid);
 		auto iter1 = fsCache_.find(fsid);
 		if (iter0 != vsCache_.end() && iter1 != fsCache_.end()) {
 			Shader * vs = iter0->second;
 			Shader * fs = iter1->second;
 			LinkedShader *ls = new LinkedShader(render_, vsid, vs, fsid, fs, vs->UseHWTransform(), true);
+			ls->program->binaryFormat_ = binaryFormat;
+			ls->program->binaryProgram_ = binaryProgram;
 			LinkedShaderCacheEntry entry(vs, fs, ls);
 			linkedShaderCache_.push_back(entry);
 		}
@@ -1012,12 +974,14 @@ bool ShaderManagerGLES::ContinuePrecompile(float sliceTime) {
 
 void ShaderManagerGLES::Save(const std::string &filename) {
 	if (!diskCacheDirty_) {
+		DEBUG_LOG(G3D, "Saving diskCacheDirty_ return");
 		return;
 	}
 	if (linkedShaderCache_.empty()) {
+		DEBUG_LOG(G3D, "Saving linkedShaderCache_ return");
 		return;
 	}
-	INFO_LOG(G3D, "Saving the shader cache to '%s'", filename.c_str());
+	DEBUG_LOG(G3D, "Saving the shader cache to '%s'", filename.c_str());
 	FILE *f = File::OpenCFile(filename, "wb");
 	if (!f) {
 		// Can't save, give up for now.
@@ -1061,6 +1025,17 @@ void ShaderManagerGLES::Save(const std::string &filename) {
 			}
 		}
 		fwrite(&fsid, 1, sizeof(fsid), f);
+
+		// opengl binary program
+		const GLenum binaryFormat = iter.ls->program->binaryFormat_;
+		const std::string& binaryProgram = iter.ls->program->binaryProgram_;
+		if (binaryFormat != 0) {
+			size_t length = binaryProgram.size();
+			fwrite(&binaryFormat, 1, sizeof(binaryFormat), f);
+			fwrite(&length, 1, sizeof(length), f);
+			fwrite(binaryProgram.data(), 1, length, f);
+			DEBUG_LOG(G3D, "Saving binaryProgram: %x, length: %d", binaryFormat, length);
+		}
 	}
 	fclose(f);
 	diskCacheDirty_ = false;
