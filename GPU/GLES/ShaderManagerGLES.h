@@ -103,26 +103,13 @@ public:
 	int u_texclampoff;
 
 	// Lighting
-	//int u_ambient;
 	int u_matambientalpha;
-	//int u_matdiffuse;
-	//int u_matspecular;
-	//int u_matemissive;
-	//int u_lightpos[4];
-	//int u_lightdir[4];
-	//int u_lightatt[4];  // attenuation
-	//int u_lightangle_spotCoef[4]; // spotlight cone angle (cosine) (x), spotlight dropoff (y)
-	//int u_lightdiffuse[4];  // each light consist of vec4[3]
-	//int u_lightspecular[4];  // attenuation
-	//int u_lightambient[4];  // attenuation
+
 
 	int u_tess_pos_tex;
 	int u_tess_tex_tex;
 	int u_tess_col_tex;
 	int u_spline_counts;
-	//int u_spline_count_v;
-	//int u_spline_type_u;
-	//int u_spline_type_v;
 };
 
 // Real public interface
@@ -211,11 +198,18 @@ private:
 	std::map<VShaderID, Shader *> vsCache_;
 
 
+	struct LinkBinaryProgram {
+		VShaderID vsid;
+		FShaderID fsid;
+		GLenum binaryFormat;
+		std::string binaryProgram;
+	};
+
 	bool diskCacheDirty_;
 	struct {
 		std::vector<VShaderID> vert;
 		std::vector<FShaderID> frag;
-		std::vector<std::pair<VShaderID, FShaderID>> link;
+		std::vector<LinkBinaryProgram> link;
 
 		size_t vertPos = 0;
 		size_t fragPos = 0;

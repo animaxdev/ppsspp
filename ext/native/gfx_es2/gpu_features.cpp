@@ -422,6 +422,21 @@ void CheckGLExtensions() {
 	gl_extensions.ARB_pixel_buffer_object = strstr(extString, "GL_ARB_pixel_buffer_object") != 0;
 	gl_extensions.NV_pixel_buffer_object = strstr(extString, "GL_NV_pixel_buffer_object") != 0;
 
+	// get_program_binary
+#if defined(__ANDROID__)
+	gl_extensions.OES_get_program_binary = strstr(extString, "GL_OES_get_program_binary") != 0;
+	if (gl_extensions.ARB_get_program_binary) {
+		//gl_extensions.GetProgramBinary = eglGetProcAddress("GetProgramBinaryOES");
+		//gl_extensions.ProgramBinary = eglGetProcAddress("ProgramBinaryOES");
+	}
+#else
+	gl_extensions.ARB_get_program_binary = strstr(extString, "GL_ARB_get_program_binary") != 0;
+	if (gl_extensions.ARB_get_program_binary) {
+		//gl_extensions.GetProgramBinary = glGetProgramBinary;
+		//gl_extensions.ProgramBinary = glProgramBinary;
+	}
+#endif
+
 	if (!gl_extensions.IsGLES && gl_extensions.IsCoreContext) {
 		// These are required, and don't need to be specified by the driver (they aren't on Apple.)
 		gl_extensions.ARB_vertex_array_object = true;

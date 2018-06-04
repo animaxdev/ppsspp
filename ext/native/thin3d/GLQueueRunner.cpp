@@ -107,32 +107,39 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps) {
 			CHECK_GL_ERROR_IF_DEBUG();
 			GLRProgram *program = step.create_program.program;
 			program->program = glCreateProgram();
-			_assert_msg_(G3D, step.create_program.num_shaders > 0, "Can't create a program with zero shaders");
-			for (int j = 0; j < step.create_program.num_shaders; j++) {
-				_dbg_assert_msg_(G3D, step.create_program.shaders[j]->shader, "Can't create a program with a null shader");
-				glAttachShader(program->program, step.create_program.shaders[j]->shader);
+			if (program->binaryFormat_ != 0) {
+				DEBUG_LOG(G3D, "Load ProgramBinary format: %x, length: %d", program->binaryFormat_, program->binaryProgram_.size());
+				glProgramBinary(program->program, program->binaryFormat_, program->binaryProgram_.data(), program->binaryProgram_.size());
 			}
+			else {
+				_assert_msg_(G3D, step.create_program.num_shaders > 0, "Can't create a program with zero shaders");
+				for (int j = 0; j < step.create_program.num_shaders; j++) {
+					_dbg_assert_msg_(G3D, step.create_program.shaders[j]->shader, "Can't create a program with a null shader");
+					glAttachShader(program->program, step.create_program.shaders[j]->shader);
+				}
 
-			for (auto iter : program->semantics_) {
-				glBindAttribLocation(program->program, iter.location, iter.attrib);
-			}
+				for (auto iter : program->semantics_) {
+					glBindAttribLocation(program->program, iter.location, iter.attrib);
+				}
 
 #if !defined(USING_GLES2)
-			if (step.create_program.support_dual_source) {
-				// Dual source alpha
-				glBindFragDataLocationIndexed(program->program, 0, 0, "fragColor0");
-				glBindFragDataLocationIndexed(program->program, 0, 1, "fragColor1");
-			} else if (gl_extensions.VersionGEThan(3, 3, 0)) {
-				glBindFragDataLocation(program->program, 0, "fragColor0");
-			}
+				if (step.create_program.support_dual_source) {
+					// Dual source alpha
+					glBindFragDataLocationIndexed(program->program, 0, 0, "fragColor0");
+					glBindFragDataLocationIndexed(program->program, 0, 1, "fragColor1");
+				}
+				else if (gl_extensions.VersionGEThan(3, 3, 0)) {
+					glBindFragDataLocation(program->program, 0, "fragColor0");
+				}
 #elif !defined(IOS)
-			if (gl_extensions.GLES3 && step.create_program.support_dual_source) {
-				glBindFragDataLocationIndexedEXT(program->program, 0, 0, "fragColor0");
-				glBindFragDataLocationIndexedEXT(program->program, 0, 1, "fragColor1");
-			}
+				if (gl_extensions.GLES3 && step.create_program.support_dual_source) {
+					glBindFragDataLocationIndexedEXT(program->program, 0, 0, "fragColor0");
+					glBindFragDataLocationIndexedEXT(program->program, 0, 1, "fragColor1");
+				}
 #endif
-			glLinkProgram(program->program);
-
+				glLinkProgram(program->program);
+			}
+			
 			GLint linkStatus = GL_FALSE;
 			glGetProgramiv(program->program, GL_LINK_STATUS, &linkStatus);
 			if (linkStatus != GL_TRUE) {
@@ -168,6 +175,13 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps) {
 				}
 				CHECK_GL_ERROR_IF_DEBUG();
 				break;
+			}
+			else if (program->binaryFormat_ == 0) {
+				GLint length;
+				glGetProgramiv(program->program, GL_PROGRAM_BINARY_LENGTH, &length);
+				program->binaryProgram_.resize(length);
+				glGetProgramBinary(program->program, length, NULL, &program->binaryFormat_, const_cast<char*>(program->binaryProgram_.data()));
+				DEBUG_LOG(G3D, "Get ProgramBinary format: %x, length: %d", program->binaryFormat_, length);
 			}
 
 			glUseProgram(program->program);
