@@ -429,12 +429,6 @@ void GPU_GLES::BeginFrame() {
 
 	//GPUCommon::BeginFrame();
 
-	// Save the cache from time to time. TODO: How often? We save on exit, so shouldn't need to do this all that often.
-	if (!shaderCachePath_.empty() && (gpuStats.numFlips & 4095) == 0) {
-		DEBUG_LOG(G3D, "GPU_GLES BeginFrame Save");
-		shaderManagerGL_->Save(shaderCachePath_);
-	}
-
 	shaderManagerGL_->DirtyShader();
 
 	// Not sure if this is really needed.
