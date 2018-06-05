@@ -542,12 +542,10 @@ void ShaderManagerGLES::Clear() {
 
 void ShaderManagerGLES::ClearCache(bool deleteThem) {
 	// TODO: Recreate all from the diskcache when we come back.
-	DEBUG_LOG(G3D, "ShaderManagerGLES ClearCache");
 	Clear();
 }
 
 void ShaderManagerGLES::DeviceLost() {
-	DEBUG_LOG(G3D, "ShaderManagerGLES DeviceLost");
 	Clear();
 }
 
