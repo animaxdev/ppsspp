@@ -138,11 +138,11 @@ void DrawEngineVulkan::InitDeviceObjects() {
 	// if creating and updating them turns out to be expensive.
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		// We now create descriptor pools on demand, so removed from here.
-		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 4 * 1024 * 1024);
+		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 2 * 1024 * 1024);
+		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 2 * 1024 * 1024);
 		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 1 * 1024 * 1024);
+		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 2 * 1024 * 1024);
+		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 2 * 1024 * 1024);
 	}
 
 	VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
