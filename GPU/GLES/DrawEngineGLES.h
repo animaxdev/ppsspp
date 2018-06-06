@@ -188,6 +188,7 @@ private:
 		GLPushBuffer *pushLight;
 		GLPushBuffer *pushVertex;
 		GLPushBuffer *pushIndex;
+		GLPushBuffer *pushTess;
 	};
 	FrameData frameData_[GLRenderManager::MAX_INFLIGHT_FRAMES];
 
@@ -199,7 +200,7 @@ private:
 	GLRenderManager *render_;
 
 	// light ubo
-	int uboAlignment_ = 512;
+	int uboAlignment_ = 256;
 	UB_VS_Lights ub_lights;
 	uint32_t lightUBOOffset;
 	GLRBuffer *lightBuf = nullptr;
@@ -218,16 +219,31 @@ private:
 
 	// Hardware tessellation
 	class TessellationDataTransferGLES : public TessellationDataTransfer {
-	private:
-		GLRTexture *data_tex[3]{};
-		GLRenderManager *renderManager_;
 	public:
-		TessellationDataTransferGLES(GLRenderManager *renderManager)
-			  : renderManager_(renderManager) { }
-		~TessellationDataTransferGLES() {
-			EndFrame();
-		}
+		TessellationDataTransferGLES(GLRenderManager *renderManager) : renderManager_(renderManager) {}
+		~TessellationDataTransferGLES() {}
+
+		void SetPushBuffer(GLPushBuffer *push) { push_ = push; }
 		void SendDataToShader(const float *pos, const float *tex, const float *col, int size, bool hasColor, bool hasTexCoords) override;
-		void EndFrame() override;  // Queues textures for deletion.
+		void PrepareBuffers(float *&pos, float *&tex, float *&col, int &posStride, int &texStride, int &colStride, int size, bool hasColor, bool hasTexCoords) override;
+
+		void GetBufferAndOffset(GLRBuffer **buf, uint32_t *offset, uint32_t *range) {
+			*buf = buf_;
+			*offset = offset_;
+			*range = range_;
+
+			buf_ = 0;
+			offset_ = 0;
+			range_ = 0;
+		}
+
+	private:
+		GLRenderManager * renderManager_;
+		GLPushBuffer *push_;  // Updated each frame.
+
+		uint32_t offset_ = 0;
+		uint32_t range_ = 0;
+		GLRBuffer * buf_ = nullptr;
 	};
+
 };

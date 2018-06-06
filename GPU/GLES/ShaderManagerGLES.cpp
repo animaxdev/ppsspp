@@ -131,14 +131,7 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 	// We need to fetch these unconditionally, gstate_c.spline or bezier will not be set if we
 	// create this shader at load time from the shader cache.
 	if(VSID.Bit(VS_BIT_BEZIER) || VSID.Bit(VS_BIT_SPLINE)) {
-		queries.push_back({ &u_tess_pos_tex, "u_tess_pos_tex" });
-		queries.push_back({ &u_tess_tex_tex, "u_tess_tex_tex" });
-		queries.push_back({ &u_tess_col_tex, "u_tess_col_tex" });
 		queries.push_back({ &u_spline_counts, "u_spline_counts" });
-
-		initialize.push_back({ &u_tess_pos_tex, 0, 4 }); // Texture unit 4
-		initialize.push_back({ &u_tess_tex_tex, 0, 5 }); // Texture unit 5
-		initialize.push_back({ &u_tess_col_tex, 0, 6 }); // Texture unit 6
 	}
 
 	if(FSID.Bit(FS_BIT_SHADER_DEPAL)) {
