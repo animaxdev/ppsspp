@@ -101,7 +101,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
-				WRITE(p, "#version 420\n");
+				WRITE(p, "#version 450\n");
 				texelFetch = "texelFetch";
 			} else if (gl_extensions.VersionGEThan(3, 0, 0)) {
 				WRITE(p, "#version 130\n");

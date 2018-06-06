@@ -112,7 +112,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 				glslES30 = true;
 				bitwiseOps = true;
 				texelFetch = "texelFetch";
-				WRITE(p, "#version 420\n");
+				WRITE(p, "#version 450\n");
 			} else if (gl_extensions.VersionGEThan(3, 0, 0)) {
 				fragColor0 = "fragColor0";
 				bitwiseOps = true;
