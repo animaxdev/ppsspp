@@ -101,7 +101,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {
-				WRITE(p, "#version 450\n");
+				WRITE(p, "#version 420\n");
 				texelFetch = "texelFetch";
 			} else if (gl_extensions.VersionGEThan(3, 0, 0)) {
 				WRITE(p, "#version 130\n");
@@ -329,15 +329,12 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	// Hardware tessellation
 	if (doBezier || doSpline) {
 		*uniformMask |= DIRTY_BEZIERSPLINE;
+
+		WRITE(p, "uniform sampler2D u_tess_pos_tex;\n");
+		WRITE(p, "uniform sampler2D u_tess_tex_tex;\n");
+		WRITE(p, "uniform sampler2D u_tess_col_tex;\n");
+
 		WRITE(p, "uniform int u_spline_counts;\n");
-		WRITE(p, "struct TessData {\n");
-		WRITE(p, "  vec4 pos;\n");
-		WRITE(p, "  vec4 uv;\n");
-		WRITE(p, "  vec4 color;\n");
-		WRITE(p, "};");
-		WRITE(p, "layout (std430, binding = 6) readonly buffer s_tess_data {\n");
-		WRITE(p, "  TessData data[];");
-		WRITE(p, "} tess_data;\n");
 
 		for (int i = 2; i <= 4; i++) {
 			// Define 3 types vec2, vec3, vec4
@@ -457,12 +454,12 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 				WRITE(p, "  ivec2 patch_pos = ivec2(u, v);\n");
 				WRITE(p, "  for (int i = 0; i < 4; i++) {\n");
 				WRITE(p, "    for (int j = 0; j < 4; j++) {\n");
-				WRITE(p, "      int idx = (i + v%s) * spline_count_u + (j + u%s);\n", doBezier ? " * 3" : "", doBezier ? " * 3" : "");
-				WRITE(p, "      _pos[i * 4 + j] = tess_data.data[idx].pos.xyz;\n");
+				WRITE(p, "      int index = (i + v%s) * spline_count_u + (j + u%s);\n", doBezier ? " * 3" : "", doBezier ? " * 3" : "");
+				WRITE(p, "      _pos[i * 4 + j] = %s(u_tess_pos_tex, ivec2(index, 0), 0).xyz;\n", texelFetch);
 				if (doTexture && hasTexcoord && hasTexcoordTess)
-					WRITE(p, "      _tex[i * 4 + j] = tess_data.data[idx].uv.xy;\n");
+					WRITE(p, "      _tex[i * 4 + j] = %s(u_tess_tex_tex, ivec2(index, 0), 0).xy;\n", texelFetch);
 				if (hasColor && hasColorTess)
-					WRITE(p, "      _col[i * 4 + j] = tess_data.data[idx].color;\n");
+					WRITE(p, "      _col[i * 4 + j] = %s(u_tess_col_tex, ivec2(index, 0), 0).rgba;\n", texelFetch);
 				WRITE(p, "    }\n");
 				WRITE(p, "  }\n");
 				WRITE(p, "  vec2 tess_pos = position.xy;\n");
@@ -493,7 +490,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 					if (hasColorTess)
 						WRITE(p, "  vec4 col = tess_sample(_col, weights);\n");
 					else
-						WRITE(p, "  vec4 col = tess_data.data[0].color;\n");
+						WRITE(p, "  vec4 col = %s(u_tess_col_tex, ivec2(0, 0), 0).rgba;\n", texelFetch);
 				}
 				if (hasNormal) {
 					// Curved surface is probably always need to compute normal(not sampling from control points)

@@ -116,7 +116,6 @@ void DrawEngineGLES::InitDeviceObjects() {
 		frameData_[i].pushLight = render_->CreatePushBuffer(i, GL_UNIFORM_BUFFER, 64 * 1024);
 		frameData_[i].pushVertex = render_->CreatePushBuffer(i, GL_ARRAY_BUFFER, 1024 * 1024);
 		frameData_[i].pushIndex = render_->CreatePushBuffer(i, GL_ELEMENT_ARRAY_BUFFER, 256 * 1024);
-		frameData_[i].pushTess = render_->CreatePushBuffer(i, GL_SHADER_STORAGE_BUFFER, 256 * 1024);
 	}
 
 	//glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uboAlignment_);
@@ -146,10 +145,6 @@ void DrawEngineGLES::DestroyDeviceObjects() {
 			render_->DeletePushBuffer(frameData_[i].pushLight);
 			frameData_[i].pushLight = nullptr;
 		}
-		if (frameData_[i].pushTess) {
-			render_->DeletePushBuffer(frameData_[i].pushTess);
-			frameData_[i].pushTess = nullptr;
-		}
 	}
 
 	ClearTrackedVertexArrays();
@@ -173,9 +168,6 @@ void DrawEngineGLES::BeginFrame() {
 	frameData.pushLight->Begin();
 	frameData.pushIndex->Begin();
 	frameData.pushVertex->Begin();
-	frameData.pushTess->Begin();
-
-	((TessellationDataTransferGLES *)tessDataTransfer)->SetPushBuffer(frameData.pushTess);
 }
 
 void DrawEngineGLES::EndFrame() {
@@ -183,7 +175,8 @@ void DrawEngineGLES::EndFrame() {
 	frameData.pushLight->End();
 	frameData.pushIndex->End();
 	frameData.pushVertex->End();
-	frameData.pushTess->End();
+
+	tessDataTransfer->EndFrame();
 }
 
 struct GlTypeInfo {
@@ -541,15 +534,7 @@ rotateVBO:
 				indexBufferOffset = (uint32_t)frameData.pushIndex->Push(decIndex, sizeof(uint16_t) * indexGen.VertexCount(), &indexBuffer);
 				render_->BindIndexBuffer(indexBuffer);
 			}
-			int numInstances = 1;
-			if (gstate_c.bezier || gstate_c.spline) {
-				GLRBuffer *buf;
-				uint32_t offset;
-				uint32_t range;
-				((TessellationDataTransferGLES *)tessDataTransfer)->GetBufferAndOffset(&buf, &offset, &range);
-				render_->BindBufferRange(buf, 6, offset, range);
-				numInstances = numPatches;
-			}
+			int numInstances = (gstate_c.bezier || gstate_c.spline) ? numPatches : 1;
 			render_->DrawIndexed(glprim[prim], vertexCount, GL_UNSIGNED_SHORT, (GLvoid*)(intptr_t)indexBufferOffset, numInstances);
 		} else {
 			render_->Draw(glprim[prim], 0, vertexCount);
@@ -684,30 +669,51 @@ bool DrawEngineGLES::IsCodePtrVertexDecoder(const u8 *ptr) const {
 	return decJitCache_->IsInSpace(ptr);
 }
 
+void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float *pos, const float *tex, const float *col, int size, bool hasColor, bool hasTexCoords) {
+	// Removed the 1D texture support, it's unlikely to be relevant for performance.
+	//float pos[3];
+	if (data_tex[0])
+		renderManager_->DeleteTexture(data_tex[0]);
+	uint8_t *pos_data = new uint8_t[size * sizeof(float) * 4];
+	memcpy(pos_data, pos, size * sizeof(float) * 4);
+	data_tex[0] = renderManager_->CreateTexture(GL_TEXTURE_2D);
+	renderManager_->TextureImage(data_tex[0], 0, size, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT, pos_data, GLRAllocType::NEW, false);
+	renderManager_->FinalizeTexture(data_tex[0], 0, false);
+	renderManager_->BindTexture(TEX_SLOT_SPLINE_POS, data_tex[0]);
 
-void DrawEngineGLES::TessellationDataTransferGLES::PrepareBuffers(float *&pos, float *&tex, float *&col, int &posStride, int &texStride, int &colStride, int size, bool hasColor, bool hasTexCoords) {
-	colStride = 4;
+	// Texcoords
+	// float uv[2];
+	if (hasTexCoords) {
+		if (data_tex[1])
+			renderManager_->DeleteTexture(data_tex[1]);
+		uint8_t *tex_data = new uint8_t[size * sizeof(float) * 4];
+		//memcpy(tex_data, pos, size * sizeof(float) * 4);
+		// zhangwei
+		memcpy(tex_data, tex, size * sizeof(float) * 4);
+		data_tex[1] = renderManager_->CreateTexture(GL_TEXTURE_2D);
+		renderManager_->TextureImage(data_tex[1], 0, size, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT, tex_data, GLRAllocType::NEW, false);
+		renderManager_->FinalizeTexture(data_tex[1], 0, false);
+		renderManager_->BindTexture(TEX_SLOT_SPLINE_NRM, data_tex[1]);
+	}
 
-	// SSBOs that are not simply float1 or float2 need to be padded up to a float4 size. vec3 members
-	// also need to be 16-byte aligned, hence the padding.
-	struct TessData {
-		float pos[3]; float pad1;
-		float uv[2]; float pad2[2];
-		float color[4];
-	};
+	// float color[4];
+	if (data_tex[2])
+		renderManager_->DeleteTexture(data_tex[2]);
+	data_tex[2] = renderManager_->CreateTexture(GL_TEXTURE_2D);
+	int sizeColor = hasColor ? size : 1;
+	uint8_t *col_data = new uint8_t[sizeColor * sizeof(float) * 4];
+	memcpy(col_data, col, sizeColor * sizeof(float) * 4);
 
-	int ssboAlignment = 256;
-	uint8_t *data = (uint8_t *)push_->PushAligned(size * sizeof(TessData), &offset_, &buf_, ssboAlignment);
-	range_ = size * sizeof(TessData);
-
-	pos = (float *)(data);
-	tex = (float *)(data + offsetof(TessData, uv));
-	col = (float *)(data + offsetof(TessData, color));
-	posStride = sizeof(TessData) / sizeof(float);
-	colStride = hasColor ? (sizeof(TessData) / sizeof(float)) : 0;
-	texStride = sizeof(TessData) / sizeof(float);
+	renderManager_->TextureImage(data_tex[2], 0, sizeColor, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT, col_data, GLRAllocType::NEW, false);
+	renderManager_->FinalizeTexture(data_tex[2], 0, false);
+	renderManager_->BindTexture(TEX_SLOT_SPLINE_COL, data_tex[2]);
 }
 
-void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float *pos, const float *tex, const float *col, int size, bool hasColor, bool hasTexCoords) {
-	// Nothing to do here! The caller will write directly to the pushbuffer through the pointers it got through PrepareBuffers.
+void DrawEngineGLES::TessellationDataTransferGLES::EndFrame() {
+	for (int i = 0; i < 3; i++) {
+		if (data_tex[i]) {
+			renderManager_->DeleteTexture(data_tex[i]);
+			data_tex[i] = nullptr;
+		}
+	}
 }

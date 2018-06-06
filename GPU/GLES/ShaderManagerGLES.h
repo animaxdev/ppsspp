@@ -105,7 +105,10 @@ public:
 	// Lighting
 	int u_matambientalpha;
 
-	// Bezier and Spline
+
+	int u_tess_pos_tex;
+	int u_tess_tex_tex;
+	int u_tess_col_tex;
 	int u_spline_counts;
 };
 

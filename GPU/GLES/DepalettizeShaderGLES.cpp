@@ -47,7 +47,7 @@ static const char *depalVShader300 =
 "#version 320 es\n"
 "precision highp float;\n"
 #else
-"#version 450\n"
+"#version 330\n"
 #endif
 "layout(location = 0) in vec4 a_position;\n"
 "layout(location = 1) in vec2 a_texcoord0;\n"
