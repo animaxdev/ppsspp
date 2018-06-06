@@ -114,7 +114,7 @@ void Vulkan2D::DeviceRestore(VulkanContext *vulkan) {
 void Vulkan2D::BeginFrame() {
 	int curFrame = vulkan_->GetCurFrame();
 	FrameData& frame = frame_[curFrame];
-	if (frame.descPoolSize < frame.descCount + 64) {
+	if (frame.descPoolSize < frame.descCount + 512) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame.descPool, 0);
 		frame.descCount = 0;
 	}

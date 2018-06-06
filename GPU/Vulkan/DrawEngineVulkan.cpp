@@ -287,7 +287,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	vertexCache_->BeginNoReset();
 
-	if (frame->descPoolSize < frame->descCount + 624) {
+	if (frame->descPoolSize < frame->descCount + 1024) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
 		frame->descCount = 0;
 	}

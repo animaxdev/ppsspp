@@ -245,7 +245,7 @@ private:
 
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 		int descCount = 0;
-		int descPoolSize = 4096;  // We double this before we allocate so we initialize this to half the size we want.
+		int descPoolSize = 2048;  // We double this before we allocate so we initialize this to half the size we want.
 
 		VulkanPushBuffer *pushUBO = nullptr;
 		VulkanPushBuffer *pushTess = nullptr;

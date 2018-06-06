@@ -114,7 +114,7 @@ private:
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 		int descCount = 0;
-		int descPoolSize = 512;
+		int descPoolSize = 1024;
 	};
 	VkResult RecreateDescriptorPool(FrameData &frame);
 
