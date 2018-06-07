@@ -847,7 +847,7 @@ void VKContext::BeginFrame() {
 	allocator_->Begin();
 
 
-	if (frame.descPoolSize < frame.descCount + 64) {
+	if (frame.descPoolSize < frame.descCount + 128) {
 		vkResetDescriptorPool(device_, frame.descPool, 0);
 		frame.descCount = 0;
 	}
