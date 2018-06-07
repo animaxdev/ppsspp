@@ -1055,7 +1055,7 @@ void FramebufferManagerCommon::DecimateFBOs() {
 		int age = frameLastFramebufUsed_ - it->second.last_frame_used;
 		if (age > FBO_OLD_AGE) {
 			it->second.fbo->Release();
-			tempFBOs_.erase(it++);
+			it = tempFBOs_.erase(it);
 		} else {
 			++it;
 		}
