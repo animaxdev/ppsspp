@@ -114,7 +114,7 @@ void DrawEngineGLES::InitDeviceObjects() {
 
 	for (int i = 0; i < GLRenderManager::MAX_INFLIGHT_FRAMES; i++) {
 		frameData_[i].pushLight = render_->CreatePushBuffer(i, GL_UNIFORM_BUFFER, 64 * 1024);
-		frameData_[i].pushVertex = render_->CreatePushBuffer(i, GL_ARRAY_BUFFER, 1024 * 1024);
+		frameData_[i].pushVertex = render_->CreatePushBuffer(i, GL_ARRAY_BUFFER, 4 * 1024 * 1024);
 		frameData_[i].pushIndex = render_->CreatePushBuffer(i, GL_ELEMENT_ARRAY_BUFFER, 256 * 1024);
 	}
 
