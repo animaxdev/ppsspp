@@ -866,7 +866,7 @@ void DrawEngineVulkan::DoFlush() {
 	} else {
 		PROFILE_THIS_SCOPE("soft");
 		// Decode to "decoded"
-		DecodeVertsToPushBuffer(nullptr, nullptr, nullptr);
+		DecodeVerts(decoded);
 		bool hasColor = (lastVType_ & GE_VTYPE_COL_MASK) != GE_VTYPE_COL_NONE;
 		if (gstate.isModeThrough()) {
 			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && (hasColor || gstate.getMaterialAmbientA() == 255);

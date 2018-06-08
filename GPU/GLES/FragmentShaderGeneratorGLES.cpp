@@ -101,9 +101,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 		}
 
 		WRITE(p, "precision highp float;\n");
-		if (shaderDepal) {
-			WRITE(p, "precision highp int;\n");
-		}
+		WRITE(p, "precision highp int;\n");
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
 			if (gl_extensions.VersionGEThan(3, 3, 0)) {

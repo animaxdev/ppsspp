@@ -97,6 +97,7 @@ void GenerateVertexShader(const VShaderID &id, char *buffer, uint32_t *attrMask,
 	if (gl_extensions.IsGLES) {
 		WRITE(p, "#version 320 es\n");
 		WRITE(p, "precision highp float;\n");
+		WRITE(p, "precision highp int;\n");
 		texelFetch = "texelFetch";
 	} else {
 		if (!gl_extensions.ForceGL2 || gl_extensions.IsCoreContext) {
