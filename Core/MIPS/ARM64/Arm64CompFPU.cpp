@@ -81,8 +81,9 @@ void Arm64Jit::Comp_FPU3op(MIPSOpcode op) {
 void Arm64Jit::Comp_FPULS(MIPSOpcode op)
 {
 	CONDITIONAL_DISABLE;
+#ifndef MOBILE_DEVICE
 	CheckMemoryBreakpoint();
-
+#endif
 	// Surprisingly, these work fine alraedy.
 
 	s32 offset = (s16)(op & 0xFFFF);

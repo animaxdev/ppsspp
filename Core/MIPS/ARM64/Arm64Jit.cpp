@@ -186,16 +186,19 @@ void Arm64Jit::EatInstruction(MIPSOpcode op) {
 	if (js.inDelaySlot) {
 		ERROR_LOG_REPORT_ONCE(ateInDelaySlot, JIT, "Ate an instruction inside a delay slot.");
 	}
-
+#ifndef MOBILE_DEVICE
 	CheckJitBreakpoint(GetCompilerPC() + 4, 0);
+#endif
 	js.numInstructions++;
 	js.compilerPC += 4;
 	js.downcountAmount += MIPSGetInstructionCycleEstimate(op);
 }
 
 void Arm64Jit::CompileDelaySlot(int flags) {
+#ifndef MOBILE_DEVICE
 	// Need to offset the downcount which was already incremented for the branch + delay slot.
 	CheckJitBreakpoint(GetCompilerPC() + 4, -2);
+#endif
 
 	// preserve flag around the delay slot! Maybe this is not always necessary on ARM where 
 	// we can (mostly) control whether we set the flag or not. Of course, if someone puts an slt in to the
@@ -325,8 +328,10 @@ const u8 *Arm64Jit::DoJit(u32 em_address, JitBlock *b) {
 	js.numInstructions = 0;
 	while (js.compiling) {
 		gpr.SetCompilerPC(GetCompilerPC());  // Let it know for log messages
+#ifndef MOBILE_DEVICE
 		// Jit breakpoints are quite fast, so let's do them in release too.
 		CheckJitBreakpoint(GetCompilerPC(), 0);
+#endif
 
 		MIPSOpcode inst = Memory::Read_Opcode_JIT(GetCompilerPC());
 		js.downcountAmount += MIPSGetInstructionCycleEstimate(inst);
