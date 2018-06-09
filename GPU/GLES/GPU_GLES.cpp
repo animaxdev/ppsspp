@@ -99,6 +99,7 @@ GPU_GLES::GPU_GLES(GraphicsContext *gfxCtx, Draw::DrawContext *draw)
 
 	// Load shader cache.
 	std::string discID = g_paramSFO.GetDiscID();
+	DEBUG_LOG(G3D, "GPU_GLES discID size: %d", discID.size());
 	if (discID.size()) {
 		File::CreateFullPath(GetSysDirectory(DIRECTORY_APP_CACHE));
 		shaderCachePath_ = GetSysDirectory(DIRECTORY_APP_CACHE) + "/" + discID + ".glshadercache";
@@ -128,13 +129,15 @@ GPU_GLES::~GPU_GLES() {
 	// If we're here during app shutdown (exiting the Windows app in-game, for example)
 	// everything should already be cleared since DeviceLost has been run.
 
+	if (!shaderCachePath_.empty() && draw_) {
+		shaderManagerGL_->Save(shaderCachePath_);
+	}
+
 	framebufferManagerGL_->DestroyAllFBOs();
 	shaderManagerGL_->ClearCache(true);
 	depalShaderCache_.Clear();
 	fragmentTestCache_.Clear();
-	if (!shaderCachePath_.empty() && draw_) {
-		shaderManagerGL_->Save(shaderCachePath_);
-	}
+
 	delete shaderManagerGL_;
 	shaderManagerGL_ = nullptr;
 	delete framebufferManagerGL_;
@@ -425,11 +428,6 @@ void GPU_GLES::BeginFrame() {
 	fragmentTestCache_.Decimate();
 
 	//GPUCommon::BeginFrame();
-
-	// Save the cache from time to time. TODO: How often? We save on exit, so shouldn't need to do this all that often.
-	if (!shaderCachePath_.empty() && (gpuStats.numFlips & 4095) == 0) {
-		shaderManagerGL_->Save(shaderCachePath_);
-	}
 
 	shaderManagerGL_->DirtyShader();
 

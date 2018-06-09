@@ -138,11 +138,11 @@ void DrawEngineVulkan::InitDeviceObjects() {
 	// if creating and updating them turns out to be expensive.
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		// We now create descriptor pools on demand, so removed from here.
-		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 4 * 1024 * 1024);
+		frame_[i].pushUBO = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 1 * 1024 * 1024);
+		frame_[i].pushTess = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 1 * 1024 * 1024);
 		frame_[i].pushVertex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 4 * 1024 * 1024);
-		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 1 * 1024 * 1024);
+		frame_[i].pushIndex = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 2 * 1024 * 1024);
+		frame_[i].pushOther = new VulkanPushBuffer(vulkan_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 2 * 1024 * 1024);
 	}
 
 	VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -287,7 +287,7 @@ void DrawEngineVulkan::BeginFrame() {
 
 	vertexCache_->BeginNoReset();
 
-	if (frame->descPoolSize < frame->descCount + 624) {
+	if (frame->descPoolSize < frame->descCount + 1024) {
 		vkResetDescriptorPool(vulkan_->GetDevice(), frame->descPool, 0);
 		frame->descCount = 0;
 	}
@@ -609,11 +609,15 @@ void DrawEngineVulkan::DoFlush() {
 		textureCache_->SetTexture();
 		gstate_c.Clean(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS);
 		textureNeedsApply = true;
+	} else if (gstate.getTextureAddress(0) == ((gstate.getFrameBufRawAddress() | 0x04000000) & 0x3FFFFFFF)) {
+		// This catches the case of clearing a texture.
+		gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
 	}
 
 	GEPrimitiveType prim = prevPrim_;
 
-	bool useHWTransform = CanUseHardwareTransform(prim);
+	// Always use software for flat shading to fix the provoking index.
+	bool useHWTransform = CanUseHardwareTransform(prim) && gstate.getShadeMode() != GE_SHADE_FLAT;
 
 	VulkanVertexShader *vshader = nullptr;
 	VulkanFragmentShader *fshader = nullptr;
@@ -862,7 +866,7 @@ void DrawEngineVulkan::DoFlush() {
 	} else {
 		PROFILE_THIS_SCOPE("soft");
 		// Decode to "decoded"
-		DecodeVertsToPushBuffer(nullptr, nullptr, nullptr);
+		DecodeVerts(decoded);
 		bool hasColor = (lastVType_ & GE_VTYPE_COL_MASK) != GE_VTYPE_COL_NONE;
 		if (gstate.isModeThrough()) {
 			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && (hasColor || gstate.getMaterialAmbientA() == 255);
@@ -892,6 +896,7 @@ void DrawEngineVulkan::DoFlush() {
 		// do not respect scissor rects.
 		params.allowClear = g_Config.iRenderingMode != 0;
 		params.allowSeparateAlphaClear = false;
+		params.provokeFlatFirst = true;
 
 		int maxIndex = indexGen.MaxIndex();
 		SoftwareTransform(
@@ -1039,7 +1044,7 @@ void DrawEngineVulkan::TessellationDataTransferVulkan::PrepareBuffers(float *&po
 		float color[4];
 	};
 
-	int ssboAlignment = vulkan_->GetPhysicalDeviceProperties().limits.minStorageBufferOffsetAlignment;
+	int ssboAlignment = vulkan_->GetPhysicalDeviceProperties(vulkan_->GetCurrentPhysicalDevice()).limits.minStorageBufferOffsetAlignment;
 	uint8_t *data = (uint8_t *)push_->PushAligned(size * sizeof(TessData), &offset_, &buf_, ssboAlignment);
 	range_ = size * sizeof(TessData);
 

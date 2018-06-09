@@ -106,6 +106,8 @@ public:
 	};
 
 	GLuint program = 0;
+	GLenum binaryFormat_ = 0;
+	std::string binaryProgram_;
 	std::vector<Semantic> semantics_;
 	std::vector<UniformLocQuery> queries_;
 	std::vector<Initializer> initialize_;
@@ -129,6 +131,7 @@ public:
 		}
 		return loc;
 	}
+
 	std::unordered_map<std::string, UniformInfo> uniformCache_;
 };
 

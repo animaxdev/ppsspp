@@ -81,14 +81,15 @@ void Arm64Jit::Comp_FPU3op(MIPSOpcode op) {
 void Arm64Jit::Comp_FPULS(MIPSOpcode op)
 {
 	CONDITIONAL_DISABLE;
-
+#ifndef MOBILE_DEVICE
+	CheckMemoryBreakpoint();
+#endif
 	// Surprisingly, these work fine alraedy.
 
 	s32 offset = (s16)(op & 0xFFFF);
 	int ft = _FT;
 	MIPSGPReg rs = _RS;
 	// u32 addr = R(rs) + offset;
-	// logBlocks = 1;
 	std::vector<FixupBranch> skips;
 	switch (op >> 26) {
 	case 49: //FI(ft) = Memory::Read_U32(addr); break; //lwc1
