@@ -524,8 +524,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 			clockwise = false;
 		}
 		indexGen.AddPrim(dc.prim, dc.vertexCount, clockwise);
-	} 
-	else {
+	} else {
 		// It's fairly common that games issue long sequences of PRIM calls, with differing
 		// inds pointer but the same base vertex pointer. We'd like to reuse vertices between
 		// these as much as possible, so we make sure here to combine as many as possible
