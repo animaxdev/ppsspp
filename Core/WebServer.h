@@ -17,8 +17,9 @@
 
 enum class WebServerFlags {
 	DISCS = 1,
+	DEBUGGER = 2,
 
-	ALL =  1,
+	ALL =  1 | 2,
 };
 
 bool StartWebServer(WebServerFlags flags);

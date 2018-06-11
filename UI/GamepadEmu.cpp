@@ -100,7 +100,7 @@ void MultiTouchButton::Draw(UIContext &dc) {
 
 	float scale = scale_;
 	if (IsDown()) {
-		scale *= 2.0f;
+		scale *= 1.5f;
 		opacity *= 1.15f;
 	}
 
@@ -279,7 +279,7 @@ void PSPDpad::Draw(UIContext &dc) {
 		float x2 = bounds_.centerX() + xoff[i] * (r + 10.f * scale_);
 		float y2 = bounds_.centerY() + yoff[i] * (r + 10.f * scale_);
 		float angle = i * M_PI / 2;
-		float imgScale = (buttons & dir[i]) ? scale_ * 2 : scale_;
+		float imgScale = (buttons & dir[i]) ? scale_ * 1.5 : scale_;
 		dc.Draw()->DrawImageRotated(arrowIndex_, x, y, imgScale, angle + PI, colorBg, false);
 		if (overlayIndex_ != -1)
 			dc.Draw()->DrawImageRotated(overlayIndex_, x2, y2, imgScale, angle + PI, color);
