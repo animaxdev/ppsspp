@@ -1605,6 +1605,12 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_BASE:
 			gstate.cmdmem[GE_CMD_BASE] = data;
 			break;
+		case GE_CMD_CULLFACEENABLE:
+			// Earth Defence Force 2
+			if (gstate.cmdmem[GE_CMD_CULLFACEENABLE] != data) {
+				goto bail;
+			}
+			break;
 		case GE_CMD_CULL:
 			// flip face by indices for GE_PRIM_TRIANGLE_STRIP
 			cullMode = data & 1;
