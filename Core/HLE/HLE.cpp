@@ -504,7 +504,7 @@ void *GetQuickSyscallFunc(MIPSOpcode op)
 	u32 callno = (op >> 6) & 0xFFFFF; //20 bits
 	const HLEFunction *info = &moduleDB[(callno & 0xFF000) >> 12].funcTable[callno & 0xFFF];
 #endif
-	return op != idleOp ? (void *)&CallSyscallWithFlags : (void *)info->func;
+	return (op != idleOp && info->func) ? (void *)&CallSyscallWithFlags : (void *)info->func;
 }
 
 static double hleSteppingTime = 0.0;
