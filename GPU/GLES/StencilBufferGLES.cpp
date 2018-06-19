@@ -23,37 +23,22 @@
 #include "GPU/GLES/TextureCacheGLES.h"
 
 static const char *stencil_fs =
-"#ifdef GL_ES\n"
-"precision highp float;\n"
-"#endif\n"
-"#if __VERSION__ >= 130\n"
-"#define varying in\n"
-"#define texture2D texture\n"
-"#define gl_FragColor fragColor0\n"
 "out vec4 fragColor0;\n"
-"#endif\n"
-"varying vec2 v_texcoord0;\n"
+"in vec2 v_texcoord0;\n"
 "uniform float u_stencilValue;\n"
 "uniform sampler2D tex;\n"
 "float roundAndScaleTo255f(in float x) { return floor(x * 255.99); }\n"
 "void main() {\n"
-"  vec4 index = texture2D(tex, v_texcoord0);\n"
-"  gl_FragColor = vec4(index.a);\n"
+"  vec4 index = texture(tex, v_texcoord0);\n"
+"  fragColor0 = vec4(index.a);\n"
 "  float shifted = roundAndScaleTo255f(index.a) / roundAndScaleTo255f(u_stencilValue);\n"
 "  if (mod(floor(shifted), 2.0) < 0.99) discard;\n"
 "}\n";
 
 static const char *stencil_vs =
-"#ifdef GL_ES\n"
-"precision highp float;\n"
-"#endif\n"
-"#if __VERSION__ >= 130\n"
-"#define attribute in\n"
-"#define varying out\n"
-"#endif\n"
-"attribute vec4 a_position;\n"
-"attribute vec2 a_texcoord0;\n"
-"varying vec2 v_texcoord0;\n"
+"layout(location = 0) in vec4 a_position;\n"
+"layout(location = 1) in vec2 a_texcoord0;\n"
+"out vec2 v_texcoord0;\n"
 "void main() {\n"
 "  v_texcoord0 = a_texcoord0;\n"
 "  gl_Position = a_position;\n"
@@ -127,8 +112,8 @@ bool FramebufferManagerGLES::NotifyStencilUpload(u32 addr, int size, bool skipZe
 		shaders.push_back(render_->CreateShader(GL_VERTEX_SHADER, vs_code, "stencil"));
 		shaders.push_back(render_->CreateShader(GL_FRAGMENT_SHADER, fs_code, "stencil"));
 		std::vector<GLRProgram::Semantic> semantics;
-		semantics.push_back({ 0, "a_position" });
-		semantics.push_back({ 1, "a_texcoord0" });
+		//semantics.push_back({ 0, "a_position" });
+		//semantics.push_back({ 1, "a_texcoord0" });
 		std::vector<GLRProgram::UniformLocQuery> queries;
 		queries.push_back({ &u_stencilUploadTex, "tex" });
 		queries.push_back({ &u_stencilValue, "u_stencilValue" });

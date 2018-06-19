@@ -48,19 +48,11 @@
 #include "GPU/GLES/ShaderManagerGLES.h"
 
 static const char tex_fs[] =
-	"#if __VERSION__ >= 130\n"
-	"#define varying in\n"
-	"#define texture2D texture\n"
-	"#define gl_FragColor fragColor0\n"
 	"out vec4 fragColor0;\n"
-	"#endif\n"
-	"#ifdef GL_ES\n"
-	"precision highp float;\n"
-	"#endif\n"
 	"uniform sampler2D sampler0;\n"
 	"in vec2 v_texcoord0;\n"
 	"void main() {\n"
-	"  gl_FragColor = texture2D(sampler0, v_texcoord0);\n"
+	"  fragColor0 = texture(sampler0, v_texcoord0);\n"
 	"}\n";
 
 static const char basic_vs[] =
