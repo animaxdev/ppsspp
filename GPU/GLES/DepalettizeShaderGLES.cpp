@@ -25,30 +25,7 @@
 #include "GPU/GLES/TextureCacheGLES.h"
 #include "GPU/Common/DepalettizeShaderCommon.h"
 
-#ifdef _WIN32
-#define SHADERLOG
-#endif
-
-static const char *depalVShader100 =
-#ifdef USING_GLES2
-"#version 100\n"
-"precision highp float;\n"
-#endif
-"attribute vec4 a_position;\n"
-"attribute vec2 a_texcoord0;\n"
-"varying vec2 v_texcoord0;\n"
-"void main() {\n"
-"  v_texcoord0 = a_texcoord0;\n"
-"  gl_Position = a_position;\n"
-"}\n";
-
 static const char *depalVShader300 =
-#ifdef USING_GLES2
-"#version 320 es\n"
-"precision highp float;\n"
-#else
-"#version 450\n"
-#endif
 "layout(location = 0) in vec4 a_position;\n"
 "layout(location = 1) in vec2 a_texcoord0;\n"
 "out vec2 v_texcoord0;\n"
@@ -75,8 +52,14 @@ void DepalShaderCacheGLES::DeviceRestore(Draw::DrawContext *draw) {
 }
 
 bool DepalShaderCacheGLES::CreateVertexShader() {
-	std::string src(useGL3_ ? depalVShader300 : depalVShader100);
-	vertexShader_ = render_->CreateShader(GL_VERTEX_SHADER, src, "depal");
+	std::string src(depalVShader300);
+	std::string prelude;
+	if (gl_extensions.IsGLES) {
+		prelude = "#version 320 es\n";
+	} else if (useGL3_) {
+		prelude = "#version 450\n";
+	}
+	vertexShader_ = render_->CreateShader(GL_VERTEX_SHADER, prelude + src, "depal");
 	return true;
 }
 
