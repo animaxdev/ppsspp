@@ -29,6 +29,7 @@
 #include "ui/ui_context.h"
 #include "ui/view.h"
 #include "ui/viewgroup.h"
+#include "util/text/utf8.h"
 
 #include "Common/FileUtil.h"
 #include "Core/System.h"
@@ -74,6 +75,47 @@
 
 #include <sstream>
 
+
+static bool IsTempPath(const std::string &str) {
+	std::string item = str;
+
+	const auto testPath = [&](std::string temp) {
+#ifdef _WIN32
+		temp = ReplaceAll(temp, "/", "\\");
+		if (!temp.empty() && temp[temp.size() - 1] != '\\')
+			temp += "\\";
+#else
+		if (!temp.empty() && temp[temp.size() - 1] != '/')
+			temp += "/";
+#endif
+		return startsWith(item, temp);
+	};
+
+	const auto testCPath = [&](const char *temp) {
+		if (temp && temp[0])
+			return testPath(temp);
+		return false;
+	};
+
+#ifdef _WIN32
+	// Normalize slashes.
+	item = ReplaceAll(str, "/", "\\");
+
+	wchar_t tempPath[MAX_PATH];
+	GetTempPath(MAX_PATH, tempPath);
+	if (testPath(ConvertWStringToUTF8(tempPath)))
+		return true;
+#endif
+
+	if (testCPath(getenv("TMPDIR")))
+		return true;
+	if (testCPath(getenv("TMP")))
+		return true;
+	if (testCPath(getenv("TEMP")))
+		return true;
+
+	return false;
+}
 
 class GameButton : public UI::Clickable {
 public:
@@ -768,6 +810,7 @@ void MainScreen::CreateViews() {
 
 	bool showRecent = g_Config.iMaxRecent > 0;
 	bool hasStorageAccess = System_GetPermissionStatus(SYSTEM_PERMISSION_STORAGE) == PERMISSION_STATUS_GRANTED;
+	bool storageIsTemporary = IsTempPath(GetSysDirectory(DIRECTORY_SAVEDATA)) && !confirmedTemporary_;
 	if (showRecent && !hasStorageAccess) {
 		showRecent = !g_Config.recentIsos.empty();
 	}
@@ -785,7 +828,7 @@ void MainScreen::CreateViews() {
 		tabRecentGames->OnHighlight.Handle(this, &MainScreen::OnGameHighlight);
 	}
 
-	Button *grantStorageButton = nullptr;
+	Button *focusButton = nullptr;
 	if (hasStorageAccess) {
 		ScrollView *scrollAllGames = new ScrollView(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT));
 		scrollAllGames->SetTag("MainScreenAllGames");
@@ -813,8 +856,9 @@ void MainScreen::CreateViews() {
 
 		LinearLayout *buttonHolder = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 		buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
-		grantStorageButton = new Button(mm->T("Give PPSSPP permission to access storage"), new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-		buttonHolder->Add(grantStorageButton)->OnClick.Handle(this, &MainScreen::OnAllowStorage);
+		focusButton = new Button(mm->T("Give PPSSPP permission to access storage"), new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+		focusButton->SetPadding(32, 16);
+		buttonHolder->Add(focusButton)->OnClick.Handle(this, &MainScreen::OnAllowStorage);
 		buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
 
 		leftColumn->Add(new Spacer(new LinearLayoutParams(0.1f)));
@@ -873,8 +917,8 @@ void MainScreen::CreateViews() {
 		root_->Add(rightColumn);
 	}
 
-	if (grantStorageButton) {
-		root_->SetDefaultFocusView(grantStorageButton);
+	if (focusButton) {
+		root_->SetDefaultFocusView(focusButton);
 	} else if (tabHolder_->GetVisibility() != V_GONE) {
 		root_->SetDefaultFocusView(tabHolder_);
 	}

@@ -37,6 +37,7 @@
 #include "Core/System.h"
 #include "Core/Debugger/Breakpoints.h"
 #include "Core/MIPS/MIPS.h"
+#include "GPU/Debugger/Stepping.h"
 
 #ifdef _WIN32
 #include "Common/CommonWindows.h"
@@ -54,7 +55,8 @@ static std::condition_variable m_InactiveCond;
 static std::mutex m_hInactiveMutex;
 static bool singleStepPending = false;
 static int steppingCounter = 0;
-static std::set<CoreLifecycleFunc> shutdownFuncs;
+static std::set<CoreLifecycleFunc> lifecycleFuncs;
+static std::set<CoreStopRequestFunc> stopFuncs;
 static bool windowHidden = false;
 static double lastActivity = 0.0;
 static double lastKeepAwake = 0.0;
@@ -76,17 +78,24 @@ void Core_NotifyActivity() {
 }
 
 void Core_ListenLifecycle(CoreLifecycleFunc func) {
-	shutdownFuncs.insert(func);
+	lifecycleFuncs.insert(func);
 }
 
 void Core_NotifyLifecycle(CoreLifecycle stage) {
-	for (auto it = shutdownFuncs.begin(); it != shutdownFuncs.end(); ++it) {
-		(*it)(stage);
+	for (auto func : lifecycleFuncs) {
+		func(stage);
 	}
+}
+
+void Core_ListenStopRequest(CoreStopRequestFunc func) {
+	stopFuncs.insert(func);
 }
 
 void Core_Stop() {
 	Core_UpdateState(CORE_POWERDOWN);
+	for (auto func : stopFuncs) {
+		func();
+	}
 }
 
 bool Core_IsStepping() {
@@ -271,6 +280,9 @@ void Core_ProcessStepping() {
 	if (coreState != CORE_STEPPING) {
 		return;
 	}
+
+	// Or any GPU actions.
+	GPUStepping::SingleStep();
 
 	// We're not inside jit now, so it's safe to clear the breakpoints.
 	CBreakPoints::ClearTemporaryBreakPoints();

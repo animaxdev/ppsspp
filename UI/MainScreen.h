@@ -115,6 +115,7 @@ protected:
 	bool backFromStore_;
 	bool lockBackgroundAudio_;
 	bool lastVertical_;
+	bool confirmedTemporary_ = false;
 
 	friend class RemoteISOBrowseScreen;
 };
