@@ -1511,6 +1511,15 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 #endif
 
 	void *verts = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
+	if (prim == GE_PRIM_RECTANGLES && g_Config.bDisableSlowFramebufEffects) {
+		// killzone
+		short* pos = (short*)verts;
+		if (pos[0] > 479 || pos[2] > 479) {
+			DEBUG_LOG(G3D, "slow effect skip RECTANGLE");
+			return;
+		}
+	}
+
 	void *inds = 0;
 	u32 vertexType = gstate.vertType;
 	if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
