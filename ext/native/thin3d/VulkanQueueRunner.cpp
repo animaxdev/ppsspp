@@ -364,9 +364,9 @@ void VulkanQueueRunner::RunSteps(VkCommandBuffer cmd, std::vector<VKRStep *> &st
 			ApplySonicHack(steps);
 		}
 		if (hacksEnabled_ & QUEUE_HACK_KILL_ZONE) {
-			//ApplyKZLHack(steps);
+			// ApplyKZLHack(steps);
 			// for disable slower effects
-			ApplySonicHack(steps);
+			// ApplySonicHack(steps);
 		}
 	}
 

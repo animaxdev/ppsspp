@@ -1511,12 +1511,18 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 #endif
 
 	void *verts = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
-	if (prim == GE_PRIM_RECTANGLES && g_Config.bDisableSlowFramebufEffects) {
+	if (PSP_CoreParameter().compat.flags().KillZoneHack) {
 		// killzone
-		short* pos = (short*)verts;
-		if (pos[0] > 479 || pos[2] > 479) {
-			DEBUG_LOG(G3D, "slow effect skip RECTANGLE");
-			return;
+		if (prim == GE_PRIM_RECTANGLES) {
+			short* pos = (short*)verts;
+			if (pos[0] > 479 || pos[2] > 479) {
+				return;
+			}
+		}
+		else if (prim == GE_PRIM_TRIANGLE_STRIP) {
+			if (0x12000183 == gstate.vertType) {
+				return;
+			}
 		}
 	}
 
