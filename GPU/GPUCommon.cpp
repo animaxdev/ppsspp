@@ -1721,7 +1721,8 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 
 	void *control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 	void *indices = NULL;
-	if ((gstate.vertType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
+	u32 vertexType = gstate.vertType;
+	if ((vertexType & GE_VTYPE_IDX_MASK) != GE_VTYPE_IDX_NONE) {
 		if (!Memory::IsValidAddress(gstate_c.indexAddr)) {
 			ERROR_LOG_REPORT(G3D, "Bad index address %08x!", gstate_c.indexAddr);
 			return;
@@ -1729,8 +1730,8 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 		indices = Memory::GetPointerUnchecked(gstate_c.indexAddr);
 	}
 
-	if (vertTypeIsSkinningEnabled(gstate.vertType)) {
-		DEBUG_LOG_REPORT(G3D, "Unusual bezier/spline vtype: %08x, morph: %d, bones: %d", gstate.vertType, (gstate.vertType & GE_VTYPE_MORPHCOUNT_MASK) >> GE_VTYPE_MORPHCOUNT_SHIFT, vertTypeGetNumBoneWeights(gstate.vertType));
+	if (vertTypeIsSkinningEnabled(vertexType)) {
+		DEBUG_LOG_REPORT(G3D, "Unusual bezier/spline vtype: %08x, morph: %d, bones: %d", vertexType, (vertexType & GE_VTYPE_MORPHCOUNT_MASK) >> GE_VTYPE_MORPHCOUNT_SHIFT, vertTypeGetNumBoneWeights(vertexType));
 	}
 
 	GEPatchPrimType patchPrim = gstate.getPatchPrimitiveType();
@@ -1742,8 +1743,8 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 	bool patchFacing = gstate.patchfacing & 1;
 
 	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
-		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		gstate_c.bezier = true;
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		if (gstate_c.spline_count_u != bz_ucount) {
 			gstate_c.Dirty(DIRTY_BEZIERSPLINE);
 			gstate_c.spline_count_u = bz_ucount;
@@ -1752,15 +1753,54 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 
 	int bytesRead = 0;
 	UpdateUVScaleOffset();
-	drawEngineCommon_->SubmitBezier(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, gstate.vertType, &bytesRead);
-
-	if (gstate_c.bezier)
-		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
-	gstate_c.bezier = false;
+	drawEngineCommon_->SubmitBezier(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 
 	// After drawing, we advance pointers - see SubmitPrim which does the same.
 	int count = bz_ucount * bz_vcount;
-	AdvanceVerts(gstate.vertType, count, bytesRead);
+	AdvanceVerts(vertexType, count, bytesRead);
+
+	// Pursuit Force
+	int cmdCount = 0;
+	const u32 *src = (const u32 *)Memory::GetPointerUnchecked(currentList->pc + 4);
+	const u32 *stall = currentList->stall ? (const u32 *)Memory::GetPointerUnchecked(currentList->stall) : 0;
+	while (src != stall) {
+		uint32_t data = *src;
+		switch (data >> 24) {
+		case GE_CMD_BEZIER:
+			if (gstate_c.bezier) {
+				drawEngineCommon_->DispatchFlush();
+			}
+			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
+			drawEngineCommon_->SubmitBezier(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+			AdvanceVerts(vertexType, count, bytesRead);
+			break;
+		case GE_CMD_VERTEXTYPE:
+			vertexType = data;
+			break;
+		case GE_CMD_VADDR:
+			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
+			break;
+		case GE_CMD_BASE:
+			gstate.cmdmem[GE_CMD_BASE] = data;
+			break;
+		default:
+			goto bail;
+		}
+		cmdCount += 1;
+		src += 1;
+	}
+
+bail:
+	if (gstate_c.bezier) {
+		gstate_c.bezier = false;
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
+	}
+
+	// Skip over the commands we just read out manually.
+	if (cmdCount > 0) {
+		UpdatePC(currentList->pc, currentList->pc + cmdCount * 4);
+		currentList->pc += cmdCount * 4;
+	}
 }
 
 void GPUCommon::Execute_Spline(u32 op, u32 diff) {
@@ -1812,8 +1852,8 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 	UpdateUVScaleOffset();
 
 	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
-		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		gstate_c.spline = true;
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		bool countsChanged = gstate_c.spline_count_u != sp_ucount || gstate_c.spline_count_v != sp_vcount;
 		bool typesChanged = gstate_c.spline_type_u != sp_utype || gstate_c.spline_type_v != sp_vtype;
 		if (countsChanged || typesChanged) {
@@ -1867,8 +1907,8 @@ bail:
 	drawEngineCommon_->SubmitSplineEnd();
 
 	if (gstate_c.spline) {
-		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 		gstate_c.spline = false;
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
 	}
 	
 	// Skip over the commands we just read out manually.
