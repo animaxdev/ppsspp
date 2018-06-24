@@ -57,7 +57,7 @@ void VulkanQueueRunner::ResizeReadbackBuffer(VkDeviceSize requiredSize) {
 
 	VkFlags typeReqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	bool success = vulkan_->MemoryTypeFromProperties(reqs.memoryTypeBits, typeReqs, &alloc.memoryTypeIndex);
-	assert(success);
+	_assert_(success);
 	vkAllocateMemory(device, &alloc, nullptr, &readbackMemory_);
 
 	uint32_t offset = 0;
@@ -66,7 +66,6 @@ void VulkanQueueRunner::ResizeReadbackBuffer(VkDeviceSize requiredSize) {
 
 void VulkanQueueRunner::DestroyDeviceObjects() {
 	ILOG("VulkanQueueRunner::DestroyDeviceObjects");
-	VkDevice device = vulkan_->GetDevice();
 	vulkan_->Delete().QueueDeleteDeviceMemory(readbackMemory_);
 	vulkan_->Delete().QueueDeleteBuffer(readbackBuffer_);
 	readbackBufferSize_ = 0;
@@ -152,7 +151,7 @@ void VulkanQueueRunner::InitBackbufferRenderPass() {
 	rp_info.pDependencies = &dep;
 
 	VkResult res = vkCreateRenderPass(vulkan_->GetDevice(), &rp_info, nullptr, &backbufferRenderPass_);
-	assert(res == VK_SUCCESS);
+	_assert_(res == VK_SUCCESS);
 }
 
 VkRenderPass VulkanQueueRunner::GetRenderPass(const RPKey &key) {
@@ -319,6 +318,9 @@ VkRenderPass VulkanQueueRunner::GetRenderPass(const RPKey &key) {
 	case VK_IMAGE_LAYOUT_UNDEFINED:
 	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
 		// Nothing to do.
+		break;
+	default:
+		_dbg_assert_msg_(G3D, false, "GetRenderPass: Unexpected final color layout %d", (int)key.finalColorLayout);
 		break;
 	}
 
@@ -653,6 +655,9 @@ void VulkanQueueRunner::LogRenderPass(const VKRStep &pass) {
 		case VKRRenderCommand::PUSH_CONSTANTS:
 			ILOG("    PushConstants(%d)", cmd.push.size);
 			break;
+
+		case VKRRenderCommand::NUM_RENDER_COMMANDS:
+			break;
 		}
 	}
 	ILOG("RenderPass End(%x), commands: %d", fb, pass.commands.size());
@@ -705,9 +710,8 @@ void VulkanQueueRunner::PerformRenderPass(const VKRStep &step, VkCommandBuffer c
 			barrier.subresourceRange.layerCount = 1;
 			barrier.subresourceRange.levelCount = 1;
 			barrier.image = iter.fb->color.image;
-			barrier.srcAccessMask = 0;
-			VkPipelineStageFlags srcStage;
-			VkPipelineStageFlags dstStage;
+			VkPipelineStageFlags srcStage{};
+			VkPipelineStageFlags dstStage{};
 			switch (barrier.oldLayout) {
 			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
 				barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
@@ -722,7 +726,7 @@ void VulkanQueueRunner::PerformRenderPass(const VKRStep &step, VkCommandBuffer c
 				srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
 			default:
-				Crash();
+				_assert_msg_(G3D, false, "PerformRenderPass: Unexpected oldLayout: %d", (int)barrier.oldLayout);
 				break;
 			}
 			barrier.newLayout = iter.targetLayout;
@@ -732,7 +736,7 @@ void VulkanQueueRunner::PerformRenderPass(const VKRStep &step, VkCommandBuffer c
 				dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 				break;
 			default:
-				Crash();
+				_assert_msg_(G3D, false, "PerformRenderPass: Unexpected newLayout: %d", (int)barrier.newLayout);
 				break;
 			}
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -759,7 +763,6 @@ void VulkanQueueRunner::PerformRenderPass(const VKRStep &step, VkCommandBuffer c
 	VKRFramebuffer *fb = step.render.framebuffer;
 
 	VkPipeline lastPipeline = VK_NULL_HANDLE;
-	VkDescriptorSet lastDescSet = VK_NULL_HANDLE;
 
 	auto &commands = step.commands;
 

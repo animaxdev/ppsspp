@@ -41,6 +41,7 @@
 #include "Core/AVIDump.h"
 #endif
 #include "Core/Config.h"
+#include "Core/ConfigValues.h"
 #include "Core/CoreTiming.h"
 #include "Core/CoreParameter.h"
 #include "Core/Core.h"
@@ -224,7 +225,7 @@ void EmuScreen::bootGame(const std::string &filename) {
 	coreParam.fileToStart = filename;
 	coreParam.mountIso = "";
 	coreParam.mountRoot = "";
-	coreParam.startPaused = false;
+	coreParam.startBreak = !g_Config.bAutoRun;
 	coreParam.printfEmuLog = false;
 	coreParam.headLess = false;
 
@@ -471,13 +472,29 @@ void EmuScreen::onVKeyDown(int virtualKeyCode) {
 		break;
 
 	case VIRTKEY_SPEED_TOGGLE:
-		if (PSP_CoreParameter().fpsLimit == 0) {
-			PSP_CoreParameter().fpsLimit = 1;
+		// Cycle through enabled speeds.
+		if (PSP_CoreParameter().fpsLimit == FPSLimit::NORMAL && g_Config.iFpsLimit1 >= 0) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::CUSTOM1;
+			osm.Show(sc->T("fixed", "Speed: alternate"), 1.0);
+		} else if (PSP_CoreParameter().fpsLimit != FPSLimit::CUSTOM2 && g_Config.iFpsLimit2 >= 0) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::CUSTOM2;
+			osm.Show(sc->T("SpeedCustom2", "Speed: alternate 2"), 1.0);
+		} else if (PSP_CoreParameter().fpsLimit != FPSLimit::NORMAL) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::NORMAL;
+			osm.Show(sc->T("standard", "Speed: standard"), 1.0);
+		}
+		break;
+
+	case VIRTKEY_SPEED_CUSTOM1:
+		if (PSP_CoreParameter().fpsLimit == FPSLimit::NORMAL) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::CUSTOM1;
 			osm.Show(sc->T("fixed", "Speed: alternate"), 1.0);
 		}
-		else if (PSP_CoreParameter().fpsLimit == 1) {
-			PSP_CoreParameter().fpsLimit = 0;
-			osm.Show(sc->T("standard", "Speed: standard"), 1.0);
+		break;
+	case VIRTKEY_SPEED_CUSTOM2:
+		if (PSP_CoreParameter().fpsLimit == FPSLimit::NORMAL) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::CUSTOM2;
+			osm.Show(sc->T("SpeedCustom2", "Speed: alternate 2"), 1.0);
 		}
 		break;
 
@@ -580,9 +597,24 @@ void EmuScreen::onVKeyDown(int virtualKeyCode) {
 }
 
 void EmuScreen::onVKeyUp(int virtualKeyCode) {
+	I18NCategory *sc = GetI18NCategory("Screen");
+
 	switch (virtualKeyCode) {
 	case VIRTKEY_UNTHROTTLE:
 		PSP_CoreParameter().unthrottle = false;
+		break;
+
+	case VIRTKEY_SPEED_CUSTOM1:
+		if (PSP_CoreParameter().fpsLimit == FPSLimit::CUSTOM1) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::NORMAL;
+			osm.Show(sc->T("standard", "Speed: standard"), 1.0);
+		}
+		break;
+	case VIRTKEY_SPEED_CUSTOM2:
+		if (PSP_CoreParameter().fpsLimit == FPSLimit::CUSTOM2) {
+			PSP_CoreParameter().fpsLimit = FPSLimit::NORMAL;
+			osm.Show(sc->T("standard", "Speed: standard"), 1.0);
+		}
 		break;
 
 	case VIRTKEY_AXIS_X_MIN:
@@ -1006,11 +1038,6 @@ void EmuScreen::update() {
 	// Virtual keys.
 	__CtrlSetRapidFire(virtKeys[VIRTKEY_RAPID_FIRE - VIRTKEY_FIRST]);
 
-	// Make sure fpsLimit starts at 0
-	if (PSP_CoreParameter().fpsLimit != 0 && PSP_CoreParameter().fpsLimit != 1) {
-		PSP_CoreParameter().fpsLimit = 0;
-	}
-
 	// This is here to support the iOS on screen back button.
 	if (pauseTrigger_) {
 		pauseTrigger_ = false;
@@ -1203,8 +1230,13 @@ void EmuScreen::render() {
 		// set back to running for the next frame
 		coreState = CORE_RUNNING;
 	} else if (coreState == CORE_STEPPING) {
-		// If we're stepping, it's convenient not to clear the screen.
-		thin3d->BindFramebufferAsRenderTarget(nullptr, { RPAction::KEEP, RPAction::DONT_CARE, RPAction::DONT_CARE });
+		// If we're stepping, it's convenient not to clear the screen entirely, so we copy display to output.
+		// This won't work in non-buffered, but that's fine.
+		thin3d->BindFramebufferAsRenderTarget(nullptr, { RPAction::CLEAR, RPAction::DONT_CARE, RPAction::DONT_CARE });
+		// Just to make sure.
+		if (PSP_IsInited()) {
+			gpu->CopyDisplayToOutput();
+		}
 	} else {
 		// Didn't actually reach the end of the frame, ran out of the blockTicks cycles.
 		// In this case we need to bind and wipe the backbuffer, at least.
