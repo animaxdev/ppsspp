@@ -76,7 +76,7 @@ bool MipsAssembleOpcode(const char* line, DebugInterface* cpu, u32 address)
 	args.mode = ArmipsMode::MEMORY;
 	args.content = str + ConvertUTF8ToWString(line);
 	args.silent = true;
-	args.memoryFile = &file;
+	args.memoryFile = std::shared_ptr<AssemblerFile>(&file);
 	args.errorsResult = &errors;
 
 	if (g_symbolMap) {
