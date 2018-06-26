@@ -1741,6 +1741,8 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 	int bz_vcount = (op >> 8) & 0xFF;
 	bool computeNormals = gstate.isLightingEnabled();
 	bool patchFacing = gstate.patchfacing & 1;
+	int patchDivisionU = gstate.getPatchDivisionU();
+	int patchDivisionV = gstate.getPatchDivisionV();
 
 	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
 		gstate_c.bezier = true;
@@ -1753,7 +1755,7 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 
 	int bytesRead = 0;
 	UpdateUVScaleOffset();
-	drawEngineCommon_->SubmitBezier(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+	drawEngineCommon_->SubmitBezier(control_points, indices, patchDivisionU, patchDivisionV, bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 
 	// After drawing, we advance pointers - see SubmitPrim which does the same.
 	int count = bz_ucount * bz_vcount;
@@ -1768,10 +1770,10 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 		switch (data >> 24) {
 		case GE_CMD_BEZIER:
 			if (gstate_c.bezier) {
-				drawEngineCommon_->DispatchFlush();
+				drawEngineCommon_->SubmitBatchEnd();
 			}
 			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
-			drawEngineCommon_->SubmitBezier(control_points, indices, gstate.getPatchDivisionU(), gstate.getPatchDivisionV(), bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
+			drawEngineCommon_->SubmitBezier(control_points, indices, patchDivisionU, patchDivisionV, bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 			AdvanceVerts(vertexType, count, bytesRead);
 			break;
 		case GE_CMD_VERTEXTYPE:
@@ -1791,6 +1793,8 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 	}
 
 bail:
+	drawEngineCommon_->SubmitBatchEnd();
+
 	if (gstate_c.bezier) {
 		gstate_c.bezier = false;
 		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE);
@@ -1879,7 +1883,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 		switch (data >> 24) {
 		case GE_CMD_SPLINE:
 			if (gstate_c.spline) {
-				drawEngineCommon_->SubmitSplineEnd();
+				drawEngineCommon_->SubmitBatchEnd();
 			}
 			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 			drawEngineCommon_->SubmitSpline(control_points, indices, patchDivisionU, patchDivisionV, sp_ucount, sp_vcount, sp_utype, sp_vtype, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
@@ -1904,7 +1908,7 @@ void GPUCommon::Execute_Spline(u32 op, u32 diff) {
 bail:
 	// always same, do not need
 	// gstate.cmdmem[GE_CMD_VERTEXTYPE] = vertexType;
-	drawEngineCommon_->SubmitSplineEnd();
+	drawEngineCommon_->SubmitBatchEnd();
 
 	if (gstate_c.spline) {
 		gstate_c.spline = false;

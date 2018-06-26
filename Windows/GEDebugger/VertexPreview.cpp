@@ -180,40 +180,48 @@ static void ExpandBezier(int &count, int op, const std::vector<SimpleVertex> &si
 	int num_patches_u = (count_u - 1) / 3;
 	int num_patches_v = (count_v - 1) / 3;
 	int total_patches = num_patches_u * num_patches_v;
-	std::vector<BezierPatch> patches;
-	patches.resize(total_patches);
+	int maxVertexCount = (tess_u + 1) * (tess_v + 1) * total_patches;
+	
+	std::vector<const SimpleVertex *> points(16);
+
+	SplineBezierBatch bezier;
+	bezier.batchVertices = (u8 *)&generatedVerts[0];
+	bezier.batchIndices = &generatedInds[0];
+	bezier.batchVertexCount = 0;
+	bezier.batchIndexCount = 0;
+	bezier.maxVertexCount = maxVertexCount;
+	bezier.batchOrigVertType = gstate.vertType;
+	bezier.points = &points[0];
+
+	bezier.tess_u = tess_u;
+	bezier.tess_v = tess_v;
+	bezier.primType = gstate.getPatchPrimitiveType();
+	bezier.computeNormals = false;
+	bezier.patchFacing = false;
+
+	generatedVerts.resize(maxVertexCount);
+	generatedInds.resize(tess_u * tess_v * 6);
+	
 	for (int patch_u = 0; patch_u < num_patches_u; patch_u++) {
 		for (int patch_v = 0; patch_v < num_patches_v; patch_v++) {
-			BezierPatch &patch = patches[patch_u + patch_v * num_patches_u];
 			for (int point = 0; point < 16; ++point) {
 				int idx = (patch_u * 3 + point % 4) + (patch_v * 3 + point / 4) * count_u;
-				patch.points[point] = &simpleVerts[0] + (!indices.empty() ? indices[idx] : idx);
+				bezier.points[point] = &simpleVerts[0] + (!indices.empty() ? indices[idx] : idx);
 			}
-			patch.u_index = patch_u * 3;
-			patch.v_index = patch_v * 3;
-			patch.index = patch_v * num_patches_u + patch_u;
-			patch.primType = gstate.getPatchPrimitiveType();
-			patch.computeNormals = false;
-			patch.patchFacing = false;
+			bezier.u_index = patch_u * 3;
+			bezier.v_index = patch_v * 3;
+			bezier.index = patch_v * num_patches_u + patch_u;
+			TessellateBezierPatch(bezier);
 		}
 	}
 
-	generatedVerts.resize((tess_u + 1) * (tess_v + 1) * total_patches);
-	generatedInds.resize(tess_u * tess_v * 6);
-
-	count = 0;
-	u8 *dest = (u8 *)&generatedVerts[0];
-	u16 *inds = &generatedInds[0];
-	for (int patch_idx = 0; patch_idx < total_patches; ++patch_idx) {
-		const BezierPatch &patch = patches[patch_idx];
-		TessellateBezierPatch(dest, inds, count, tess_u, tess_v, patch, gstate.vertType);
-	}
+	count = bezier.batchVertexCount;
 }
 
 static void ExpandSpline(int &count, int op, const std::vector<SimpleVertex> &simpleVerts, const std::vector<u16> &indices, std::vector<SimpleVertex> &generatedVerts, std::vector<u16> &generatedInds) {
-	SplinePatchLocal patch;
-	patch.computeNormals = false;
+	SplineBezierBatch patch;
 	patch.primType = gstate.getPatchPrimitiveType();
+	patch.computeNormals = false;
 	patch.patchFacing = false;
 
 	patch.count_u = (op & 0x00FF) >> 0;
@@ -255,6 +263,7 @@ static void ExpandSpline(int &count, int op, const std::vector<SimpleVertex> &si
 	patch.batchIndices = &generatedInds[0];
 	patch.batchOrigVertType = gstate.vertType;
 	patch.batchVertexCount = 0;
+	patch.batchIndexCount = 0;
 	patch.maxVertexCount = maxVertexCount;
 
 	TessellateSplinePatch(patch);
