@@ -691,8 +691,6 @@ void DrawEngineGLES::TessellationDataTransferGLES::SendDataToShader(const float 
 		if (data_tex[1])
 			renderManager_->DeleteTexture(data_tex[1]);
 		uint8_t *tex_data = new uint8_t[size * sizeof(float) * 4];
-		//memcpy(tex_data, pos, size * sizeof(float) * 4);
-		// zhangwei
 		memcpy(tex_data, tex, size * sizeof(float) * 4);
 		data_tex[1] = renderManager_->CreateTexture(GL_TEXTURE_2D);
 		renderManager_->TextureImage(data_tex[1], 0, size, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT, tex_data, GLRAllocType::NEW, false);
