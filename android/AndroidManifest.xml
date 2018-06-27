@@ -7,8 +7,13 @@
     <!-- Note that versionCode should be in the format xyzzrrrr. Example: 16030000 -->
 
     <uses-sdk
+<<<<<<< HEAD
         android:minSdkVersion="21"
         android:targetSdkVersion="27" />
+=======
+        android:minSdkVersion="9"
+        android:targetSdkVersion="28" />
+>>>>>>> fb9524b6320dfbaef1eb579cc669b80fe2b8f0d1
 
     <uses-feature android:glEsVersion="0x00020000" />
     <uses-feature android:name="android.hardware.screen.landscape" android:required="false" />

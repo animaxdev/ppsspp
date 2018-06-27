@@ -200,7 +200,7 @@ static void ExpandBezier(int &count, int op, const std::vector<SimpleVertex> &si
 	bezier.patchFacing = false;
 
 	generatedVerts.resize(maxVertexCount);
-	generatedInds.resize(tess_u * tess_v * 6);
+	generatedInds.resize(tess_u * tess_v * 6 * total_patches);
 	
 	for (int patch_u = 0; patch_u < num_patches_u; patch_u++) {
 		for (int patch_v = 0; patch_v < num_patches_v; patch_v++) {
