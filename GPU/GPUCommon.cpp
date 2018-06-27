@@ -1772,9 +1772,17 @@ void GPUCommon::Execute_Bezier(u32 op, u32 diff) {
 			if (gstate_c.bezier) {
 				drawEngineCommon_->SubmitBatchEnd();
 			}
+			bz_ucount = data & 0xFF;
+			bz_vcount = (data >> 8) & 0xFF;
+			count = bz_ucount * bz_vcount;
 			control_points = Memory::GetPointerUnchecked(gstate_c.vertexAddr);
 			drawEngineCommon_->SubmitBezier(control_points, indices, patchDivisionU, patchDivisionV, bz_ucount, bz_vcount, patchPrim, computeNormals, patchFacing, vertexType, &bytesRead);
 			AdvanceVerts(vertexType, count, bytesRead);
+			break;
+		case GE_CMD_PATCHDIVISION:
+			gstate.cmdmem[GE_CMD_PATCHDIVISION] = data;
+			patchDivisionU = gstate.getPatchDivisionU();
+			patchDivisionV = gstate.getPatchDivisionV();
 			break;
 		case GE_CMD_VERTEXTYPE:
 			vertexType = data;

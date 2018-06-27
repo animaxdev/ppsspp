@@ -50,7 +50,6 @@ struct SplineBezierBatch {
 	
 	// Bezier: These are used to generate UVs.
 	int u_index, v_index;
-	int index;
 
 	// Spline
 	int count_u;

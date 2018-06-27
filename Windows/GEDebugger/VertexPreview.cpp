@@ -183,6 +183,8 @@ static void ExpandBezier(int &count, int op, const std::vector<SimpleVertex> &si
 	int maxVertexCount = (tess_u + 1) * (tess_v + 1) * total_patches;
 	
 	std::vector<const SimpleVertex *> points(16);
+	generatedVerts.resize(maxVertexCount);
+	generatedInds.resize(tess_u * tess_v * 6 * total_patches);
 
 	SplineBezierBatch bezier;
 	bezier.batchVertices = (u8 *)&generatedVerts[0];
@@ -199,9 +201,6 @@ static void ExpandBezier(int &count, int op, const std::vector<SimpleVertex> &si
 	bezier.computeNormals = false;
 	bezier.patchFacing = false;
 
-	generatedVerts.resize(maxVertexCount);
-	generatedInds.resize(tess_u * tess_v * 6 * total_patches);
-	
 	for (int patch_u = 0; patch_u < num_patches_u; patch_u++) {
 		for (int patch_v = 0; patch_v < num_patches_v; patch_v++) {
 			for (int point = 0; point < 16; ++point) {
@@ -210,7 +209,6 @@ static void ExpandBezier(int &count, int op, const std::vector<SimpleVertex> &si
 			}
 			bezier.u_index = patch_u * 3;
 			bezier.v_index = patch_v * 3;
-			bezier.index = patch_v * num_patches_u + patch_u;
 			TessellateBezierPatch(bezier);
 		}
 	}

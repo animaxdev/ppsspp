@@ -552,12 +552,12 @@ static void _BezierPatchLowQuality(SplineBezierBatch& bezier) {
 				v3.nrm = norm;
 			}
 
-			int total = bezier.index * 3 * 3 * 4; // A patch has 3x3 tiles, and each tiles have 4 vertices.
+			// A patch has 3x3 tiles, and each tiles have 4 vertices.
 			int tile_index = tile_u + tile_v * 3;
-			int idx0 = total + tile_index * 4 + 0 + startIndex;
-			int idx1 = total + tile_index * 4 + 1 + startIndex;
-			int idx2 = total + tile_index * 4 + 2 + startIndex;
-			int idx3 = total + tile_index * 4 + 3 + startIndex;
+			int idx0 = tile_index * 4 + 0 + startIndex;
+			int idx1 = tile_index * 4 + 1 + startIndex;
+			int idx2 = tile_index * 4 + 2 + startIndex;
+			int idx3 = tile_index * 4 + 3 + startIndex;
 
 			CopyQuad(dest, &v0, &v1, &v2, &v3);
 			CopyQuadIndex(indices, prim_type, idx0, idx1, idx2, idx3);
@@ -688,11 +688,10 @@ static void _BezierPatchHighQuality(SplineBezierBatch& bezier, int quality) {
 	// Combine the vertices into triangles.
 	for (int tile_v = 0; tile_v < tess_v; ++tile_v) {
 		for (int tile_u = 0; tile_u < tess_u; ++tile_u) {
-			int total = bezier.index * (tess_u + 1) * (tess_v + 1);
-			int idx0 = total + tile_v * (tess_u + 1) + tile_u + startIndex;
-			int idx1 = total + tile_v * (tess_u + 1) + tile_u + 1 + startIndex;
-			int idx2 = total + (tile_v + 1) * (tess_u + 1) + tile_u + startIndex;
-			int idx3 = total + (tile_v + 1) * (tess_u + 1) + tile_u + 1 + startIndex;
+			int idx0 = tile_v * (tess_u + 1) + tile_u + startIndex;
+			int idx1 = tile_v * (tess_u + 1) + tile_u + 1 + startIndex;
+			int idx2 = (tile_v + 1) * (tess_u + 1) + tile_u + startIndex;
+			int idx3 = (tile_v + 1) * (tess_u + 1) + tile_u + 1 + startIndex;
 
 			CopyQuadIndex(indices, prim_type, idx0, idx1, idx2, idx3);
 			bezier.batchIndexCount += 6;
@@ -1010,7 +1009,6 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 				}
 				batchLocal.u_index = patch_u * 3;
 				batchLocal.v_index = patch_v * 3;
-				batchLocal.index = patch_v * num_patches_u + patch_u;
 				TessellateBezierPatch(batchLocal);
 			}
 		}
