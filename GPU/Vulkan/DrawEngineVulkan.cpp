@@ -615,9 +615,10 @@ void DrawEngineVulkan::DoFlush() {
 	}
 
 	GEPrimitiveType prim = prevPrim_;
+	bool tess = gstate_c.bezier || gstate_c.spline;
 
 	// Always use software for flat shading to fix the provoking index.
-	bool useHWTransform = CanUseHardwareTransform(prim) && gstate.getShadeMode() != GE_SHADE_FLAT;
+	bool useHWTransform = CanUseHardwareTransform(prim) && (tess || gstate.getShadeMode() != GE_SHADE_FLAT);
 
 	VulkanVertexShader *vshader = nullptr;
 	VulkanFragmentShader *fshader = nullptr;
@@ -851,7 +852,6 @@ void DrawEngineVulkan::DoFlush() {
 		PROFILE_THIS_SCOPE("render_q");
 		UpdateUBOs(frame);
 
-		bool tess = gstate_c.bezier || gstate_c.spline;
 		VkDescriptorSet ds = GetOrCreateDescriptorSet(imageView, sampler, baseBuf, lightBuf, boneBuf, tess);
 		const uint32_t dynamicUBOOffsets[3] = {baseUBOOffset, lightUBOOffset, boneUBOOffset};
 
