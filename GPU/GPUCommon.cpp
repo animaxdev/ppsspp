@@ -1635,19 +1635,12 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		{
 			// pc will be increased end of loop and after we return
 			const u32 target = gstate_c.getRelativeAddress(data & 0x00FFFFFC) - 8;
-			const u32 distance = (target - (currentList->pc + (cmdCount) * 4)) / 4;
-			if (distance < 16) {
-				// short jump
-				UpdatePC(currentList->pc, target);
-				currentList->pc = target;
-				// reset
-				src += distance;
-				cmdCount = 0;
-			}
-			else {
-				// long jump
-				goto bail;
-			}
+			const u32 distance = (target - currentList->pc) / 4 - cmdCount;
+			UpdatePC(currentList->pc, target);
+			currentList->pc = target;
+			// reset
+			src += distance;
+			cmdCount = 0;
 			break;
 		}
 		//case GE_CMD_NOP:
