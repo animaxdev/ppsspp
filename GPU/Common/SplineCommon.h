@@ -72,6 +72,8 @@ enum SplineBezierQuality {
 	HIGH_QUALITY = 2,
 };
 
+
+bool CanUseHardwareTessellation(GEPatchPrimType prim);
 // for ge debugger preview
 void TessellateSplinePatch(SplineBezierBatch &spatch);
 void TessellateBezierPatch(SplineBezierBatch &bezier);

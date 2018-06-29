@@ -24,6 +24,7 @@
 #include "Common/MemoryUtil.h"
 #include "Core/Config.h"
 
+#include "GPU/Common/GPUStateUtils.h"
 #include "GPU/Common/SplineCommon.h"
 #include "GPU/Common/DrawEngineCommon.h"
 #include "GPU/ge_constants.h"
@@ -181,6 +182,13 @@ static void spline_knot(int n, int type, float *knot) {
 		knot[n + 3] = (float)(n - 2);
 		knot[n + 4] = (float)(n - 2);
 	}
+}
+
+bool CanUseHardwareTessellation(GEPatchPrimType prim) {
+	if (g_Config.bHardwareTessellation && !g_Config.bSoftwareRendering) {
+		return CanUseHardwareTransform(PatchPrimToPrim(prim));
+	}
+	return false;
 }
 
 // Prepare mesh of one patch for "Instanced Tessellation".
@@ -771,8 +779,6 @@ void TessellateSplinePatch(SplineBezierBatch &spatch) {
 	}
 }
 
-// This maps GEPatchPrimType to GEPrimitiveType.
-const GEPrimitiveType primType[] = { GE_PRIM_TRIANGLES, GE_PRIM_LINES, GE_PRIM_POINTS, GE_PRIM_POINTS };
 static SplineBezierBatch batchLocal{};
 
 void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, int type_u, int type_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead) {
@@ -818,13 +824,12 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 		points[idx] = simplified_control_points + (indices ? idxConv.convert(idx) : idx);
 	}
 
-
 	if (batchLocal.batchVertices == nullptr) {
 		batchLocal.batchVertices = splineBuffer;
 		batchLocal.batchIndices = quadIndices_;
 		batchLocal.batchVertexCount = 0;
 		batchLocal.batchIndexCount = 0;
-		batchLocal.batchPrimType = primType[prim_type];
+		batchLocal.batchPrimType = PatchPrimToPrim(prim_type);
 		batchLocal.batchVertType = vertType;
 		batchLocal.batchOrigVertType = origVertType;
 	}
@@ -842,7 +847,7 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 	batchLocal.primType = prim_type;
 	batchLocal.patchFacing = patchFacing;
 
-	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
+	if (CanUseHardwareTessellation(prim_type)) {
 		float *pos = (float*)(decoded + 65536 * 18); // Size 4 float
 		float *tex = pos + count_u * count_v * 4; // Size 4 float
 		float *col = tex + count_u * count_v * 4; // Size 4 float
@@ -890,8 +895,6 @@ void DrawEngineCommon::SubmitSpline(const void *control_points, const void *indi
 }
 
 void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indices, int tess_u, int tess_v, int count_u, int count_v, GEPatchPrimType prim_type, bool computeNormals, bool patchFacing, u32 vertType, int *bytesRead) {
-	PROFILE_THIS_SCOPE("bezier");
-
 	u16 index_lower_bound = 0;
 	u16 index_upper_bound = count_u * count_v - 1;
 	IndexConverter idxConv(vertType, indices);
@@ -939,7 +942,7 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 		batchLocal.batchIndices = quadIndices_;
 		batchLocal.batchVertexCount = 0;
 		batchLocal.batchIndexCount = 0;
-		batchLocal.batchPrimType = primType[prim_type];
+		batchLocal.batchPrimType = PatchPrimToPrim(prim_type);
 		batchLocal.batchVertType = vertType;
 		batchLocal.batchOrigVertType = origVertType;
 	}
@@ -962,7 +965,7 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 	batchLocal.tess_u = tess_u;
 	batchLocal.tess_v = tess_v;
 
-	if (g_Config.bHardwareTessellation && g_Config.bHardwareTransform && !g_Config.bSoftwareRendering) {
+	if (CanUseHardwareTessellation(prim_type)) {
 		int posStride, texStride, colStride;
 		tessDataTransfer->PrepareBuffers(pos, tex, col, posStride, texStride, colStride, count_u * count_v, hasColor, hasTexCoords);
 		float *p = pos;
@@ -1015,7 +1018,6 @@ void DrawEngineCommon::SubmitBezier(const void *control_points, const void *indi
 		delete[] points;
 	}
 }
-
 
 void DrawEngineCommon::SubmitBatchEnd() {
 	if (batchLocal.batchVertexCount == 0) {
