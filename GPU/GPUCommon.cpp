@@ -1614,6 +1614,9 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_VADDR:
 			gstate_c.vertexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
 			break;
+		case GE_CMD_IADDR:
+			gstate_c.indexAddr = gstate_c.getRelativeAddress(data & 0x00FFFFFF);
+			break;
 		case GE_CMD_OFFSETADDR:
 			gstate.cmdmem[GE_CMD_OFFSETADDR] = data;
 			gstate_c.offsetAddr = data << 8;
@@ -1687,7 +1690,6 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			}
 			break;
 		}
-
 		default:
 			// All other commands might need a flush or something, stop this inner loop.
 			goto bail;
