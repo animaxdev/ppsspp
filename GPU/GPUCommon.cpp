@@ -1552,7 +1552,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 	UpdateUVScaleOffset();
 
 	// cull mode
-	int cullMode = gstate.isCullEnabled() ? gstate.getCullMode() : -1;
+	int cullMode = gstate.getCullMode();
 
 	uint32_t vertTypeID = GetVertTypeID(vertexType, gstate.getUVGenMode());
 	drawEngineCommon_->SubmitPrim(verts, inds, prim, count, vertTypeID, cullMode, &bytesRead);
@@ -1631,7 +1631,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			}
 			break;
 		case GE_CMD_CULL:
-			// flip face by indices for GE_PRIM_TRIANGLE_STRIP
+			// gundam vs gundam next plus
 			cullMode = data & 1;
 			break;
 		case GE_CMD_JUMP:
@@ -1650,6 +1650,7 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 		case GE_CMD_NOP_FF:
 			break;
 		case GE_CMD_BONEMATRIXNUMBER:
+			// the 3rd Birthday
 			gstate.cmdmem[GE_CMD_BONEMATRIXNUMBER] = data;
 			break;
 		case GE_CMD_TEXSCALEU:
@@ -1661,10 +1662,12 @@ void GPUCommon::Execute_Prim(u32 op, u32 diff) {
 			gstate_c.uv.vScale = getFloat24(data);
 			break;
 		case GE_CMD_TEXOFFSETU:
+			// tomb raider
 			gstate.cmdmem[GE_CMD_TEXOFFSETU] = data;
 			gstate_c.uv.uOff = getFloat24(data);
 			break;
 		case GE_CMD_TEXOFFSETV:
+			// tomb raider
 			gstate.cmdmem[GE_CMD_TEXOFFSETV] = data;
 			gstate_c.uv.vOff = getFloat24(data);
 			break;
@@ -1705,7 +1708,7 @@ bail:
 		UpdatePC(currentList->pc, currentList->pc + cmdCount * 4);
 		currentList->pc += cmdCount * 4;
 		// flush back cull mode
-		if (cullMode != -1 && cullMode != gstate.getCullMode()) {
+		if (gstate.isCullEnabled() && cullMode != gstate.getCullMode()) {
 			drawEngineCommon_->DispatchFlush();
 			gstate.cmdmem[GE_CMD_CULL] ^= 1;
 			gstate_c.Dirty(DIRTY_RASTER_STATE);

@@ -551,7 +551,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		case GE_VTYPE_IDX_8BIT >> GE_VTYPE_IDX_SHIFT:
 			for (int j = i; j <= lastMatch; j++) {
 				bool clockwise = true;
-				if (drawCalls[j].cullMode != -1 && gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
+				if (gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
 					clockwise = false;
 				}
 				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u8 *)drawCalls[j].inds, indexLowerBound, clockwise);
@@ -560,7 +560,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		case GE_VTYPE_IDX_16BIT >> GE_VTYPE_IDX_SHIFT:
 			for (int j = i; j <= lastMatch; j++) {
 				bool clockwise = true;
-				if (drawCalls[j].cullMode != -1 && gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
+				if (gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
 					clockwise = false;
 				}
 				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u16_le *)drawCalls[j].inds, indexLowerBound, clockwise);
@@ -569,7 +569,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		case GE_VTYPE_IDX_32BIT >> GE_VTYPE_IDX_SHIFT:
 			for (int j = i; j <= lastMatch; j++) {
 				bool clockwise = true;
-				if (drawCalls[j].cullMode != -1 && gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
+				if (gstate.isCullEnabled() && gstate.getCullMode() != drawCalls[j].cullMode) {
 					clockwise = false;
 				}
 				indexGen.TranslatePrim(drawCalls[j].prim, drawCalls[j].vertexCount, (const u32_le *)drawCalls[j].inds, indexLowerBound, clockwise);
