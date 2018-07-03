@@ -520,7 +520,7 @@ void DrawEngineCommon::DecodeVertsStep(u8 *dest, int &i, int &decodedVerts) {
 		decodedVerts += indexUpperBound - indexLowerBound + 1;
 
 		bool clockwise = true;
-		if (dc.cullMode != -1 && gstate.isCullEnabled() && gstate.getCullMode() != dc.cullMode) {
+		if (gstate.isCullEnabled() && gstate.getCullMode() != dc.cullMode) {
 			clockwise = false;
 		}
 		indexGen.AddPrim(dc.prim, dc.vertexCount, clockwise);
