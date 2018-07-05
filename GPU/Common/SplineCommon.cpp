@@ -603,11 +603,10 @@ struct PrecomputedCurves {
 
 static void _BezierPatchHighQuality(SplineBezierBatch& bezier, int quality) {
 	u16 *&indices = bezier.batchIndices;
-	int tess_u = bezier.tess_u / quality;
-	int tess_v = bezier.tess_v / quality;
+	int tess_u = std::max(bezier.tess_u / quality, 1);
+	int tess_v = std::max(bezier.tess_v / quality, 1);
 	u32 origVertType = bezier.batchOrigVertType;
 	int startIndex = bezier.batchVertexCount;
-
 	const float third = 1.0f / 3.0f;
 
 	// First compute all the vertices and put them in an array
