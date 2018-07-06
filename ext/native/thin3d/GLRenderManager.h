@@ -313,7 +313,9 @@ public:
 		return shaders.empty() && programs.empty() && buffers.empty() && textures.empty() && inputLayouts.empty() && framebuffers.empty() && pushBuffers.empty();
 	}
 	void Take(GLDeleter &other) {
+#ifndef MOBILE_DEVICE
 		_assert_msg_(G3D, IsEmpty(), "Deleter already has stuff");
+#endif
 		shaders = std::move(other.shaders);
 		programs = std::move(other.programs);
 		buffers = std::move(other.buffers);
@@ -321,13 +323,6 @@ public:
 		inputLayouts = std::move(other.inputLayouts);
 		framebuffers = std::move(other.framebuffers);
 		pushBuffers = std::move(other.pushBuffers);
-		other.shaders.clear();
-		other.programs.clear();
-		other.buffers.clear();
-		other.textures.clear();
-		other.inputLayouts.clear();
-		other.framebuffers.clear();
-		other.pushBuffers.clear();
 	}
 
 	std::vector<GLRShader *> shaders;
@@ -923,7 +918,6 @@ private:
 	int threadFrame_ = -1;
 
 	bool nextFrame = false;
-	bool firstFrame = true;
 
 	GLDeleter deleter_;
 

@@ -103,12 +103,9 @@ void GLRenderManager::ThreadStart() {
 }
 
 void GLRenderManager::ThreadEnd() {
-	ILOG("ThreadEnd");
-
 	// Wait for any shutdown to complete in StopThread().
 	std::unique_lock<std::mutex> lock(mutex_);
 	queueRunner_.DestroyDeviceObjects();
-	VLOG("PULL: Quitting");
 
 	// Good point to run all the deleters to get rid of leftover objects.
 	for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
@@ -130,47 +127,39 @@ void GLRenderManager::ThreadEnd() {
 }
 
 bool GLRenderManager::ThreadFrame() {
-	std::unique_lock<std::mutex> lock(mutex_);
-	if (!run_)
-		return false;
+	if (nextFrame && ++threadFrame_ >= MAX_INFLIGHT_FRAMES) {
+		threadFrame_ = 0;
+	}
+	FrameData &frameData = frameData_[threadFrame_];
 
 	// In case of syncs or other partial completion, we keep going until we complete a frame.
 	do {
-		if (nextFrame) {
-			threadFrame_++;
-			if (threadFrame_ >= MAX_INFLIGHT_FRAMES)
-				threadFrame_ = 0;
+		std::unique_lock<std::mutex> lock(mutex_);
+		while (!frameData.readyForRun && run_) {
+			frameData.pull_condVar.wait(lock);
 		}
-		FrameData &frameData = frameData_[threadFrame_];
+
+		if (!frameData.readyForRun || !run_) {
+			// This means we're out of frames to render and run_ is false, so bail.
+			return false;
+		}
+
+		//
 		{
 			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-			while (!frameData.readyForRun && run_) {
-				VLOG("PULL: Waiting for frame[%d].readyForRun", threadFrame_);
-				frameData.pull_condVar.wait(lock);
-			}
-			if (!frameData.readyForRun && !run_) {
-				// This means we're out of frames to render and run_ is false, so bail.
-				return false;
-			}
-			VLOG("PULL: Setting frame[%d].readyForRun = false", threadFrame_);
 			frameData.readyForRun = false;
 			frameData.deleter_prev.Perform(this);
 			frameData.deleter_prev.Take(frameData.deleter);
-			// Previously we had a quick exit here that avoided calling Run() if run_ was suddenly false,
-			// but that created a race condition where frames could end up not finished properly on resize etc.
+		}
 
-			// Only increment next time if we're done.
-			nextFrame = frameData.type == GLRRunType::END;
-			assert(frameData.type == GLRRunType::END || frameData.type == GLRRunType::SYNC);
-		}
-		VLOG("PULL: Running frame %d", threadFrame_);
-		if (firstFrame) {
-			ILOG("Running first frame (%d)", threadFrame_);
-			firstFrame = false;
-		}
+		//
 		Run(threadFrame_);
-		VLOG("PULL: Finished frame %d", threadFrame_);
+
+		// Only increment next time if we're done.
+		nextFrame = frameData.type == GLRRunType::END;
+
 	} while (!nextFrame);
+
 	return true;
 }
 
@@ -194,8 +183,6 @@ void GLRenderManager::StopThread() {
 		// Wait until we've definitely stopped the threadframe.
 		std::unique_lock<std::mutex> lock(mutex_);
 
-		ILOG("GL submission thread paused. Frame=%d", curFrame_);
-
 		// Eat whatever has been queued up for this frame if anything.
 		Wipe();
 
@@ -217,7 +204,6 @@ void GLRenderManager::StopThread() {
 			frameData.initSteps.clear();
 
 			while (!frameData.readyForFence) {
-				VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (stop)", i);
 				frameData.push_condVar.wait(lock);
 			}
 		}
@@ -358,8 +344,6 @@ void GLRenderManager::CopyImageToMemorySync(GLRTexture *texture, int mipLevel, i
 }
 
 void GLRenderManager::BeginFrame() {
-	VLOG("BeginFrame");
-
 	int curFrame = GetCurFrame();
 	FrameData &frameData = frameData_[curFrame];
 
@@ -367,19 +351,15 @@ void GLRenderManager::BeginFrame() {
 	{
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1", curFrame);
 			frameData.push_condVar.wait(lock);
 		}
 		frameData.readyForFence = false;
 		frameData.readyForSubmit = true;
 	}
 
-	VLOG("PUSH: Fencing %d", curFrame);
-
 	// glFenceSync(&frameData.fence...)
 
 	// Must be after the fence - this performs deletes.
-	VLOG("PUSH: BeginFrame %d", curFrame);
 	if (!run_) {
 		WLOG("BeginFrame while !run_!");
 	}
@@ -396,7 +376,6 @@ void GLRenderManager::Finish() {
 	FrameData &frameData = frameData_[curFrame];
 	{
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-		VLOG("PUSH: Frame[%d].readyForRun = true, notifying pull", curFrame);
 		frameData.steps = std::move(steps_);
 		steps_.clear();
 		frameData.initSteps = std::move(initSteps_);
@@ -432,8 +411,6 @@ void GLRenderManager::Submit(int frame, bool triggerFence) {
 	// When !triggerFence, we notify after syncing with Vulkan.
 
 	if (triggerFence) {
-		VLOG("PULL: Frame %d.readyForFence = true", frame);
-
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		assert(frameData.readyForSubmit);
 		frameData.readyForFence = true;
@@ -501,17 +478,15 @@ void GLRenderManager::Run(int frame) {
 	default:
 		assert(false);
 	}
-
-	VLOG("PULL: Finished running frame %d", frame);
 }
 
 void GLRenderManager::FlushSync() {
 	// TODO: Reset curRenderStep_?
 	int curFrame = curFrame_;
 	FrameData &frameData = frameData_[curFrame];
+	
 	{
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-		VLOG("PUSH: Frame[%d].readyForRun = true (sync)", curFrame);
 		frameData.initSteps = std::move(initSteps_);
 		initSteps_.clear();
 		frameData.steps = std::move(steps_);
@@ -521,11 +496,11 @@ void GLRenderManager::FlushSync() {
 		frameData.type = GLRRunType::SYNC;
 		frameData.pull_condVar.notify_all();
 	}
+
 	{
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		// Wait for the flush to be hit, since we're syncing.
 		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (sync)", curFrame);
 			frameData.push_condVar.wait(lock);
 		}
 		frameData.readyForFence = false;
