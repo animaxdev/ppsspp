@@ -76,9 +76,9 @@ void FramebufferManagerGLES::CompileDraw2DProgram() {
 		shaders.push_back(render_->CreateShader(GL_FRAGMENT_SHADER, fs_code, "draw2d"));
 
 		std::vector<GLRProgram::UniformLocQuery> queries;
-		queries.push_back({ &u_draw2d_tex, "u_tex" });
+		//queries.push_back({ &u_draw2d_tex, "u_tex" });
 		std::vector<GLRProgram::Initializer> initializers;
-		initializers.push_back({ &u_draw2d_tex, 0 });
+		//initializers.push_back({ &u_draw2d_tex, 0 });
 		std::vector<GLRProgram::Semantic> semantics;
 		//semantics.push_back({ 0, "a_position" });
 		//semantics.push_back({ 1, "a_texcoord0" });

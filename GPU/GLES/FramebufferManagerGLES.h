@@ -105,7 +105,7 @@ private:
 	int u_postShaderTex = -1;
 	
 	// Cached uniform locs
-	int u_draw2d_tex = -1;
+	//int u_draw2d_tex = -1;
 
 	int plainColorLoc_ = -1;
 	int videoLoc_ = -1;
