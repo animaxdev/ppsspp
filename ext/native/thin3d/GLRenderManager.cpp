@@ -104,7 +104,7 @@ void GLRenderManager::ThreadStart() {
 
 void GLRenderManager::ThreadEnd() {
 	// Wait for any shutdown to complete in StopThread().
-	std::unique_lock<std::mutex> lock(mutex_);
+	//std::unique_lock<std::mutex> lock(mutex_);
 	queueRunner_.DestroyDeviceObjects();
 
 	// Good point to run all the deleters to get rid of leftover objects.
@@ -134,29 +134,28 @@ bool GLRenderManager::ThreadFrame() {
 
 	// In case of syncs or other partial completion, we keep going until we complete a frame.
 	do {
-		std::unique_lock<std::mutex> lock(mutex_);
-		while (!frameData.readyForRun && run_) {
-			frameData.pull_condVar.wait(lock);
-		}
-
-		if (!frameData.readyForRun || !run_) {
-			// This means we're out of frames to render and run_ is false, so bail.
-			return false;
-		}
-
-		//
+		// wait frame
 		{
 			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-			frameData.readyForRun = false;
-			frameData.deleter_prev.Perform(this);
-			frameData.deleter_prev.Take(frameData.deleter);
+			while (!frameData.readyForRun) {
+				if(!run_) {
+					return false;
+				}
+				frameData.pull_condVar.wait(lock);
+			}
 		}
-
-		//
-		Run(threadFrame_);
-
+		
+		frameData.readyForRun = false;
+		frameData.deleter_prev.Perform(this);
+		frameData.deleter_prev.Take(frameData.deleter);
 		// Only increment next time if we're done.
 		nextFrame = frameData.type == GLRRunType::END;
+
+		// run frame
+		{
+			//std::unique_lock<std::mutex> lock(mutex_);
+			Run(threadFrame_);
+		}
 
 	} while (!nextFrame);
 
@@ -164,51 +163,52 @@ bool GLRenderManager::ThreadFrame() {
 }
 
 void GLRenderManager::StopThread() {
-	// Since we don't control the thread directly, this will only pause the thread.
-
-	if (run_) {
-		run_ = false;
-		for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
-			auto &frameData = frameData_[i];
-			{
-				std::unique_lock<std::mutex> lock(frameData.push_mutex);
-				frameData.push_condVar.notify_all();
-			}
-			{
-				std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-				frameData.pull_condVar.notify_all();
-			}
-		}
-
-		// Wait until we've definitely stopped the threadframe.
-		std::unique_lock<std::mutex> lock(mutex_);
-
-		// Eat whatever has been queued up for this frame if anything.
-		Wipe();
-
-		// Wait for any fences to finish and be resignaled, so we don't have sync issues.
-		// Also clean out any queued data, which might refer to things that might not be valid
-		// when we restart...
-		for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
-			auto &frameData = frameData_[i];
-			std::unique_lock<std::mutex> lock(frameData.push_mutex);
-			if (frameData.readyForRun || frameData.steps.size() != 0) {
-				Crash();
-			}
-			frameData.readyForRun = false;
-			frameData.readyForSubmit = false;
-			for (size_t i = 0; i < frameData.steps.size(); i++) {
-				delete frameData.steps[i];
-			}
-			frameData.steps.clear();
-			frameData.initSteps.clear();
-
-			while (!frameData.readyForFence) {
-				frameData.push_condVar.wait(lock);
-			}
-		}
-	} else {
+	if (!run_)  {
 		ILOG("GL submission thread was already paused.");
+		return;
+	}
+	
+	// Since we don't control the thread directly, this will only pause the thread.
+	run_ = false;
+
+	for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
+		auto &frameData = frameData_[i];
+		{
+			std::unique_lock<std::mutex> lock(frameData.push_mutex);
+			frameData.push_condVar.notify_all();
+		}
+		{
+			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
+			frameData.pull_condVar.notify_all();
+		}
+	}
+
+	// Wait until we've definitely stopped the threadframe.
+	//std::unique_lock<std::mutex> lock(mutex_);
+
+	// Eat whatever has been queued up for this frame if anything.
+	Wipe();
+
+	// Wait for any fences to finish and be resignaled, so we don't have sync issues.
+	// Also clean out any queued data, which might refer to things that might not be valid
+	// when we restart...
+	for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
+		auto &frameData = frameData_[i];
+		std::unique_lock<std::mutex> lock(frameData.push_mutex);
+		if (frameData.readyForRun || frameData.steps.size() != 0) {
+			Crash();
+		}
+		frameData.readyForRun = false;
+		frameData.readyForSubmit = false;
+		for (size_t i = 0; i < frameData.steps.size(); i++) {
+			delete frameData.steps[i];
+		}
+		frameData.steps.clear();
+		frameData.initSteps.clear();
+
+		while (!frameData.readyForFence) {
+			frameData.push_condVar.wait(lock);
+		}
 	}
 }
 
@@ -371,15 +371,12 @@ void GLRenderManager::BeginFrame() {
 }
 
 void GLRenderManager::Finish() {
-	curRenderStep_ = nullptr;
 	int curFrame = GetCurFrame();
 	FrameData &frameData = frameData_[curFrame];
 	{
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.initSteps = std::move(initSteps_);
-		initSteps_.clear();
 		frameData.readyForRun = true;
 		frameData.type = GLRRunType::END;
 		frameData_[curFrame_].deleter.Take(deleter_);
@@ -388,10 +385,10 @@ void GLRenderManager::Finish() {
 	// Notify calls do not in fact need to be done with the mutex locked.
 	frameData.pull_condVar.notify_all();
 
-	curFrame_++;
-	if (curFrame_ >= MAX_INFLIGHT_FRAMES)
+	if (++curFrame_ >= MAX_INFLIGHT_FRAMES)
 		curFrame_ = 0;
 
+	curRenderStep_ = nullptr;
 	insideFrame_ = false;
 }
 
@@ -484,13 +481,11 @@ void GLRenderManager::FlushSync() {
 	// TODO: Reset curRenderStep_?
 	int curFrame = curFrame_;
 	FrameData &frameData = frameData_[curFrame];
-	
+
 	{
 		std::unique_lock<std::mutex> lock(frameData.pull_mutex);
 		frameData.initSteps = std::move(initSteps_);
-		initSteps_.clear();
 		frameData.steps = std::move(steps_);
-		steps_.clear();
 		frameData.readyForRun = true;
 		assert(frameData.readyForFence == false);
 		frameData.type = GLRRunType::SYNC;
@@ -545,7 +540,6 @@ void GLRenderManager::WaitUntilQueueIdle() {
 		std::unique_lock<std::mutex> lock(frameData.push_mutex);
 		// Ignore unsubmitted frames.
 		while (!frameData.readyForFence && frameData.readyForRun) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (wait idle)", i);
 			frameData.push_condVar.wait(lock);
 		}
 	}

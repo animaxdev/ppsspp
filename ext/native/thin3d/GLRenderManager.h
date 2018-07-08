@@ -910,7 +910,7 @@ private:
 	// Execution time state
 	bool run_ = true;
 	// Thread is managed elsewhere, and should call ThreadFrame.
-	std::mutex mutex_;
+	//std::mutex mutex_;
 	int threadInitFrame_ = 0;
 	GLQueueRunner queueRunner_;
 

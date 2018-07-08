@@ -310,23 +310,21 @@ void VulkanRenderManager::ThreadFunc() {
 
 		{
 			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-			while (!frameData.readyForRun && run_) {
+			while (!frameData.readyForRun) {
+				if(!run_) {
+					// device is already idle
+					return;
+				}
 				frameData.pull_condVar.wait(lock);
 			}
 		}
 
-		if (!frameData.readyForRun && !run_) {
-			// This means we're out of frames to render and run_ is false, so bail.
-			break;
-		}
-		
 		frameData.readyForRun = false;
 		// Previously we had a quick exit here that avoided calling Run() if run_ was suddenly false,
 		// but that created a race condition where frames could end up not finished properly on resize etc.
 
 		// Only increment next time if we're done.
 		nextFrame = frameData.type == VKRRunType::END;
-		//assert(frameData.type == VKRRunType::END || frameData.type == VKRRunType::SYNC);
 
 		Run(threadFrame);
 	}
