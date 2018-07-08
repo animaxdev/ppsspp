@@ -246,8 +246,7 @@ void VulkanContext::BeginFrame() {
 
 void VulkanContext::EndFrame() {
 	frame_[curFrame_].deleteList.Take(globalDeleteList_);
-	curFrame_++;
-	if (curFrame_ >= inflightFrames_) {
+	if (++curFrame_ >= GetInflightFrames()) {
 		curFrame_ = 0;
 	}
 }

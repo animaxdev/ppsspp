@@ -227,7 +227,7 @@ public:
 	}
 
 	int GetInflightFrames() const {
-		return inflightFrames_;
+		return MAX_INFLIGHT_FRAMES;
 	}
 
 	int GetCurFrame() const {
@@ -300,7 +300,6 @@ private:
 	int height_ = 0;
 	int flags_ = 0;
 
-	int inflightFrames_ = MAX_INFLIGHT_FRAMES;
 
 	struct FrameData {
 		FrameData() {}
