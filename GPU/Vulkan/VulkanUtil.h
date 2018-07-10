@@ -112,10 +112,10 @@ private:
 
 	struct FrameData {
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
-		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 		int descCount = 0;
 		int descPoolSize = 1024;
 	};
+	std::map<DescriptorSetKey, VkDescriptorSet> frameDescSets;
 	VkResult RecreateDescriptorPool(FrameData &frame);
 
 	FrameData frame_[VulkanContext::MAX_INFLIGHT_FRAMES];

@@ -37,9 +37,10 @@ void Vulkan2D::DestroyDeviceObjects() {
 		if (frame_[i].descPool != VK_NULL_HANDLE) {
 			vulkan_->Delete().QueueDeleteDescriptorPool(frame_[i].descPool);
 			frame_[i].descPool = VK_NULL_HANDLE;
-			frame_[i].descSets.clear();
 		}
 	}
+	frameDescSets.clear();
+
 	for (auto it : pipelines_) {
 		vulkan_->Delete().QueueDeletePipeline(it.second);
 	}
@@ -119,7 +120,7 @@ void Vulkan2D::BeginFrame() {
 		frame.descCount = 0;
 	}
 	// cache must reset per frame
-	frame.descSets.clear();
+	frameDescSets.clear();
 }
 
 void Vulkan2D::EndFrame() {
@@ -132,7 +133,7 @@ VkResult Vulkan2D::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
-		frame.descSets.clear();
+		frameDescSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[1];
@@ -160,8 +161,8 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 	key.imageView[1] = tex2;
 	key.sampler[0] = sampler1;
 	key.sampler[1] = sampler2;
-	auto iter = frame.descSets.find(key);
-	if (iter != frame.descSets.end()) {
+	auto iter = frameDescSets.find(key);
+	if (iter != frameDescSets.end()) {
 		return iter->second;
 	}
 
@@ -240,7 +241,7 @@ VkDescriptorSet Vulkan2D::GetDescriptorSet(VkImageView tex1, VkSampler sampler1,
 
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
-	frame.descSets[key] = descSet;
+	frameDescSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;

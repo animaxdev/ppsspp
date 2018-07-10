@@ -252,11 +252,10 @@ private:
 		VulkanPushBuffer *pushVertex = nullptr;
 		VulkanPushBuffer *pushIndex = nullptr;
 		VulkanPushBuffer *pushOther = nullptr;
-		
-		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 
 		void Destroy(VulkanContext *vulkan);
 	};
+	std::map<DescriptorSetKey, VkDescriptorSet> frameDescSets;
 
 	GEPrimitiveType lastPrim_ = GE_PRIM_INVALID;
 	FrameData frame_[VulkanContext::MAX_INFLIGHT_FRAMES];

@@ -183,7 +183,6 @@ void DrawEngineVulkan::FrameData::Destroy(VulkanContext *vulkan) {
 	if (descPool != VK_NULL_HANDLE) {
 		vulkan->Delete().QueueDeleteDescriptorPool(descPool);
 		descPool = VK_NULL_HANDLE;
-		descSets.clear();
 	}
 
 	if (pushUBO) {
@@ -220,6 +219,8 @@ void DrawEngineVulkan::FrameData::Destroy(VulkanContext *vulkan) {
 void DrawEngineVulkan::DestroyDeviceObjects() {
 	delete tessDataTransfer;
 	tessDataTransfer = nullptr;
+
+	frameDescSets.clear();
 
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		frame_[i].Destroy(vulkan_);
@@ -292,7 +293,7 @@ void DrawEngineVulkan::BeginFrame() {
 		frame->descCount = 0;
 	}
 	// cache must reset per frame
-	frame->descSets.clear();
+	frameDescSets.clear();
 
 	if (--decimationCounter_ <= 0) {
 		decimationCounter_ = VERTEXCACHE_DECIMATION_INTERVAL;
@@ -355,7 +356,7 @@ VkResult DrawEngineVulkan::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
-		frame.descSets.clear();
+		frameDescSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[3];
@@ -393,8 +394,8 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 
 	// See if we already have this descriptor set cached.
 	if (!tess) { // Don't cache descriptors for HW tessellation.
-		auto iter = frame.descSets.find(key);
-		if (iter != frame.descSets.end()) {
+		auto iter = frameDescSets.find(key);
+		if (iter != frameDescSets.end()) {
 			return iter->second;
 		}
 	}
@@ -563,7 +564,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
 
 	if (!tess) // Again, avoid caching when HW tessellation.
-		frame.descSets[key] = descSet;
+		frameDescSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;

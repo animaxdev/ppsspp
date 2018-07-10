@@ -534,12 +534,13 @@ private:
 		// Per-frame descriptor set cache. As it's per frame and reset every frame, we don't need to
 		// worry about invalidating descriptors pointing to deleted textures.
 		// However! ARM is not a fan of doing it this way.
-		std::map<DescriptorSetKey, VkDescriptorSet> descSets;
+		//std::map<DescriptorSetKey, VkDescriptorSet> descSets;
 
 		VkDescriptorPool descPool = VK_NULL_HANDLE;
 		int descCount = 0;
 		int descPoolSize = 256;
 	};
+	std::map<DescriptorSetKey, VkDescriptorSet> frameDescSets;
 
 	VkResult RecreateDescriptorPool(FrameData &frame);
 
@@ -826,11 +827,10 @@ VKContext::~VKContext() {
 	for (int i = 0; i < VulkanContext::MAX_INFLIGHT_FRAMES; i++) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame_[i].descPool);
 		frame_[i].descPool = VK_NULL_HANDLE;
-		frame_[i].descSets.clear();
-
 		frame_[i].pushBuffer->Destroy();
 		delete frame_[i].pushBuffer;
 	}
+	frameDescSets.clear();
 	vulkan_->Delete().QueueDeleteDescriptorSetLayout(descriptorSetLayout_);
 	vulkan_->Delete().QueueDeletePipelineLayout(pipelineLayout_);
 	vulkan_->Delete().QueueDeletePipelineCache(pipelineCache_);
@@ -851,7 +851,7 @@ void VKContext::BeginFrame() {
 		frame.descCount = 0;
 	}
 	// cache must reset per frame
-	frame.descSets.clear();
+	frameDescSets.clear();
 }
 
 void VKContext::WaitRenderCompletion(Framebuffer *fbo) {
@@ -877,7 +877,7 @@ VkResult VKContext::RecreateDescriptorPool(FrameData &frame) {
 	if (frame.descPool) {
 		vulkan_->Delete().QueueDeleteDescriptorPool(frame.descPool);
 		frame.descCount = 0;
-		frame.descSets.clear();
+		frameDescSets.clear();
 	}
 
 	VkDescriptorPoolSize dpTypes[2];
@@ -910,8 +910,8 @@ VkDescriptorSet VKContext::GetOrCreateDescriptorSet(VkBuffer buf) {
 	key.sampler = boundSamplers_[0];
 	key.buffer = buf;
 
-	auto iter = frame.descSets.find(key);
-	if (iter != frame.descSets.end()) {
+	auto iter = frameDescSets.find(key);
+	if (iter != frameDescSets.end()) {
 		return iter->second;
 	}
 
@@ -980,7 +980,7 @@ VkDescriptorSet VKContext::GetOrCreateDescriptorSet(VkBuffer buf) {
 
 	vkUpdateDescriptorSets(device_, 2, writes, 0, nullptr);
 
-	frame.descSets[key] = descSet;
+	frameDescSets[key] = descSet;
 	frame.descCount++;
 
 	return descSet;
