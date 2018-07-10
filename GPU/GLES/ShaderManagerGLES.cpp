@@ -94,10 +94,17 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 	queries.push_back({ &u_stencilReplaceValue, "u_stencilReplaceValue" });
 	queries.push_back({ &u_testtex, "testtex" });
 
-	queries.push_back({ &u_fbotex, "fbotex" });
-	queries.push_back({ &u_blendFixA, "u_blendFixA" });
-	queries.push_back({ &u_blendFixB, "u_blendFixB" });
-	queries.push_back({ &u_fbotexSize, "u_fbotexSize" });
+	// DIRTY_SHADERBLEND
+	bool isModeClear = FSID.Bit(FS_BIT_CLEARMODE);
+	ReplaceBlendType replaceBlend = static_cast<ReplaceBlendType>(FSID.Bits(FS_BIT_REPLACE_BLEND, 3));
+	if (!isModeClear && replaceBlend > REPLACE_BLEND_STANDARD) {
+		queries.push_back({ &u_fbotex, "fbotex" });
+		queries.push_back({ &u_blendFixA, "u_blendFixA" });
+		queries.push_back({ &u_blendFixB, "u_blendFixB" });
+		queries.push_back({ &u_fbotexSize, "u_fbotexSize" });
+
+		initialize.push_back({ &u_fbotex,       0, 1 });
+	}
 	
 	queries.push_back({ &u_depthRange, "u_depthRange" });
 
@@ -152,7 +159,6 @@ LinkedShader::LinkedShader(GLRenderManager *render, VShaderID VSID, Shader *vs, 
 	availableUniforms = vs->GetUniformMask() | fs->GetUniformMask();
 
 	initialize.push_back({ &u_tex,          0, 0 });
-	initialize.push_back({ &u_fbotex,       0, 1 });
 	initialize.push_back({ &u_testtex,      0, 2 });
 	
 	program = render->CreateProgram(shaders, semantics, queries, initialize, gstate_c.featureFlags & GPU_SUPPORTS_DUALSOURCE_BLEND);
