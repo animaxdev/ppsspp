@@ -388,9 +388,6 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 	key.sampler_ = sampler;
 	key.secondaryImageView_ = boundSecondary_;
 	key.depalImageView_ = boundDepal_;
-	key.base_ = base;
-	key.light_ = light;
-	key.bone_ = bone;
 
 	// See if we already have this descriptor set cached.
 	if (!tess) { // Don't cache descriptors for HW tessellation.
@@ -565,6 +562,7 @@ VkDescriptorSet DrawEngineVulkan::GetOrCreateDescriptorSet(VkImageView imageView
 
 	if (!tess) // Again, avoid caching when HW tessellation.
 		frameDescSets[key] = descSet;
+
 	frame.descCount++;
 
 	return descSet;

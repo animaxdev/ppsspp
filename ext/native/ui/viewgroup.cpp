@@ -1148,7 +1148,7 @@ TabHolder::TabHolder(Orientation orientation, float stripSize, LayoutParams *lay
 	: LinearLayout(Opposite(orientation), layoutParams), stripSize_(stripSize) {
 	SetSpacing(0.0f);
 	if (orientation == ORIENT_HORIZONTAL) {
-		tabStrip_ = new ChoiceStrip(orientation, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+		tabStrip_ = new ChoiceStrip(orientation, new LayoutParams(FILL_PARENT, WRAP_CONTENT));
 		tabStrip_->SetTopTabs(true);
 		tabScroll_ = new ScrollView(orientation, new LayoutParams(FILL_PARENT, WRAP_CONTENT));
 		tabScroll_->Add(tabStrip_);
@@ -1267,10 +1267,7 @@ ChoiceStrip::ChoiceStrip(Orientation orientation, LayoutParams *layoutParams)
 }
 
 void ChoiceStrip::AddChoice(const std::string &title) {
-	StickyChoice *c = new StickyChoice(title, "",
-			orientation_ == ORIENT_HORIZONTAL ?
-			nullptr :
-			new LinearLayoutParams(FILL_PARENT, ITEM_HEIGHT));
+	StickyChoice *c = new StickyChoice(title, "", new LinearLayoutParams(orientation_ == ORIENT_HORIZONTAL ? WRAP_CONTENT : FILL_PARENT, ITEM_HEIGHT));
 	c->OnClick.Handle(this, &ChoiceStrip::OnChoiceClick);
 	Add(c);
 	if (selected_ == (int)views_.size() - 1)
@@ -1278,10 +1275,7 @@ void ChoiceStrip::AddChoice(const std::string &title) {
 }
 
 void ChoiceStrip::AddChoice(ImageID buttonImage) {
-	StickyChoice *c = new StickyChoice(buttonImage,
-			orientation_ == ORIENT_HORIZONTAL ?
-			nullptr :
-			new LinearLayoutParams(FILL_PARENT, ITEM_HEIGHT));
+	StickyChoice *c = new StickyChoice(buttonImage, new LinearLayoutParams(orientation_ == ORIENT_HORIZONTAL ? WRAP_CONTENT : FILL_PARENT, ITEM_HEIGHT));
 	c->OnClick.Handle(this, &ChoiceStrip::OnChoiceClick);
 	Add(c);
 	if (selected_ == (int)views_.size() - 1)
