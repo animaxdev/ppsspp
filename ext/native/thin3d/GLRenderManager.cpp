@@ -104,7 +104,7 @@ void GLRenderManager::ThreadStart() {
 
 void GLRenderManager::ThreadEnd() {
 	// Wait for any shutdown to complete in StopThread().
-	//std::unique_lock<std::mutex> lock(mutex_);
+	std::unique_lock<std::mutex> lock(mutex_);
 	queueRunner_.DestroyDeviceObjects();
 
 	// Good point to run all the deleters to get rid of leftover objects.
@@ -145,15 +145,15 @@ bool GLRenderManager::ThreadFrame() {
 			}
 		}
 		
-		frameData.readyForRun = false;
-		frameData.deleter_prev.Perform(this);
-		frameData.deleter_prev.Take(frameData.deleter);
-		// Only increment next time if we're done.
-		nextFrame = frameData.type == GLRRunType::END;
-
 		// run frame
 		{
-			//std::unique_lock<std::mutex> lock(mutex_);
+			std::unique_lock<std::mutex> lock(mutex_);
+			frameData.readyForRun = false;
+			frameData.deleter_prev.Perform(this);
+			frameData.deleter_prev.Take(frameData.deleter);
+			// Only increment next time if we're done.
+			nextFrame = frameData.type == GLRRunType::END;
+
 			Run(threadFrame_);
 		}
 
@@ -184,7 +184,7 @@ void GLRenderManager::StopThread() {
 	}
 
 	// Wait until we've definitely stopped the threadframe.
-	//std::unique_lock<std::mutex> lock(mutex_);
+	std::unique_lock<std::mutex> lock(mutex_);
 
 	// Eat whatever has been queued up for this frame if anything.
 	Wipe();
