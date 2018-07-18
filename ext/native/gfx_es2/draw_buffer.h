@@ -80,6 +80,8 @@ public:
 
 	void Flush(bool set_blend_state = true);
 
+	void ScreenFrame(float x, float y, float w, float h, float pixelWidth, float pixelHeight, uint32_t color);
+
 	void Rect(float x, float y, float w, float h, uint32_t color, int align = ALIGN_TOPLEFT);
 	void hLine(float x1, float y, float x2, uint32_t color);
 	void vLine(float x, float y1, float y2, uint32_t color);

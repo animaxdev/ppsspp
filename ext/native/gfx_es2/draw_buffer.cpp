@@ -150,6 +150,30 @@ void DrawBuffer::RectVGradient(float x, float y, float w, float h, uint32_t colo
 	V(x,		 y + h, 0, colorBottom, 0, 1);
 }
 
+void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidth, float pixelHeight, uint32_t color)
+{
+	const AtlasImage &image = atlas->images[0];
+	float x0 = x;      float x1 = x + w;
+	float y0 = y;      float y1 = y;
+	float x3 = x;      float x2 = x + w;
+	float y3 = y + h;  float y2 = y + h;
+
+	float x4 = 0;           float x5 = pixelWidth;
+	float y4 = 0;           float y5 = 0;
+	float x7 = 0;           float x6 = pixelWidth;
+	float y7 = pixelHeight; float y6 = pixelHeight;
+
+	V(x0, y0, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
+	V(x3, y3, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
+	V(x2, y2, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x5, y5, 0, color, image.u2, image.v2);
+	V(x1, y1, 0, color, image.u1, image.v1); V(x0, y0, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
+
+	V(x4, y4, 0, color, image.u1, image.v1); V(x0, y0, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
+	V(x7, y7, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
+	V(x6, y6, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x5, y5, 0, color, image.u2, image.v2);
+	V(x5, y5, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
+}
+
 void DrawBuffer::RectOutline(float x, float y, float w, float h, uint32_t color, int align) {
 	hLine(x, y, x + w + pixel_in_dps_x, color);
 	hLine(x, y + h, x + w + pixel_in_dps_x, color);
