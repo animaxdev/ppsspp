@@ -449,8 +449,64 @@ inline float clamp1(float x) {
 	return x;
 }
 
+static int touch_id = -1;
+static float touch_down_x = 0;
+static float touch_down_y = 0;
+static float touch_move_x = 0;
+static float touch_move_y = 0;
 bool EmuScreen::touch(const TouchInput &touch) {
 	Core_NotifyActivity();
+
+	if (touch.flags == TOUCH_DOWN) {
+		touch_id = touch.id;
+		touch_down_x = touch.x;
+		touch_down_y = touch.y;
+		touch_move_x = touch.x;
+		touch_move_y = touch.y;
+	}
+	else if (touch.flags == TOUCH_MOVE) {
+		if (touch_id == touch.id) {
+			touch_move_x = touch.x;
+			touch_move_y = touch.y;
+			return true;
+		}
+	}
+	else {
+		if (touch_id == touch.id) {
+			float factor_x = PSP_CoreParameter().renderWidth / (float)PSP_CoreParameter().pixelWidth;
+			float factor_y = PSP_CoreParameter().renderHeight / (float)PSP_CoreParameter().pixelHeight;
+			float x;
+			float width;
+			if (touch_down_x > touch_move_x) {
+				x = touch_move_x;
+				width = touch_down_x - touch_move_x;
+			}
+			else {
+				x = touch_down_x;
+				width = touch_move_x - touch_down_x;
+			}
+
+			float y;
+			float height;
+			if (touch_down_y > touch_move_y) {
+				y = touch_move_y;
+				height = touch_down_y - touch_move_y;
+			}
+			else {
+				y = touch_down_y;
+				height = touch_move_y - touch_down_y;
+			}
+			
+			SaveState::PartScreenshot(x * factor_x, y * factor_y, width * factor_x, height * factor_y);
+
+			touch_id = -1;
+			touch_down_x = 0;
+			touch_down_y = 0;
+			touch_move_x = 0;
+			touch_move_y = 0;
+			return true;
+		}
+	}
 
 	if (root_) {
 		root_->Touch(touch);
@@ -1319,6 +1375,31 @@ void EmuScreen::renderUI() {
 
 	if (g_Config.iShowFPSCounter && !invalid_) {
 		DrawFPS(draw2d, ctx->GetBounds());
+	}
+
+	if (touch_id != -1) {
+		float x;
+		float width;
+		if (touch_down_x > touch_move_x) {
+			x = touch_move_x;
+			width = touch_down_x - touch_move_x;
+		} 
+		else {
+			x = touch_down_x;
+			width = touch_move_x - touch_down_x;
+		}
+
+		float y;
+		float height;
+		if (touch_down_y > touch_move_y) {
+			y = touch_move_y;
+			height = touch_down_y - touch_move_y;
+		}
+		else {
+			y = touch_down_y;
+			height = touch_move_y - touch_down_y;
+		}
+		draw2d->ScreenFrame(x, y, width, height, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 	}
 
 #if !PPSSPP_PLATFORM(UWP)

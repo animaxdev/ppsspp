@@ -39,6 +39,8 @@ namespace SaveState
 	void Init();
 	void Shutdown();
 
+	void PartScreenshot(int x, int y, int width, int height);
+
 	// Cycle through the 5 savestate slots
 	void NextSlot();
 	void SaveSlot(const std::string &gameFilename, int slot, Callback callback, void *cbUserData = 0);

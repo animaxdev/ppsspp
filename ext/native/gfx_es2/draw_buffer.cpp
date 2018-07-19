@@ -150,9 +150,12 @@ void DrawBuffer::RectVGradient(float x, float y, float w, float h, uint32_t colo
 	V(x,		 y + h, 0, colorBottom, 0, 1);
 }
 
-void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidth, float pixelHeight, uint32_t color)
+void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidth, float pixelHeight)
 {
 	const AtlasImage &image = atlas->images[0];
+	float border = 3.0f;
+	uint32_t color = 0x99AAAAAA;
+
 	float x0 = x;      float x1 = x + w;
 	float y0 = y;      float y1 = y;
 	float x3 = x;      float x2 = x + w;
@@ -162,6 +165,24 @@ void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidt
 	float y4 = 0;           float y5 = 0;
 	float x7 = 0;           float x6 = pixelWidth;
 	float y7 = pixelHeight; float y6 = pixelHeight;
+
+	V(x0, y0, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
+	V(x3, y3, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
+	V(x2, y2, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x5, y5, 0, color, image.u2, image.v2);
+	V(x1, y1, 0, color, image.u1, image.v1); V(x0, y0, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
+
+	V(x4, y4, 0, color, image.u1, image.v1); V(x0, y0, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
+	V(x7, y7, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
+	V(x6, y6, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x5, y5, 0, color, image.u2, image.v2);
+	V(x5, y5, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
+
+
+
+	x4 = x0 - border;       x5 = x1 + border;
+	y4 = y0 - border;       y5 = y1 - border;
+	x7 = x3 - border;       x6 = x2 + border;
+	y7 = y3 + border;       y6 = y2 + border;
+	color = 0xEEFFFFFF;
 
 	V(x0, y0, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
 	V(x3, y3, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);

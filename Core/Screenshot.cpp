@@ -251,12 +251,14 @@ const u8 *ConvertBufferToScreenshot(const GPUDebugBuffer &buf, bool alpha, u8 *&
 	}
 
 	const u8 *buffer = buf.GetData();
-	if (buf.GetFlipped() && buf.GetFormat() == nativeFmt) {
-		// Silly OpenGL reads upside down, we flip to another buffer for simplicity.
-		for (u32 y = 0; y < h; y++) {
-			memcpy(temp + y * w * pixelSize, buffer + (buf.GetHeight() - y - 1) * buf.GetStride() * pixelSize, w * pixelSize);
+	if (buf.GetFormat() == nativeFmt) {
+		if (buf.GetFlipped()) {
+			// Silly OpenGL reads upside down, we flip to another buffer for simplicity.
+			for (u32 y = 0; y < h; y++) {
+				memcpy(temp + y * w * pixelSize, buffer + (buf.GetHeight() - y - 1) * buf.GetStride() * pixelSize, w * pixelSize);
+			}
 		}
-	} else if (buf.GetFormat() < GPU_DBG_FORMAT_FLOAT && buf.GetFormat() != nativeFmt) {
+	} else if (buf.GetFormat() < GPU_DBG_FORMAT_FLOAT) {
 		// Let's boil it down to how we need to interpret the bits.
 		int baseFmt = buf.GetFormat() & ~(GPU_DBG_FORMAT_REVERSE_FLAG | GPU_DBG_FORMAT_BRSWAP_FLAG);
 		bool rev = (buf.GetFormat() & GPU_DBG_FORMAT_REVERSE_FLAG) != 0;
@@ -283,7 +285,7 @@ const u8 *ConvertBufferToScreenshot(const GPUDebugBuffer &buf, bool alpha, u8 *&
 				}
 			}
 		}
-	} else if (buf.GetFormat() != nativeFmt) {
+	} else {
 		bool flip = buf.GetFlipped();
 
 		// This is pretty inefficient.
@@ -332,8 +334,8 @@ bool TakeGameScreenshot(const char *filename, ScreenshotFormat fmt, ScreenshotTy
 		return false;
 	}
 
-	u8 *flipbuffer = nullptr;
 	if (success) {
+		u8 *flipbuffer = nullptr;
 		const u8 *buffer = ConvertBufferToScreenshot(buf, false, flipbuffer, w, h);
 		success = buffer != nullptr;
 		if (success) {
@@ -343,10 +345,10 @@ bool TakeGameScreenshot(const char *filename, ScreenshotFormat fmt, ScreenshotTy
 				*height = h;
 
 			success = Save888RGBScreenshot(filename, fmt, buffer, w, h);
+			delete[] flipbuffer;
 		}
 	}
-	delete [] flipbuffer;
-
+	
 	if (!success) {
 		ERROR_LOG(SYSTEM, "Failed to write screenshot.");
 	}
@@ -403,4 +405,116 @@ bool Save8888RGBAScreenshot(const char *filename, const u8 *buffer, int w, int h
 	}
 	return success;
 #endif
+}
+
+
+const u8 *ConvertBufferToPartScreenshot(const GPUDebugBuffer &buf, u8 *&temp, u32 w, u32 h, int clip_x, int clip_y, int clip_width, int clip_height) {
+	int pixelSize = 3;
+	GPUDebugBufferFormat nativeFmt = GPU_DBG_FORMAT_888_RGB;
+	const u8 *buffer = buf.GetData();
+
+	w = std::min(w, buf.GetStride());
+	h = std::min(h, buf.GetHeight());
+
+	// The temp buffer will be freed by the caller if set, and can be the return value.
+	temp = new u8[pixelSize * clip_width * clip_height];
+
+	if (buf.GetFormat() == nativeFmt) {
+		if (buf.GetFlipped()) {
+			// Silly OpenGL reads upside down, we flip to another buffer for simplicity.
+			for (int y = clip_y; y < clip_height; y++) {
+				memcpy(temp + (y - clip_y) * clip_width * pixelSize, buffer + ((buf.GetHeight() - y - 1) + clip_x) * buf.GetStride() * pixelSize, clip_width * pixelSize);
+			}
+		}
+		else {
+			for (int y = clip_y; y < clip_height; y++) {
+				memcpy(temp + (y - clip_y) * clip_width * pixelSize, buffer + (y * buf.GetStride() + clip_x) * pixelSize, clip_width * pixelSize);
+			}
+		}
+	}
+	else if (buf.GetFormat() < GPU_DBG_FORMAT_FLOAT) {
+		// Let's boil it down to how we need to interpret the bits.
+		int baseFmt = buf.GetFormat() & ~(GPU_DBG_FORMAT_REVERSE_FLAG | GPU_DBG_FORMAT_BRSWAP_FLAG);
+		bool rev = (buf.GetFormat() & GPU_DBG_FORMAT_REVERSE_FLAG) != 0;
+		bool brswap = (buf.GetFormat() & GPU_DBG_FORMAT_BRSWAP_FLAG) != 0;
+		bool flip = buf.GetFlipped();
+
+		// This is pretty inefficient.
+		for (int y = clip_y; y < clip_y + clip_height; y++) {
+			for (int x = clip_x; x < clip_x + clip_width; x++) {
+				u8 *dst;
+				if (flip) {
+					dst = &temp[(h - (y - clip_y) - 1) * clip_width * pixelSize + (x - clip_x) * pixelSize];
+				}
+				else {
+					dst = &temp[(y - clip_y) * clip_width * pixelSize + (x - clip_x) * pixelSize];
+				}
+
+				u8 &r = brswap ? dst[2] : dst[0];
+				u8 &g = dst[1];
+				u8 &b = brswap ? dst[0] : dst[2];
+				u8 &a = r;
+
+				if (!ConvertPixelTo8888RGBA(GPUDebugBufferFormat(baseFmt), r, g, b, a, buffer, y * buf.GetStride() + x, rev)) {
+					return nullptr;
+				}
+			}
+		}
+	}
+	else {
+		bool flip = buf.GetFlipped();
+
+		// This is pretty inefficient.
+		for (int y = clip_y; y < clip_y + clip_height; y++) {
+			for (int x = clip_x; x < clip_x + clip_width; x++) {
+				u8 *dst;
+				if (flip) {
+					dst = &temp[(h - (y - clip_y) - 1) * clip_width * pixelSize + (x - clip_x) * pixelSize];
+				}
+				else {
+					dst = &temp[(y - clip_y) * clip_width * pixelSize + (x - clip_x) * pixelSize];
+				}
+
+				u8 &a = dst[0];
+				if (!ConvertPixelTo8888RGBA(buf.GetFormat(), dst[0], dst[1], dst[2], a, buffer, y * buf.GetStride() + x, false)) {
+					return nullptr;
+				}
+			}
+		}
+	}
+
+	return temp;
+}
+
+bool TakePartScreenshot(int x, int y, int width, int height) {
+	if (!gpuDebug) {
+		ERROR_LOG(SYSTEM, "Can't take screenshots when GPU not running");
+		return false;
+	}
+
+	int maxRes = -1;
+	GPUDebugBuffer buf;
+	bool success = gpuDebug->GetCurrentFramebuffer(buf, GPU_DBG_FRAMEBUF_DISPLAY, maxRes);
+	if (!success) {
+		ERROR_LOG(G3D, "Failed to obtain screenshot data.");
+		return false;
+	}
+
+	if (success) {
+		u8 *flipbuffer = nullptr;
+		// Only crop to the top left when using a render screenshot.
+		u32 pixelWidth = maxRes > 0 ? 480 * maxRes : PSP_CoreParameter().renderWidth;
+		u32 pixelHeight = maxRes > 0 ? 272 * maxRes : PSP_CoreParameter().renderHeight;
+		const u8 *buffer = ConvertBufferToPartScreenshot(buf, flipbuffer, pixelWidth, pixelHeight, x, y, width, height);
+		success = buffer != nullptr;
+		if (success) {
+			success = Save888RGBScreenshot("hello.jpg", ScreenshotFormat::JPG, buffer, width, height);
+		}
+		delete[] flipbuffer;
+	}
+
+	if (!success) {
+		ERROR_LOG(SYSTEM, "Failed to write screenshot.");
+	}
+	return success;
 }

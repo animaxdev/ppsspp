@@ -66,6 +66,7 @@ namespace SaveState
 		SAVESTATE_VERIFY,
 		SAVESTATE_REWIND,
 		SAVESTATE_SAVE_SCREENSHOT,
+		SAVESTATE_PART_SCREENSHOT,
 	};
 
 	struct Operation
@@ -75,10 +76,20 @@ namespace SaveState
 		{
 		}
 
+		Operation(OperationType t, const std::string &f, int x, int y, int width, int height, Callback cb, void *cbUserData_)
+			: type(t), filename(f), x(x), y(y), width(width), height(height), callback(cb), cbUserData(cbUserData_)
+		{
+		}
+
 		OperationType type;
 		std::string filename;
 		Callback callback;
 		void *cbUserData;
+
+		int x;
+		int y;
+		int width;
+		int height;
 	};
 
 	CChunkFileReader::Error SaveToRam(std::vector<u8> &data) {
@@ -332,6 +343,11 @@ namespace SaveState
 	void SaveScreenshot(const std::string &filename, Callback callback, void *cbUserData)
 	{
 		Enqueue(Operation(SAVESTATE_SAVE_SCREENSHOT, filename, callback, cbUserData));
+	}
+
+	void PartScreenshot(int x, int y, int width, int height)
+	{
+		Enqueue(Operation(SAVESTATE_PART_SCREENSHOT, std::string(""), x, y, width, height, Callback(), 0));
 	}
 
 	bool CanRewind()
@@ -850,6 +866,14 @@ namespace SaveState
 
 			case SAVESTATE_SAVE_SCREENSHOT:
 				tempResult = TakeGameScreenshot(op.filename.c_str(), ScreenshotFormat::JPG, SCREENSHOT_DISPLAY, nullptr, nullptr, 2);
+				callbackResult = tempResult ? Status::SUCCESS : Status::FAILURE;
+				if (!tempResult) {
+					ERROR_LOG(SAVESTATE, "Failed to take a screenshot for the savestate! %s", op.filename.c_str());
+				}
+				break;
+
+			case SAVESTATE_PART_SCREENSHOT:
+				tempResult = TakePartScreenshot(op.x, op.y, op.width, op.height);
 				callbackResult = tempResult ? Status::SUCCESS : Status::FAILURE;
 				if (!tempResult) {
 					ERROR_LOG(SAVESTATE, "Failed to take a screenshot for the savestate! %s", op.filename.c_str());
