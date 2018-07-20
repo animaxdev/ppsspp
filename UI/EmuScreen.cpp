@@ -120,6 +120,187 @@ static void __EmuScreenVblank()
 #endif
 }
 
+
+class ScreenCliper
+{
+public:
+	ScreenCliper() : state_(CLIP_NONE), touch_id(-1) {}
+
+	bool Touch(const TouchInput &touch) {
+		if (touch.flags == TOUCH_DOWN) {
+			if (state_ == CLIP_NONE) {
+				state_ = CLIP_RUNNING;
+				touch_id = touch.id;
+
+				touch_down_x = touch.x;
+				touch_down_y = touch.y;
+				touch_move_x = touch.x;
+				touch_move_y = touch.y;
+				return true;
+			}
+			else if (state_ == CLIP_RUNNING && touch_id == -1) {
+				float space = 12.0f;
+				if (std::abs(touch.x - clip_x) < space) {
+					if (touch.y > clip_y - space && touch.y < clip_y + clip_height + space) {
+						state_ |= ADJUST_LEFT;
+					}
+				}
+				else if (std::abs(touch.x - (clip_x + clip_width)) < space) {
+					if (touch.y > clip_y - space && touch.y < clip_y + clip_height + space) {
+						state_ |= ADJUST_RIGHT;
+					}
+				}
+
+				if (std::abs(touch.y - clip_y) < space) {
+					if (touch.x > clip_x - space && touch.x < clip_x + clip_width + space) {
+						state_ |= ADJUST_TOP;
+					}
+				}
+				else if (std::abs(touch.y - (clip_y + clip_height)) < space) {
+					if (touch.x > clip_x - space && touch.x < clip_x + clip_width + space) {
+						state_ |= ADJUST_BOTTOM;
+					}
+				}
+
+				if (state_ == CLIP_RUNNING) {
+					if (std::abs(touch.x - (clip_x + clip_width / 2)) < space && std::abs(touch.y - (clip_y + clip_height / 2)) < space) {
+						state_ = CLIP_NONE;
+						touch_id = -1;
+						PartScreenshot();
+						return true;
+					}
+				}
+
+				touch_id = touch.id;
+				touch_down_x = touch.x;
+				touch_down_y = touch.y;
+				touch_move_x = touch.x;
+				touch_move_y = touch.y;
+				return true;
+			}
+		}
+		else if (touch.flags == TOUCH_MOVE) {
+			if (touch_id == touch.id) {
+				touch_move_x = touch.x;
+				touch_move_y = touch.y;
+				if (state_ == CLIP_RUNNING) {
+					if (touch_down_x > touch_move_x) {
+						clip_x = touch_move_x;
+						clip_width = touch_down_x - touch_move_x;
+					}
+					else {
+						clip_x = touch_down_x;
+						clip_width = touch_move_x - touch_down_x;
+					}
+
+					if (touch_down_y > touch_move_y) {
+						clip_y = touch_move_y;
+						clip_height = touch_down_y - touch_move_y;
+					}
+					else {
+						clip_y = touch_down_y;
+						clip_height = touch_move_y - touch_down_y;
+					}
+				}
+				return true;
+			}
+		}
+		else {
+			if (touch_id == touch.id) {
+				AdjustClip(clip_x, clip_y, clip_width, clip_height);
+				state_ = CLIP_RUNNING;
+				touch_id = -1;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void AdjustClip(float &x, float &y, float &width, float &height) {
+		if (state_ & ADJUST_LEFT) {
+			x += (touch_move_x - touch_down_x);
+			width -= (touch_move_x - touch_down_x);
+		}
+		if (state_ & ADJUST_RIGHT) {
+			width += (touch_move_x - touch_down_x);
+		}
+		if (state_ & ADJUST_TOP) {
+			y += (touch_move_y - touch_down_y);
+			height -= (touch_move_y - touch_down_y);
+		}
+		if (state_ & ADJUST_BOTTOM) {
+			height += (touch_move_y - touch_down_y);
+		}
+
+		if (width < 0) {
+			x += width;
+			width = -width;
+		}
+
+		if (height < 0) {
+			y += height;
+			height = -height;
+		}
+	}
+
+	void Draw(DrawBuffer *draw2d) {
+		if (state_ == CLIP_NONE) {
+			return;
+		}
+
+		float x = clip_x;
+		float y = clip_y;
+		float width = clip_width;
+		float height = clip_height;
+		AdjustClip(x, y, width, height);
+		draw2d->ScreenFrame(x, y, width, height, PixelWidth(), PixelHeight());
+	}
+
+	void PartScreenshot() {
+		float factor_x = RenderWidth() / (float)PixelWidth();
+		float factor_y = RenderHeight() / (float)PixelHeight();
+		SaveState::PartScreenshot(clip_x * factor_x, clip_y * factor_y, clip_width * factor_x, clip_height * factor_y);
+	}
+
+	int PixelWidth() const {
+		return PSP_CoreParameter().pixelWidth;
+	}
+
+	int PixelHeight() const {
+		return PSP_CoreParameter().pixelHeight;
+	}
+
+	int RenderWidth() const {
+		return PSP_CoreParameter().renderWidth;
+	}
+
+	int RenderHeight() const {
+		return PSP_CoreParameter().renderHeight;
+	}
+
+private:
+	enum CLIP_STATE {
+		CLIP_NONE = 0,
+		CLIP_RUNNING = 1,
+		ADJUST_TOP = 2,
+		ADJUST_RIGHT = 4,
+		ADJUST_BOTTOM = 8,
+		ADJUST_LEFT = 16
+	};
+	int state_;
+
+	int touch_id;
+	float touch_down_x;
+	float touch_down_y;
+	float touch_move_x;
+	float touch_move_y;
+
+	float clip_x;
+	float clip_y;
+	float clip_width;
+	float clip_height;
+};
+
 EmuScreen::EmuScreen(const std::string &filename)
 	: bootPending_(true), gamePath_(filename), invalid_(true), quit_(false), pauseTrigger_(false), saveStatePreviewShownTime_(0.0), saveStatePreview_(nullptr) {
 	memset(axisState_, 0, sizeof(axisState_));
@@ -128,6 +309,8 @@ EmuScreen::EmuScreen(const std::string &filename)
 	frameStep_ = false;
 	lastNumFlips = gpuStats.numFlips;
 	startDumping = false;
+
+	//cliper_ = new ScreenCliper();
 
 	OnDevMenu.Handle(this, &EmuScreen::OnDevTools);
 }
@@ -325,6 +508,7 @@ EmuScreen::~EmuScreen() {
 		// If we were invalid, it would already be shutdown.
 		PSP_Shutdown();
 	}
+	//delete cliper_;
 #ifndef MOBILE_DEVICE
 	if (g_Config.bDumpFrames && startDumping)
 	{
@@ -449,64 +633,13 @@ inline float clamp1(float x) {
 	return x;
 }
 
-static int touch_id = -1;
-static float touch_down_x = 0;
-static float touch_down_y = 0;
-static float touch_move_x = 0;
-static float touch_move_y = 0;
+
 bool EmuScreen::touch(const TouchInput &touch) {
 	Core_NotifyActivity();
 
-	if (touch.flags == TOUCH_DOWN) {
-		touch_id = touch.id;
-		touch_down_x = touch.x;
-		touch_down_y = touch.y;
-		touch_move_x = touch.x;
-		touch_move_y = touch.y;
-	}
-	else if (touch.flags == TOUCH_MOVE) {
-		if (touch_id == touch.id) {
-			touch_move_x = touch.x;
-			touch_move_y = touch.y;
-			return true;
-		}
-	}
-	else {
-		if (touch_id == touch.id) {
-			float factor_x = PSP_CoreParameter().renderWidth / (float)PSP_CoreParameter().pixelWidth;
-			float factor_y = PSP_CoreParameter().renderHeight / (float)PSP_CoreParameter().pixelHeight;
-			float x;
-			float width;
-			if (touch_down_x > touch_move_x) {
-				x = touch_move_x;
-				width = touch_down_x - touch_move_x;
-			}
-			else {
-				x = touch_down_x;
-				width = touch_move_x - touch_down_x;
-			}
-
-			float y;
-			float height;
-			if (touch_down_y > touch_move_y) {
-				y = touch_move_y;
-				height = touch_down_y - touch_move_y;
-			}
-			else {
-				y = touch_down_y;
-				height = touch_move_y - touch_down_y;
-			}
-			
-			SaveState::PartScreenshot(x * factor_x, y * factor_y, width * factor_x, height * factor_y);
-
-			touch_id = -1;
-			touch_down_x = 0;
-			touch_down_y = 0;
-			touch_move_x = 0;
-			touch_move_y = 0;
-			return true;
-		}
-	}
+	//if (cliper_->Touch(touch)) {
+	//	return true;
+	//}
 
 	if (root_) {
 		root_->Touch(touch);
@@ -1377,30 +1510,7 @@ void EmuScreen::renderUI() {
 		DrawFPS(draw2d, ctx->GetBounds());
 	}
 
-	if (touch_id != -1) {
-		float x;
-		float width;
-		if (touch_down_x > touch_move_x) {
-			x = touch_move_x;
-			width = touch_down_x - touch_move_x;
-		} 
-		else {
-			x = touch_down_x;
-			width = touch_move_x - touch_down_x;
-		}
-
-		float y;
-		float height;
-		if (touch_down_y > touch_move_y) {
-			y = touch_move_y;
-			height = touch_down_y - touch_move_y;
-		}
-		else {
-			y = touch_down_y;
-			height = touch_move_y - touch_down_y;
-		}
-		draw2d->ScreenFrame(x, y, width, height, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
-	}
+	//cliper_->Draw(draw2d);
 
 #if !PPSSPP_PLATFORM(UWP)
 	if (g_Config.iGPUBackend == (int)GPUBackend::VULKAN && g_Config.bShowAllocatorDebug) {

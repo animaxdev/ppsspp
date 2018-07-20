@@ -31,6 +31,8 @@ struct AxisInput;
 
 class AsyncImageFileView;
 
+class ScreenCliper;
+
 class EmuScreen : public UIScreen {
 public:
 	EmuScreen(const std::string &filename);
@@ -75,6 +77,8 @@ private:
 
 	bool bootPending_;
 	std::string gamePath_;
+
+	//ScreenCliper * cliper_;
 
 	// Something invalid was loaded, don't try to emulate
 	bool invalid_;
