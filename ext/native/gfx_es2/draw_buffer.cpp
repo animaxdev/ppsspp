@@ -153,7 +153,6 @@ void DrawBuffer::RectVGradient(float x, float y, float w, float h, uint32_t colo
 void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidth, float pixelHeight)
 {
 	const AtlasImage &image = atlas->images[0];
-	float border = 3.0f;
 	uint32_t color = 0x99AAAAAA;
 
 	float x0 = x;      float x1 = x + w;
@@ -177,12 +176,13 @@ void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidt
 	V(x5, y5, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
 
 
-
+	//
+	float border = 3.0f;
+	color = 0xEEFFFFFF;
 	x4 = x0 - border;       x5 = x1 + border;
 	y4 = y0 - border;       y5 = y1 - border;
 	x7 = x3 - border;       x6 = x2 + border;
 	y7 = y3 + border;       y6 = y2 + border;
-	color = 0xEEFFFFFF;
 
 	V(x0, y0, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x7, y7, 0, color, image.u2, image.v2);
 	V(x3, y3, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
@@ -193,6 +193,18 @@ void DrawBuffer::ScreenFrame(float x, float y, float w, float h, float pixelWidt
 	V(x7, y7, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x6, y6, 0, color, image.u2, image.v2);
 	V(x6, y6, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x5, y5, 0, color, image.u2, image.v2);
 	V(x5, y5, 0, color, image.u1, image.v1); V(x1, y1, 0, color, image.u2, image.v1); V(x4, y4, 0, color, image.u2, image.v2);
+
+
+	//
+	float space = 12.0f;
+	color = 0xAAFFFFFF;
+	x0 = (x + w / 2) - space;      x1 = (x + w / 2) + space;
+	y0 = (y + h / 2) - space;      y1 = (y + h / 2) - space;
+	x3 = (x + w / 2) - space;      x2 = (x + w / 2) + space;
+	y3 = (y + h / 2) + space;      y2 = (y + h / 2) + space;
+
+	V(x0, y0, 0, color, image.u1, image.v1); V(x3, y3, 0, color, image.u2, image.v1); V(x1, y1, 0, color, image.u2, image.v2);
+	V(x3, y3, 0, color, image.u1, image.v1); V(x2, y2, 0, color, image.u2, image.v1); V(x1, y1, 0, color, image.u2, image.v2);
 }
 
 void DrawBuffer::RectOutline(float x, float y, float w, float h, uint32_t color, int align) {

@@ -30,7 +30,7 @@
 #include "math/math_util.h"
 #include "ui/ui_context.h"
 
-#define BUTTON_TOUCH_SCALE 1.8f
+#define BUTTON_TOUCH_SCALE 2.0f
 
 static u32 GetButtonColor() {
 	return g_Config.iTouchButtonStyle == 1 ? 0xFFFFFF : 0xc0b080;

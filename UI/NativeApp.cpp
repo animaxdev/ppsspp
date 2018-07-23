@@ -132,10 +132,8 @@ static UI::Theme ui_theme;
 #include "android/android-ndk-profiler/prof.h"
 #endif
 
-ScreenManager *screenManager;
-std::string config_filename;
-
-bool g_graphicsInited;
+static ScreenManager *screenManager;
+static bool g_graphicsInited;
 
 // Really need to clean this mess of globals up... but instead I add more :P
 bool g_TakeScreenshot;

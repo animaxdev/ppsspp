@@ -120,7 +120,13 @@ protected:
 	UI::Size PopupWidth() const override { return 500; }
 
 private:
-	UI::EventReturn OnDeleteButtonClick(UI::EventParams &e);
+	UI::EventReturn OnDeleteButtonClick(UI::EventParams &e) {
+		std::shared_ptr<GameInfo> ginfo = g_gameInfoCache->GetInfo(nullptr, savePath_, GAMEINFO_WANTSIZE);
+		ginfo->Delete();
+		TriggerFinish(DR_NO);
+		return UI::EVENT_DONE;
+	}
+
 	std::string savePath_;
 };
 
@@ -175,13 +181,6 @@ private:
 	std::string subtitle_;
 	std::string filedate_;
 };
-
-UI::EventReturn SavedataPopupScreen::OnDeleteButtonClick(UI::EventParams &e) {
-	std::shared_ptr<GameInfo> ginfo = g_gameInfoCache->GetInfo(nullptr, savePath_, GAMEINFO_WANTSIZE);
-	ginfo->Delete();
-	TriggerFinish(DR_NO);
-	return UI::EVENT_DONE;
-}
 
 static std::string CleanSaveString(std::string str) {
 	std::string s = ReplaceAll(str, "&", "&&");

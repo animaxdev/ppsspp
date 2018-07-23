@@ -121,6 +121,48 @@ static void __EmuScreenVblank()
 }
 
 
+class CliperPopupScreen : public PopupScreen {
+public:
+	CliperPopupScreen() : PopupScreen("Cliper") {
+	}
+
+	void CreatePopupContents(UI::ViewGroup *parent) override {
+		using namespace UI;
+		UIContext &dc = *screenManager()->getUIContext();
+		const Style &textStyle = dc.theme->popupStyle;
+
+		
+		LinearLayout *content = new LinearLayout(ORIENT_VERTICAL);
+		parent->Add(content);
+		
+
+		std::string image_path("hello.jpg");
+		if (File::Exists(image_path)) {
+			PrioritizedWorkQueue *wq = g_gameInfoCache->WorkQueue();
+			content->Add(new AsyncImageFileView(image_path, IS_DEFAULT, wq, new LinearLayoutParams(480, 272, Margins(10, 0))));
+		}
+
+		content->Add(new TextView(image_path, 0, true, new LinearLayoutParams(Margins(10, 5))))->SetTextColor(textStyle.fgColor);
+
+
+		I18NCategory *di = GetI18NCategory("Dialog");
+		LinearLayout *buttons = new LinearLayout(ORIENT_HORIZONTAL);
+		buttons->Add(new Button(di->T("Back"), new LinearLayoutParams(1.0)))->OnClick.Handle<UIScreen>(this, &UIScreen::OnBack);
+		buttons->Add(new Button(di->T("Delete"), new LinearLayoutParams(1.0)))->OnClick.Handle(this, &CliperPopupScreen::OnDeleteButtonClick);
+		content->Add(buttons);
+	}
+
+protected:
+	UI::Size PopupWidth() const override { return 500; }
+
+private:
+	UI::EventReturn OnDeleteButtonClick(UI::EventParams &e) {
+		File::Delete("hello.jpg");
+		return UI::EVENT_DONE;
+	}
+};
+
+
 class ScreenCliper
 {
 public:
@@ -262,6 +304,11 @@ public:
 		SaveState::PartScreenshot(clip_x * factor_x, clip_y * factor_y, clip_width * factor_x, clip_height * factor_y);
 	}
 
+	void ShowPopup() {
+		//CliperPopupScreen *popupScreen = new CliperPopupScreen();
+		//screenManager()->push(popupScreen);
+	}
+
 	int PixelWidth() const {
 		return PSP_CoreParameter().pixelWidth;
 	}
@@ -310,7 +357,7 @@ EmuScreen::EmuScreen(const std::string &filename)
 	lastNumFlips = gpuStats.numFlips;
 	startDumping = false;
 
-	//cliper_ = new ScreenCliper();
+	cliper_ = new ScreenCliper();
 
 	OnDevMenu.Handle(this, &EmuScreen::OnDevTools);
 }
@@ -508,7 +555,7 @@ EmuScreen::~EmuScreen() {
 		// If we were invalid, it would already be shutdown.
 		PSP_Shutdown();
 	}
-	//delete cliper_;
+	delete cliper_;
 #ifndef MOBILE_DEVICE
 	if (g_Config.bDumpFrames && startDumping)
 	{
@@ -637,9 +684,9 @@ inline float clamp1(float x) {
 bool EmuScreen::touch(const TouchInput &touch) {
 	Core_NotifyActivity();
 
-	//if (cliper_->Touch(touch)) {
-	//	return true;
-	//}
+	if (cliper_->Touch(touch)) {
+		return true;
+	}
 
 	if (root_) {
 		root_->Touch(touch);
@@ -1510,7 +1557,7 @@ void EmuScreen::renderUI() {
 		DrawFPS(draw2d, ctx->GetBounds());
 	}
 
-	//cliper_->Draw(draw2d);
+	cliper_->Draw(draw2d);
 
 #if !PPSSPP_PLATFORM(UWP)
 	if (g_Config.iGPUBackend == (int)GPUBackend::VULKAN && g_Config.bShowAllocatorDebug) {
