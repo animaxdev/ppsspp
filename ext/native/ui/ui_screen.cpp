@@ -135,12 +135,8 @@ TouchInput UIScreen::transformTouch(const TouchInput &touch) {
 bool UIScreen::touch(const TouchInput &touch) {
 	if (root_) {
 		if (ClickDebug && (touch.flags & TOUCH_DOWN)) {
-			ILOG("Touch down!");
 			std::vector<UI::View *> views;
 			root_->Query(touch.x, touch.y, views);
-			for (auto view : views) {
-				ILOG("%s", view->Describe().c_str());
-			}
 		}
 
 		UI::TouchEvent(touch, root_);

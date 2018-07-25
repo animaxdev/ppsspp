@@ -150,7 +150,6 @@ struct PendingMessage {
 
 static std::mutex pendingMutex;
 static std::vector<PendingMessage> pendingMessages;
-static Draw::DrawContext *g_draw;
 static Draw::Pipeline *colorPipeline;
 static Draw::Pipeline *texColorPipeline;
 static UIContext *uiContext;
@@ -683,7 +682,7 @@ bool NativeInitGraphics(GraphicsContext *graphicsContext) {
 
 	using namespace Draw;
 	Core_SetGraphicsContext(graphicsContext);
-	g_draw = graphicsContext->GetDrawContext();
+	DrawContext *g_draw = graphicsContext->GetDrawContext();
 	_assert_msg_(G3D, g_draw, "No draw context available!");
 
 	ui_draw2d.SetAtlas(&ui_atlas);
@@ -862,31 +861,38 @@ void RenderOverlays(UIContext *dc, void *userdata) {
 	}
 }
 
+#ifdef _WIN32
+#undef far
+#undef near
+#endif
 void NativeRender(GraphicsContext *graphicsContext) {
 	g_GameManager.Update();
 
 	float xres = dp_xres;
 	float yres = dp_yres;
 
+	float near = -1.0f;
+	float far = 1.0f;
+
 	// Apply the UIContext bounds as a 2D transformation matrix.
 	// TODO: This should be moved into the draw context...
 	Matrix4x4 ortho;
 	switch (GetGPUBackend()) {
 	case GPUBackend::VULKAN:
-		ortho.setOrthoD3D(0.0f, xres, 0, yres, -1.0f, 1.0f);
+		ortho.setOrthoD3D(0.0f, xres, 0, yres, near, far);
 		break;
 	case GPUBackend::DIRECT3D9:
-		ortho.setOrthoD3D(0.0f, xres, yres, 0.0f, -1.0f, 1.0f);
+		ortho.setOrthoD3D(0.0f, xres, yres, 0.0f, near, far);
 		Matrix4x4 translation;
 		// Account for the small window adjustment.
 		translation.setTranslation(Vec3(-0.5f * g_dpi_scale_x / g_dpi_scale_real_x, -0.5f * g_dpi_scale_y / g_dpi_scale_real_y, 0.0f));
 		ortho = translation * ortho;
 		break;
 	case GPUBackend::DIRECT3D11:
-		ortho.setOrthoD3D(0.0f, xres, yres, 0.0f, -1.0f, 1.0f);
+		ortho.setOrthoD3D(0.0f, xres, yres, 0.0f, near, far);
 		break;
 	case GPUBackend::OPENGL:
-		ortho.setOrtho(0.0f, xres, yres, 0.0f, -1.0f, 1.0f);
+		ortho.setOrtho(0.0f, xres, yres, 0.0f, near, far);
 		break;
 	}
 

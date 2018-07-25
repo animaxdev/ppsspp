@@ -151,13 +151,10 @@ public:
 	static void DoAlign(int flags, float *x, float *y, float *w, float *h);
 
 	void PushDrawMatrix(const Matrix4x4 &m) {
-		drawMatrixStack_.push_back(drawMatrix_);
 		drawMatrix_ = m;
 	}
 
 	void PopDrawMatrix() {
-		drawMatrix_ = drawMatrixStack_.back();
-		drawMatrixStack_.pop_back();
 	}
 
 	Matrix4x4 GetDrawMatrix() {
@@ -165,13 +162,10 @@ public:
 	}
 
 	void PushAlpha(float a) {
-		alphaStack_.push_back(alpha_);
 		alpha_ *= a;
 	}
 
 	void PopAlpha() {
-		alpha_ = alphaStack_.back();
-		alphaStack_.pop_back();
 	}
 
 private:
@@ -182,10 +176,7 @@ private:
 	};
 
 	Matrix4x4 drawMatrix_;
-	std::vector<Matrix4x4> drawMatrixStack_;
-
 	float alpha_ = 1.0f;
-	std::vector<float> alphaStack_;
 
 	Draw::DrawContext *draw_;
 	Draw::Buffer *vbuf_;

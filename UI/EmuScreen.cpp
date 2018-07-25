@@ -120,7 +120,7 @@ static void __EmuScreenVblank()
 #endif
 }
 
-
+#ifndef MOBILE_DEVICE
 class CliperPopupScreen : public PopupScreen {
 public:
 	CliperPopupScreen() : PopupScreen("Cliper") {
@@ -347,6 +347,7 @@ private:
 	float clip_width;
 	float clip_height;
 };
+#endif
 
 EmuScreen::EmuScreen(const std::string &filename)
 	: bootPending_(true), gamePath_(filename), invalid_(true), quit_(false), pauseTrigger_(false), saveStatePreviewShownTime_(0.0), saveStatePreview_(nullptr) {
@@ -356,9 +357,9 @@ EmuScreen::EmuScreen(const std::string &filename)
 	frameStep_ = false;
 	lastNumFlips = gpuStats.numFlips;
 	startDumping = false;
-
+#ifndef MOBILE_DEVICE
 	cliper_ = new ScreenCliper();
-
+#endif
 	OnDevMenu.Handle(this, &EmuScreen::OnDevTools);
 }
 
@@ -555,7 +556,9 @@ EmuScreen::~EmuScreen() {
 		// If we were invalid, it would already be shutdown.
 		PSP_Shutdown();
 	}
+#ifndef MOBILE_DEVICE
 	delete cliper_;
+#endif
 #ifndef MOBILE_DEVICE
 	if (g_Config.bDumpFrames && startDumping)
 	{
@@ -683,11 +686,11 @@ inline float clamp1(float x) {
 
 bool EmuScreen::touch(const TouchInput &touch) {
 	Core_NotifyActivity();
-
+#ifndef MOBILE_DEVICE
 	if (cliper_->Touch(touch)) {
 		return true;
 	}
-
+#endif
 	if (root_) {
 		root_->Touch(touch);
 		return true;
@@ -1556,9 +1559,9 @@ void EmuScreen::renderUI() {
 	if (g_Config.iShowFPSCounter && !invalid_) {
 		DrawFPS(draw2d, ctx->GetBounds());
 	}
-
+#ifndef MOBILE_DEVICE
 	cliper_->Draw(draw2d);
-
+#endif
 #if !PPSSPP_PLATFORM(UWP)
 	if (g_Config.iGPUBackend == (int)GPUBackend::VULKAN && g_Config.bShowAllocatorDebug) {
 		DrawAllocatorVis(ctx, gpu);

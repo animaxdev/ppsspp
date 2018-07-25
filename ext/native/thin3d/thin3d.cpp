@@ -189,13 +189,9 @@ static const std::vector<ShaderSource> fsCol = {
 
 static const std::vector<ShaderSource> vsCol = {
 	{ ShaderLanguage::GLSL_ES_200,
-	"#if __VERSION__ >= 130\n"
-	"#define attribute in\n"
-	"#define varying out\n"
-	"#endif\n"
-	"attribute vec3 Position;\n"
-	"attribute vec4 Color0;\n"
-	"varying vec4 oColor0;\n"
+	"in vec3 Position;\n"
+	"in vec4 Color0;\n"
+	"out vec4 oColor0;\n"
 	"uniform mat4 WorldViewProj;\n"
 	"void main() {\n"
 	"  gl_Position = WorldViewProj * vec4(Position, 1.0);\n"
@@ -250,15 +246,11 @@ const UniformBufferDesc vsColBufDesc { sizeof(VsColUB), {
 
 static const std::vector<ShaderSource> vsTexCol = {
 	{ ShaderLanguage::GLSL_ES_200,
-	"#if __VERSION__ >= 130\n"
-	"#define attribute in\n"
-	"#define varying out\n"
-	"#endif\n"
-	"attribute vec3 Position;\n"
-	"attribute vec4 Color0;\n"
-	"attribute vec2 TexCoord0;\n"
-	"varying vec4 oColor0;\n"
-	"varying vec2 oTexCoord0;\n"
+	"in vec3 Position;\n"
+	"in vec4 Color0;\n"
+	"in vec2 TexCoord0;\n"
+	"out vec4 oColor0;\n"
+	"out vec2 oTexCoord0;\n"
 	"uniform mat4 WorldViewProj;\n"
 	"void main() {\n"
 	"  gl_Position = WorldViewProj * vec4(Position, 1.0);\n"

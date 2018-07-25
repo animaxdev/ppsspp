@@ -68,8 +68,6 @@ void DrawBuffer::Shutdown() {
 		vbuf_ = nullptr;
 	}
 	inited_ = false;
-	alphaStack_.clear();
-	drawMatrixStack_.clear();
 	pipeline_ = nullptr;
 	draw_ = nullptr;
 	count_ = 0;
@@ -77,6 +75,7 @@ void DrawBuffer::Shutdown() {
 
 void DrawBuffer::Begin(Draw::Pipeline *program) {
 	pipeline_ = program;
+	alpha_ = 1.0f;
 	count_ = 0;
 }
 
