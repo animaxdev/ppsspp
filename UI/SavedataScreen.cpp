@@ -458,13 +458,13 @@ void SavedataScreen::CreateViews() {
 	main->Add(new Button(di->T("Back"), new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, 0.0f)))->OnClick.Handle<UIScreen>(this, &UIScreen::OnBack);
 
 	ChoiceStrip *sortStrip = new ChoiceStrip(ORIENT_HORIZONTAL, new AnchorLayoutParams(NONE, 0, 0, NONE));
-	sortStrip->AddChoice(sa->T("Filename"));
+	sortStrip->AddChoice(sa->T("Name"));
 	sortStrip->AddChoice(sa->T("Size"));
 	sortStrip->SetSelection((int)sortOption_);
 	sortStrip->OnChoice.Handle<SavedataScreen>(this, &SavedataScreen::OnSortClick);
 
-	root_->Add(main);
 	root_->Add(sortStrip);
+	root_->Add(main);
 }
 
 UI::EventReturn SavedataScreen::OnSortClick(UI::EventParams &e) {
