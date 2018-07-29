@@ -86,9 +86,11 @@ enum {
 	FS_BIT_BLENDFUNC_B = 42,  // 4 bits
 	FS_BIT_FLATSHADE = 46,
 	FS_BIT_BGRA_TEXTURE = 47,
-	// 48+ are free.
-	FS_BIT_SHADER_DEPAL_BILINEAR = 48,
-	FS_BIT_SHADER_DEPAL_FORMAT = 49, // 2 bits
+	FS_BIT_TEST_DISCARD_TO_ZERO = 48,
+	//
+	FS_BIT_SHADER_DEPAL_BILINEAR = 49,
+	FS_BIT_SHADER_DEPAL_FORMAT = 50, // 2 bits
+	// 51+ are free.
 };
 
 struct ShaderID {

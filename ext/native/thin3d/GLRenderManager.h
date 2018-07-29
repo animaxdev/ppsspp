@@ -538,6 +538,9 @@ public:
 		_dbg_assert_(G3D, program != nullptr);
 		data.program.program = program;
 		curRenderStep_->commands.push_back(data);
+#ifdef _DEBUG
+		curProgram_ = program;
+#endif
 	}
 
 	void BindPixelPackBuffer(GLRBuffer *buffer) {  // Want to support an offset but can't in ES 2.0. We supply an offset when binding the buffers instead.
@@ -600,6 +603,9 @@ public:
 
 	void SetUniformI(GLint *loc, int count, const int *udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORM4I };
 		data.uniform4.loc = loc;
 		data.uniform4.count = count;
@@ -609,6 +615,9 @@ public:
 
 	void SetUniformI1(GLint *loc, int udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORM4I };
 		data.uniform4.loc = loc;
 		data.uniform4.count = 1;
@@ -618,6 +627,9 @@ public:
 
 	void SetUniformF(GLint *loc, int count, const float *udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORM4F };
 		data.uniform4.loc = loc;
 		data.uniform4.count = count;
@@ -627,6 +639,9 @@ public:
 
 	void SetUniformF1(GLint *loc, const float udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORM4F };
 		data.uniform4.loc = loc;
 		data.uniform4.count = 1;
@@ -636,6 +651,9 @@ public:
 
 	void SetUniformF(const char *name, int count, const float *udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORM4F };
 		data.uniform4.name = name;
 		data.uniform4.count = count;
@@ -645,6 +663,9 @@ public:
 
 	void SetUniformM4x4(GLint *loc, const float *udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORMMATRIX };
 		data.uniformMatrix4.loc = loc;
 		memcpy(data.uniformMatrix4.m, udata, sizeof(float) * 16);
@@ -653,6 +674,9 @@ public:
 
 	void SetUniformM4x4(const char *name, const float *udata) {
 		_dbg_assert_(G3D, curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
+#ifdef _DEBUG
+		assert(curProgram_);
+#endif
 		GLRRenderData data{ GLRRenderCommand::UNIFORMMATRIX };
 		data.uniformMatrix4.name = name;
 		memcpy(data.uniformMatrix4.m, udata, sizeof(float) * 16);
@@ -932,4 +956,8 @@ private:
 
 	int targetWidth_ = 0;
 	int targetHeight_ = 0;
+
+#ifdef _DEBUG
+	GLRProgram *curProgram_ = nullptr;
+#endif
 };

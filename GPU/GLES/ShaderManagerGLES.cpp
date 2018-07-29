@@ -570,7 +570,7 @@ void ShaderManagerGLES::DirtyShader() {
 	shaderSwitchDirtyUniforms_ = 0;
 }
 
-void ShaderManagerGLES::DirtyLastShader() { // disables vertex arrays
+void ShaderManagerGLES::DirtyLastShader() {
 	lastShader_ = nullptr;
 	lastVShaderSame_ = false;
 }
