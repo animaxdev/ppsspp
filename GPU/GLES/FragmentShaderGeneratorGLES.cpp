@@ -295,7 +295,8 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 			// TODO: Not sure the right way to do this for projection.
 			// This path destroys resolution on older PowerVR no matter what I do if projection is needed,
 			// so we disable it on SGX 540 and lesser, and live with the consequences.
-			if (needShaderTexClamp && !(gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_TERRIBLE)) {
+			bool badPrecision = (gl_extensions.bugs & BUG_PVR_SHADER_PRECISION_TERRIBLE) != 0;
+			if (needShaderTexClamp && !(doTextureProjection && badPrecision)) {
 				// We may be clamping inside a larger surface (tex = 64x64, buffer=480x272).
 				// We may also be wrapping in such a surface, or either one in a too-small surface.
 				// Obviously, clamping to a smaller surface won't work.  But better to clamp to something.
@@ -331,9 +332,9 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, uint64_t *uniform
 
 			if (!shaderDepal) {
 				if (doTextureProjection) {
-					WRITE(p, "  vec4 t = textureProj(tex, %s);\n", texcoord);
+					WRITE(p, "  vec4 t = %sProj(tex, %s);\n", texture, texcoord);
 				} else {
-					WRITE(p, "  vec4 t = texture(tex, %s.xy);\n", texcoord);
+					WRITE(p, "  vec4 t = %s(tex, %s.xy);\n", texture, texcoord);
 				}
 			} else {
 				if (doTextureProjection) {

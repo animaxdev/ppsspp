@@ -442,10 +442,9 @@ protected:
 void TextureCacheGLES::ApplyTextureFramebuffer(TexCacheEntry *entry, VirtualFramebuffer *framebuffer) {
 	DepalShader *depal = nullptr;
 	uint32_t clutMode = gstate.clutformat & 0xFFFFFF;
-
-	bool useShaderDepal = framebufferManager_->GetCurrentRenderVFB() != framebuffer;
-
+	
 	if ((entry->status & TexCacheEntry::STATUS_DEPALETTIZE) && !g_Config.bDisableSlowFramebufEffects) {
+		bool useShaderDepal = framebufferManager_->GetCurrentRenderVFB() != framebuffer && gstate_c.Supports(GPU_SUPPORTS_GLSL_ES_300);
 		if (useShaderDepal) {
 			const GEPaletteFormat clutFormat = gstate.getClutPaletteFormat();
 			GLRTexture *clutTexture = depalShaderCache_->GetClutTexture(clutFormat, clutHash_, clutBuf_);

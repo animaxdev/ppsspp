@@ -344,10 +344,10 @@ void TextureCacheVulkan::ApplyTextureFramebuffer(TexCacheEntry *entry, VirtualFr
 	DepalShaderVulkan *depalShader = nullptr;
 	uint32_t clutMode = gstate.clutformat & 0xFFFFFF;
 
-	// fx game like kill zone, use depal in current fb
-	bool useShaderDepal = framebufferManager_->GetCurrentRenderVFB() != framebuffer;
-
 	if ((entry->status & TexCacheEntry::STATUS_DEPALETTIZE) && !g_Config.bDisableSlowFramebufEffects) {
+		// fx game like kill zone, use depal in current fb
+		bool useShaderDepal = framebufferManager_->GetCurrentRenderVFB() != framebuffer;
+
 		if (useShaderDepal) {
 			depalShaderCache_->SetPushBuffer(drawEngine_->GetPushBufferForTextureData());
 			const GEPaletteFormat clutFormat = gstate.getClutPaletteFormat();
