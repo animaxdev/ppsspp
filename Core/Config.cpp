@@ -396,6 +396,7 @@ static ConfigSetting generalSettings[] = {
 	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, false),
 	ConfigSetting("Language", &g_Config.sLanguageIni, &DefaultLangRegion),
 	ConfigSetting("ForceLagSync", &g_Config.bForceLagSync, false, true, true),
+	ConfigSetting("DiscordPresence", &g_Config.bDiscordPresence, true, true, false),  // Or maybe it makes sense to have it per-game? Race conditions abound...
 
 	ReportedConfigSetting("NumWorkerThreads", &g_Config.iNumWorkerThreads, &DefaultNumWorkers, true, true),
 	ConfigSetting("AutoLoadSaveState", &g_Config.iAutoLoadSaveState, 0, true, true),
@@ -1162,8 +1163,8 @@ void Config::DownloadCompletedCallback(http::Download &download) {
 		return;
 	}
 
-	JsonReader reader(data.c_str(), data.size());
-	const JsonGet root = reader.root();
+	json::JsonReader reader(data.c_str(), data.size());
+	const json::JsonGet root = reader.root();
 	if (!root) {
 		ERROR_LOG(LOADER, "Failed to parse json");
 		return;
@@ -1210,11 +1211,14 @@ void Config::AddRecent(const std::string &file) {
 		return;
 
 	const std::string filename = File::ResolvePath(file);
-	for (auto str = recentIsos.begin(); str != recentIsos.end(); ++str) {
-		const std::string recent = File::ResolvePath(*str);
+	for (auto iter = recentIsos.begin(); iter != recentIsos.end();) {
+		const std::string recent = File::ResolvePath(*iter);
 		if (filename == recent) {
-			recentIsos.erase(str);
+			// Note that the increment-erase idiom doesn't work with vectors.
+			iter = recentIsos.erase(iter);
 			// We'll add it back below.
+		} else {
+			iter++;
 		}
 	}
 
@@ -1229,10 +1233,13 @@ void Config::RemoveRecent(const std::string &file) {
 		return;
 
 	const std::string filename = File::ResolvePath(file);
-	for (auto str = recentIsos.begin(); str != recentIsos.end(); ++str) {
-		const std::string recent = File::ResolvePath(*str);
+	for (auto iter = recentIsos.begin(); iter != recentIsos.end();) {
+		const std::string recent = File::ResolvePath(*iter);
 		if (filename == recent) {
-			recentIsos.erase(str);
+			// Note that the increment-erase idiom doesn't work with vectors.
+			iter = recentIsos.erase(iter);
+		} else {
+			iter++;
 		}
 	}
 }
