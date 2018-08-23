@@ -1709,11 +1709,9 @@ bail:
 		currentList->pc += cmdCount * 4;
 		// flush back cull mode
 		if (cullMode != gstate.getCullMode()) {
-			if(gstate.isCullEnabled()) {
-				drawEngineCommon_->DispatchFlush();
-				gstate_c.Dirty(DIRTY_RASTER_STATE);
-			}
+			gstate_c.Dirty(DIRTY_RASTER_STATE);
 			gstate.cmdmem[GE_CMD_CULL] ^= 1;
+			drawEngineCommon_->DispatchFlush();
 		}
 	}
 
