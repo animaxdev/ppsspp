@@ -77,9 +77,9 @@ private:
 
 	bool bootPending_;
 	std::string gamePath_;
-#ifndef MOBILE_DEVICE
-	ScreenCliper * cliper_;
-#endif
+
+	//ScreenCliper * cliper_;
+
 	// Something invalid was loaded, don't try to emulate
 	bool invalid_;
 	bool quit_;
