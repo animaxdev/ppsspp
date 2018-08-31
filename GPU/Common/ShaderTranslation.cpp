@@ -244,7 +244,7 @@ bool TranslateShader(std::string *dest, ShaderLanguage destLang, TranslatedShade
 	// Can't fail, parsing worked, "linking" worked.
 	glslang::SpvOptions options;
 	options.disableOptimizer = false;
-	options.optimizeSize = false;
+	options.optimizeSize = true;
 	options.generateDebugInfo = false;
 	glslang::GlslangToSpv(*program.getIntermediate(shaderStage), spirv, &options);
 

@@ -2,7 +2,7 @@
 
 #include "Common/StringUtils.h"
 #include "Common/Vulkan/SPIRVDisasm.h"
-#include "ext/vulkan/spirv.hpp"
+#include "ext/glslang/SPIRV/spirv.hpp"
 
 #define WRITE p+=sprintf
 

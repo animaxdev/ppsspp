@@ -1079,7 +1079,7 @@ bool GLSLtoSPV(const VkShaderStageFlagBits shader_type,
 	// Can't fail, parsing worked, "linking" worked.
 	glslang::SpvOptions options;
 	options.disableOptimizer = false;
-	options.optimizeSize = false;
+	options.optimizeSize = true;
 	options.generateDebugInfo = false;
 	glslang::GlslangToSpv(*program.getIntermediate(stage), spirv, &options);
 	return true;
