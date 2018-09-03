@@ -25,7 +25,6 @@
 
 #include "Common/MemoryUtil.h"
 #include "Core/MemMap.h"
-#include "Core/Host.h"
 #include "Core/System.h"
 #include "Core/Reporting.h"
 #include "Core/Config.h"
@@ -44,6 +43,7 @@
 #include "GPU/Common/VertexDecoderCommon.h"
 #include "GPU/Common/SoftwareTransformCommon.h"
 #include "GPU/Common/DrawEngineCommon.h"
+#include "GPU/Debugger/Debugger.h"
 #include "GPU/Vulkan/DrawEngineVulkan.h"
 #include "GPU/Vulkan/TextureCacheVulkan.h"
 #include "GPU/Vulkan/ShaderManagerVulkan.h"
@@ -1005,7 +1005,7 @@ void DrawEngineVulkan::DoFlush() {
 	gstate_c.vertBounds.maxV = 0;
 
 #ifndef MOBILE_DEVICE
-	host->GPUNotifyDraw();
+	GPUDebug::NotifyDraw();
 #endif
 }
 
