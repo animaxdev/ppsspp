@@ -140,6 +140,7 @@ static bool resized = false;
 static bool restarting = false;
 
 static bool askedForStoragePermission = false;
+static int renderCounter = 0;
 
 struct PendingMessage {
 	std::string msg;
@@ -343,6 +344,14 @@ void CreateDirectoriesAndroid() {
 }
 
 static void CheckFailedGPUBackends() {
+	// We only want to do this once per process run and backend, to detect process crashes.
+	// If NativeShutdown is called before we finish, we might call this multiple times.
+	static int lastBackend = -1;
+	if (lastBackend == g_Config.iGPUBackend) {
+		return;
+	}
+	lastBackend = g_Config.iGPUBackend;
+
 	std::string cache = GetSysDirectory(DIRECTORY_APP_CACHE) + "/FailedGraphicsBackends.txt";
 
 	if (System_GetPropertyBool(SYSPROP_SUPPORTS_PERMISSIONS)) {
@@ -354,9 +363,13 @@ static void CheckFailedGPUBackends() {
 	// Use this if you want to debug a graphics crash...
 	if (g_Config.sFailedGPUBackends == "IGNORE")
 		return;
+	else if (!g_Config.sFailedGPUBackends.empty())
+		ERROR_LOG(LOADER, "Failed graphics backends: %s", g_Config.sFailedGPUBackends.c_str());
 
 	// Okay, let's not try a backend in the failed list.
 	g_Config.iGPUBackend = g_Config.NextValidBackend();
+	if (lastBackend != g_Config.iGPUBackend)
+		WARN_LOG(LOADER, "Failed graphics backend switched from %d to %d", lastBackend, g_Config.iGPUBackend);
 	// And then let's - for now - add the current to the failed list.
 	if (g_Config.sFailedGPUBackends.empty()) {
 		g_Config.sFailedGPUBackends = StringFromFormat("%d", g_Config.iGPUBackend);
@@ -674,6 +687,7 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 	// When it's reset we don't want to forget all our managed things.
 	CheckFailedGPUBackends();
 	SetGPUBackend((GPUBackend) g_Config.iGPUBackend);
+	renderCounter = 0;
 
 	// Must be done restarting by now.
 	restarting = false;
@@ -1002,7 +1016,6 @@ void NativeRender(GraphicsContext *graphicsContext) {
 	ui_draw2d.PopDrawMatrix();
 	ui_draw2d_front.PopDrawMatrix();
 
-	static int renderCounter = 0;
 	if (renderCounter < 10 && ++renderCounter == 10) {
 		// We're rendering fine, clear out failure info.
 		ClearFailedGPUBackends();
