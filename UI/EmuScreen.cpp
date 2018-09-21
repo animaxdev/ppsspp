@@ -358,6 +358,9 @@ EmuScreen::EmuScreen(const std::string &filename)
 	frameStep_ = false;
 	lastNumFlips = gpuStats.numFlips;
 	startDumping = false;
+	// Make sure we don't leave it at powerdown after the last game.
+	if (coreState == CORE_POWERDOWN)
+		coreState = CORE_STEPPING;
 
 	//cliper_ = new ScreenCliper();
 
