@@ -102,7 +102,7 @@ public:
 			std::string save_info = ginfo->id + ", " + GetFileDateAsString(savePath_);
 			if (File::Exists(image_path)) {
 				PrioritizedWorkQueue *wq = g_gameInfoCache->WorkQueue();
-				toprow->Add(new AsyncImageFileView(image_path, IS_DEFAULT, wq, new LinearLayoutParams(480, 272, Margins(10, 0))));
+				toprow->Add(new AsyncImageFileView(image_path, IS_KEEP_ASPECT, wq, new LinearLayoutParams(480, 272, Margins(10, 0))));
 			} else {
 				toprow->Add(new TextView(sa->T("No screenshot"), new LinearLayoutParams(Margins(10, 5))))->SetTextColor(textStyle.fgColor);
 			}
