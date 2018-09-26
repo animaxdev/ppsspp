@@ -473,13 +473,14 @@ void CheckGLExtensions() {
 
 	// get_program_binary
 #if defined(__ANDROID__)
-	gl_extensions.OES_get_program_binary = strstr(extString, "GL_OES_get_program_binary") != 0;
+	gl_extensions.OES_get_program_binary = g_set_gl_extensions.count("GL_OES_get_program_binary") != 0;
 	if (gl_extensions.ARB_get_program_binary) {
 		//gl_extensions.GetProgramBinary = eglGetProcAddress("GetProgramBinaryOES");
 		//gl_extensions.ProgramBinary = eglGetProcAddress("ProgramBinaryOES");
 	}
 #else
-	gl_extensions.ARB_get_program_binary = strstr(extString, "GL_ARB_get_program_binary") != 0;
+	
+	gl_extensions.ARB_get_program_binary = g_set_gl_extensions.count("GL_ARB_get_program_binary") != 0;
 	if (gl_extensions.ARB_get_program_binary) {
 		//gl_extensions.GetProgramBinary = glGetProgramBinary;
 		//gl_extensions.ProgramBinary = glProgramBinary;
