@@ -53,6 +53,7 @@
 #include "Core/Host.h"
 #include "Core/System.h"
 #include "Core/Reporting.h"
+#include "Core/TextureReplacer.h"
 #include "Core/WebServer.h"
 #include "GPU/Common/PostShader.h"
 #include "android/jni/TestRunner.h"
@@ -118,6 +119,18 @@ static std::string PostShaderTranslateName(const char *value) {
 	} else {
 		return value;
 	}
+}
+
+static std::string *GPUDeviceNameSetting() {
+	if (g_Config.iGPUBackend == (int)GPUBackend::VULKAN) {
+		return &g_Config.sVulkanDevice;
+	}
+#ifdef _WIN32
+	if (g_Config.iGPUBackend == (int)GPUBackend::DIRECT3D11) {
+		return &g_Config.sD3D11Device;
+	}
+#endif
+	return nullptr;
 }
 
 void GameSettingsScreen::CreateViews() {
@@ -212,18 +225,10 @@ void GameSettingsScreen::CreateViews() {
 
 	// Backends that don't allow a device choice will only expose one device.
 	if (draw->GetDeviceList().size() > 1) {
-		std::string *deviceNameSetting = nullptr;
-		if (g_Config.iGPUBackend == (int)GPUBackend::VULKAN) {
-			deviceNameSetting = &g_Config.sVulkanDevice;
-		}
-#ifdef _WIN32
-		if (g_Config.iGPUBackend == (int)GPUBackend::DIRECT3D11) {
-			deviceNameSetting = &g_Config.sD3D11Device;
-		}
-#endif
+		std::string *deviceNameSetting = GPUDeviceNameSetting();
 		if (deviceNameSetting) {
 			PopupMultiChoiceDynamic *deviceChoice = graphicsSettings->Add(new PopupMultiChoiceDynamic(deviceNameSetting, gr->T("Device"), draw->GetDeviceList(), nullptr, screenManager()));
-			deviceChoice->OnChoice.Handle(this, &GameSettingsScreen::OnRenderingBackend);
+			deviceChoice->OnChoice.Handle(this, &GameSettingsScreen::OnRenderingDevice);
 		}
 	}
 
@@ -567,7 +572,7 @@ void GameSettingsScreen::CreateViews() {
 		autoHide->SetEnabledPtr(&g_Config.bShowTouchControls);
 		autoHide->SetFormat("%is");
 		autoHide->SetZeroLabel(co->T("Off"));
-		static const char *touchControlStyles[] = {"Classic", "Thin borders"};
+		static const char *touchControlStyles[] = {"Classic", "Thin borders", "Glowing borders"};
 		View *style = controlsSettings->Add(new PopupMultiChoice(&g_Config.iTouchButtonStyle, co->T("Button style"), touchControlStyles, 0, ARRAY_SIZE(touchControlStyles), co->GetName(), screenManager()));
 		style->SetEnabledPtr(&g_Config.bShowTouchControls);
 	}
@@ -1069,6 +1074,23 @@ void GameSettingsScreen::CallbackRenderingBackend(bool yes) {
 	}
 }
 
+void GameSettingsScreen::CallbackRenderingDevice(bool yes) {
+	// If the user ends up deciding not to restart, set the config back to the current backend
+	// so it doesn't get switched by accident.
+	if (yes) {
+		// Extra save here to make sure the choice really gets saved even if there are shutdown bugs in
+		// the GPU backend code.
+		g_Config.Save();
+		System_SendMessage("graphics_restart", "");
+	} else {
+		std::string *deviceNameSetting = GPUDeviceNameSetting();
+		if (deviceNameSetting)
+			*deviceNameSetting = GetGPUBackendDevice();
+		// Needed to redraw the setting.
+		RecreateViews();
+	}
+}
+
 UI::EventReturn GameSettingsScreen::OnRenderingBackend(UI::EventParams &e) {
 	//I18NCategory *di = GetI18NCategory("Dialog");
 
@@ -1078,6 +1100,18 @@ UI::EventReturn GameSettingsScreen::OnRenderingBackend(UI::EventParams &e) {
 		//	std::bind(&GameSettingsScreen::CallbackRenderingBackend, this, std::placeholders::_1)));
 		g_Config.Save();
 		System_SendMessage("graphics_restart", "");
+	}
+	return UI::EVENT_DONE;
+}
+
+UI::EventReturn GameSettingsScreen::OnRenderingDevice(UI::EventParams &e) {
+	I18NCategory *di = GetI18NCategory("Dialog");
+
+	// It only makes sense to show the restart prompt if the device was actually changed.
+	std::string *deviceNameSetting = GPUDeviceNameSetting();
+	if (deviceNameSetting && *deviceNameSetting != GetGPUBackendDevice()) {
+		screenManager()->push(new PromptScreen(di->T("ChangingGPUBackends", "Changing GPU backends requires PPSSPP to restart. Restart now?"), di->T("Yes"), di->T("No"),
+			std::bind(&GameSettingsScreen::CallbackRenderingDevice, this, std::placeholders::_1)));
 	}
 	return UI::EVENT_DONE;
 }
@@ -1335,38 +1369,9 @@ UI::EventReturn DeveloperToolsScreen::OnLoadLanguageIni(UI::EventParams &e) {
 
 UI::EventReturn DeveloperToolsScreen::OnOpenTexturesIniFile(UI::EventParams &e) {
 	std::string gameID = g_paramSFO.GetDiscID();
-	std::string texturesDirectory = GetSysDirectory(DIRECTORY_TEXTURES) + gameID + "/";
-	bool enabled_ = !gameID.empty();
-	if (enabled_) {
-		if (!File::Exists(texturesDirectory)) {
-			File::CreateFullPath(texturesDirectory);
-		}
-		if (!File::Exists(texturesDirectory + "textures.ini")) {
-			FILE *f = File::OpenCFile(texturesDirectory + "textures.ini", "wb");
-			if (f) {
-				fwrite("\xEF\xBB\xBF", 0, 3, f);
-				fclose(f);
-				// Let's also write some defaults
-				std::fstream fs;
-				File::OpenCPPFile(fs, texturesDirectory + "textures.ini", std::ios::out | std::ios::ate);
-				fs << "# This file is optional\n";
-				fs << "# for syntax explanation check:\n";
-				fs << "# - https://github.com/hrydgard/ppsspp/pull/8715 \n";
-				fs << "# - https://github.com/hrydgard/ppsspp/pull/8792 \n";
-				fs << "[options]\n";
-				fs << "version = 1\n";
-				fs << "hash = quick\n";
-				fs << "\n";
-				fs << "[hashes]\n";
-				fs << "\n";
-				fs << "[hashranges]\n";
-				fs.close();
-			}
-		}
-		enabled_ = File::Exists(texturesDirectory + "textures.ini");
-	}
-	if (enabled_) {
-		File::openIniFile(texturesDirectory + "textures.ini");
+	std::string generatedFilename;
+	if (TextureReplacer::GenerateIni(gameID, &generatedFilename)) {
+		File::openIniFile(generatedFilename);
 	}
 	return UI::EVENT_DONE;
 }
