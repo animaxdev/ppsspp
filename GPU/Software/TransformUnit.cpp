@@ -52,7 +52,8 @@ SoftwareDrawEngine::~SoftwareDrawEngine() {
 void SoftwareDrawEngine::DispatchFlush() {
 }
 
-void SoftwareDrawEngine::DispatchSubmitPrim(void *verts, void *inds, GEPrimitiveType prim, int vertexCount, u32 vertTypeID, int *bytesRead) {
+void SoftwareDrawEngine::DispatchSubmitPrim(void *verts, void *inds, GEPrimitiveType prim, int vertexCount, u32 vertTypeID, int cullMode, int *bytesRead) {
+	_assert_msg_(G3D, cullMode == gstate.getCullMode(), "Mixed cull mode not supported.");
 	transformUnit.SubmitPrimitive(verts, inds, prim, vertexCount, vertTypeID, bytesRead, this);
 }
 
@@ -581,12 +582,16 @@ bool TransformUnit::GetCurrentSimpleVertices(int count, std::vector<GPUDebugVert
 
 	static std::vector<u32> temp_buffer;
 	static std::vector<SimpleVertex> simpleVertices;
-	temp_buffer.resize(65536 * 24 / sizeof(u32));
+	temp_buffer.resize(std::max((int)indexUpperBound, 8192) * 128 / sizeof(u32));
 	simpleVertices.resize(indexUpperBound + 1);
 
 	VertexDecoder vdecoder;
 	VertexDecoderOptions options{};
 	vdecoder.SetVertexType(gstate.vertType, options);
+
+	if (!Memory::IsValidRange(gstate_c.vertexAddr, (indexUpperBound + 1) * vdecoder.VertexSize()))
+		return false;
+
 	DrawEngineCommon::NormalizeVertices((u8 *)(&simpleVertices[0]), (u8 *)(&temp_buffer[0]), Memory::GetPointer(gstate_c.vertexAddr), &vdecoder, indexLowerBound, indexUpperBound, gstate.vertType);
 
 	float world[16];

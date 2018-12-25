@@ -7,7 +7,7 @@
 #include "DiscordIntegration.h"
 #include "i18n/i18n.h"
 
-#if (PPSSPP_PLATFORM(WINDOWS) || PPSSPP_PLATFORM(MAC) || PPSSPP_PLATFORM(LINUX)) && !PPSSPP_PLATFORM(ANDROID)
+#if (PPSSPP_PLATFORM(WINDOWS) || PPSSPP_PLATFORM(MAC) || PPSSPP_PLATFORM(LINUX)) && !PPSSPP_PLATFORM(ANDROID) && !PPSSPP_PLATFORM(UWP)
 
 #ifdef _MSC_VER
 #define ENABLE_DISCORD
@@ -102,6 +102,7 @@ void Discord::SetPresenceGame(const char *gameTitle) {
 	std::string details = sc->T("Playing");
 	discordPresence.details = details.c_str();
 	discordPresence.startTimestamp = time(0);
+	discordPresence.largeImageText = "PPSSPP is the best PlayStation Portable emulator around!";
 #ifdef GOLD
 	discordPresence.largeImageKey = "icon_gold_png";
 #else
@@ -126,6 +127,7 @@ void Discord::SetPresenceMenu() {
 	discordPresence.state = sc->T("In menu");
 	discordPresence.details = "";
 	discordPresence.startTimestamp = time(0);
+	discordPresence.largeImageText = "PPSSPP is the best PlayStation Portable emulator around!";
 #ifdef GOLD
 	discordPresence.largeImageKey = "icon_gold_png";
 #else

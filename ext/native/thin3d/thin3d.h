@@ -204,13 +204,8 @@ enum class ShaderLanguage {
 	GLSL_ES_300 = 2,
 	GLSL_410 = 4,
 	GLSL_VULKAN = 8,
-	SPIRV_VULKAN = 16,
 	HLSL_D3D9 = 32,
 	HLSL_D3D11 = 64,
-	HLSL_D3D9_BYTECODE = 128,
-	HLSL_D3D11_BYTECODE = 256,
-	METAL = 512,
-	METAL_BYTECODE = 1024,
 };
 
 enum FormatSupport {
@@ -421,7 +416,6 @@ struct StencilSide {
 	Comparison compareOp;
 	uint8_t compareMask;
 	uint8_t writeMask;
-	uint8_t reference;
 };
 
 struct DepthStencilStateDesc {
@@ -547,8 +541,8 @@ public:
 	virtual InputLayout *CreateInputLayout(const InputLayoutDesc &desc) = 0;
 
 	// Note that these DO NOT AddRef so you must not ->Release presets unless you manually AddRef them.
-	ShaderModule *GetVshaderPreset(VertexShaderPreset preset) { return fsPresets_[preset]; }
-	ShaderModule *GetFshaderPreset(FragmentShaderPreset preset) { return vsPresets_[preset]; }
+	ShaderModule *GetVshaderPreset(VertexShaderPreset preset) { return vsPresets_[preset]; }
+	ShaderModule *GetFshaderPreset(FragmentShaderPreset preset) { return fsPresets_[preset]; }
 
 	// Resources
 	virtual Buffer *CreateBuffer(size_t size, uint32_t usageFlags) = 0;
@@ -593,6 +587,7 @@ public:
 	virtual void SetScissorRect(int left, int top, int width, int height) = 0;
 	virtual void SetViewports(int count, Viewport *viewports) = 0;
 	virtual void SetBlendFactor(float color[4]) = 0;
+	virtual void SetStencilRef(uint8_t ref) = 0;
 
 	virtual void BindSamplerStates(int start, int count, SamplerState **state) = 0;
 	virtual void BindTextures(int start, int count, Texture **textures) = 0;
@@ -666,5 +661,14 @@ struct VsColUB {
 	float WorldViewProj[16];
 };
 extern const UniformBufferDesc vsColBufDesc;
+
+// Useful utility for specifying a shader in multiple languages.
+
+struct ShaderSource {
+	ShaderLanguage lang;
+	const char *src;
+};
+
+ShaderModule *CreateShader(DrawContext *draw, ShaderStage stage, const std::vector<ShaderSource> &sources);
 
 }  // namespace Draw

@@ -188,6 +188,7 @@ SOURCES_CXX += \
 	$(GPUDIR)/Software/Lighting.cpp \
 	$(GPUDIR)/Software/Rasterizer.cpp \
 	$(GPUDIR)/GLES/DepalettizeShaderGLES.cpp \
+	$(GPUDIR)/GLES/DepthBufferGLES.cpp \
 	$(GPUDIR)/GLES/VertexShaderGeneratorGLES.cpp \
 	$(GPUDIR)/GLES/DrawEngineGLES.cpp \
 	$(GPUDIR)/GLES/GPU_GLES.cpp \
@@ -584,7 +585,6 @@ SOURCES_C += $(EXTDIR)/udis86/decode.c \
 
 
 SOURCES_CXX += \
-	$(COMMONDIR)/Vulkan/SPIRVDisasm.cpp \
 	$(COMMONDIR)/Vulkan/VulkanContext.cpp \
 	$(COMMONDIR)/Vulkan/VulkanDebug.cpp \
 	$(COMMONDIR)/Vulkan/VulkanImage.cpp \
