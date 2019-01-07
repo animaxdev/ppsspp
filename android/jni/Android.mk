@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-#TARGET_PLATFORM := android-8
+#TARGET_PLATFORM := android-24
 
 NATIVE := ../../ext/native
 SRC := ../..
@@ -150,6 +150,8 @@ SPIRV_CROSS_FILES := \
   $(SRC)/ext/SPIRV-Cross/spirv_cfg.cpp \
   $(SRC)/ext/SPIRV-Cross/spirv_cross.cpp \
   $(SRC)/ext/SPIRV-Cross/spirv_cross_util.cpp \
+  $(SRC)/ext/SPIRV-Cross/spirv_parser.cpp \
+  $(SRC)/ext/SPIRV-Cross/spirv_cross_parsed_ir.cpp \
   $(SRC)/ext/SPIRV-Cross/spirv_glsl.cpp
 
 EXEC_AND_LIB_FILES := \
