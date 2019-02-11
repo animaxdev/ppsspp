@@ -685,6 +685,7 @@ namespace MainWindow {
 				SaveState::SaveSlot(PSP_CoreParameter().fileToStart, g_Config.iCurrentStateSlot, SaveStateActionFinished);
 				break;
 			}
+			break;
 		}
 
 		case ID_OPTIONS_LANGUAGE:
@@ -946,7 +947,7 @@ namespace MainWindow {
 			break;
 
 		case ID_OPTIONS_SHOWFPS:
-			g_Config.iShowFPSCounter = !g_Config.iShowFPSCounter;
+			g_Config.iShowFPSCounter = g_Config.iShowFPSCounter ? 0 : 3;  // 3 = both speed and FPS
 			break;
 
 		case ID_OPTIONS_TEXTUREFILTERING_AUTO: setTexFiltering(TEX_FILTER_AUTO); break;

@@ -93,6 +93,7 @@ public:
 	bool bHideSlowWarnings;
 	bool bHideStateWarnings;
 	bool bPreloadFunctions;
+	uint32_t uJitDisableFlags;
 
 	bool bSeparateSASThread;
 	bool bSeparateIOThread;
@@ -175,7 +176,6 @@ public:
 	bool bTexDeposterize;
 	int iFpsLimit1;
 	int iFpsLimit2;
-	int iForceMaxEmulatedFPS;
 	int iMaxRecent;
 	int iCurrentStateSlot;
 	int iRewindFlipFrequency;
