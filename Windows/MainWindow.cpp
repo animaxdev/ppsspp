@@ -24,6 +24,7 @@
 #include "Common/CommonWindows.h"
 #include "Common/KeyMap.h"
 #include "Common/OSVersion.h"
+#include "ppsspp_config.h"
 
 #include <Windowsx.h>
 #include <shellapi.h>
@@ -48,13 +49,19 @@
 #include "Core/MIPS/JitCommon/JitBlockCache.h"
 #include "Windows/InputBox.h"
 #include "Windows/InputDevice.h"
+#if PPSSPP_API(ANY_GL)
 #include "Windows/GPU/WindowsGLContext.h"
+#include "Windows/GEDebugger/GEDebugger.h"
+#endif
 #include "Windows/Debugger/Debugger_Disasm.h"
 #include "Windows/Debugger/Debugger_MemoryDlg.h"
-#include "Windows/GEDebugger/GEDebugger.h"
+
+#include "Common/GraphicsContext.h"
 
 #include "Windows/main.h"
+#ifndef _M_ARM
 #include "Windows/DinputDevice.h"
+#endif
 #include "Windows/EmuThread.h"
 #include "Windows/resource.h"
 
@@ -513,9 +520,10 @@ namespace MainWindow
 		DialogManager::AddDlg(disasmWindow[0]);
 		disasmWindow[0]->Show(g_Config.bShowDebuggerOnLoad);
 
+#if PPSSPP_API(ANY_GL)
 		geDebuggerWindow = new CGEDebugger(MainWindow::GetHInstance(), MainWindow::GetHWND());
 		DialogManager::AddDlg(geDebuggerWindow);
-
+#endif
 		memoryWindow[0] = new CMemoryDlg(MainWindow::GetHInstance(), MainWindow::GetHWND(), currentDebugMIPS);
 		DialogManager::AddDlg(memoryWindow[0]);
 	}
@@ -526,11 +534,13 @@ namespace MainWindow
 			delete disasmWindow[0];
 		disasmWindow[0] = 0;
 		
+#if PPSSPP_API(ANY_GL)
 		DialogManager::RemoveDlg(geDebuggerWindow);
 		if (geDebuggerWindow)
 			delete geDebuggerWindow;
 		geDebuggerWindow = 0;
-		
+#endif
+
 		DialogManager::RemoveDlg(memoryWindow[0]);
 		if (memoryWindow[0])
 			delete memoryWindow[0];
@@ -816,7 +826,9 @@ namespace MainWindow
 			return WindowsRawInput::ProcessChar(hWnd, wParam, lParam);
 
 		case WM_DEVICECHANGE:
+#ifndef _M_ARM
 			DinputDevice::CheckDevices();
+#endif
 			return DefWindowProc(hWnd, message, wParam, lParam);
 
 		case WM_VERYSLEEPY_MSG:

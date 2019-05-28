@@ -562,7 +562,8 @@ static inline Vec4<int> GetTextureFunctionOutput(const Vec4<int>& prim_color, co
 		const __m128 b = _mm_mul_ps(p, t);
 		if (gstate.isColorDoublingEnabled()) {
 			// We double right here, only for modulate.  Other tex funcs do not color double.
-			out_rgb.ivec = _mm_cvtps_epi32(_mm_mul_ps(b, _mm_set_ps1(2.0f / 255.0f)));
+			const __m128 doubleColor = _mm_setr_ps(2.0f / 255.0f, 2.0f / 255.0f, 2.0f / 255.0f, 1.0f / 255.0f);
+			out_rgb.ivec = _mm_cvtps_epi32(_mm_mul_ps(b, doubleColor));
 		} else {
 			out_rgb.ivec = _mm_cvtps_epi32(_mm_mul_ps(b, _mm_set_ps1(1.0f / 255.0f)));
 		}
@@ -894,12 +895,24 @@ inline void DrawSinglePixel(const DrawingCoords &p, u16 z, u8 fog, const Vec4<in
 	const u32 old_color = GetPixelColor(p.x, p.y);
 	u32 new_color;
 
+	// Dithering happens before the logic op and regardless of framebuffer format or clear mode.
+	// We do it while alpha blending because it happens before clamping.
 	if (gstate.isAlphaBlendEnabled() && !clearMode) {
 		const Vec4<int> dst = Vec4<int>::FromRGBA(old_color);
+		Vec3<int> blended = AlphaBlendingResult(prim_color, dst);
+		if (gstate.isDitherEnabled()) {
+			blended += Vec3<int>::AssignToAll(gstate.getDitherValue(p.x, p.y));
+		}
+
 		// ToRGB() always automatically clamps.
-		new_color = AlphaBlendingResult(prim_color, dst).ToRGB();
+		new_color = blended.ToRGB();
 		new_color |= stencil << 24;
 	} else {
+		if (gstate.isDitherEnabled()) {
+			// We'll discard alpha anyway.
+			prim_color += Vec4<int>::AssignToAll(gstate.getDitherValue(p.x, p.y));
+		}
+
 #if defined(_M_SSE)
 		new_color = Vec3<int>(prim_color.ivec).ToRGB();
 		new_color |= stencil << 24;
@@ -919,7 +932,6 @@ inline void DrawSinglePixel(const DrawingCoords &p, u16 z, u8 fog, const Vec4<in
 	}
 	new_color = (new_color & ~gstate.getColorMask()) | (old_color & gstate.getColorMask());
 
-	// TODO: Dither before or inside SetPixelColor
 	SetPixelColor(p.x, p.y, new_color);
 }
 

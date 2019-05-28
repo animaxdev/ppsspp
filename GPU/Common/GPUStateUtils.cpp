@@ -1171,7 +1171,13 @@ void ConvertBlendState(GenericBlendState &blendState, bool allowShaderBlend) {
 			break;
 		}
 	} else if (!IsStencilTestOutputDisabled()) {
-		switch (ReplaceAlphaWithStencilType()) {
+		StencilValueType stencilValue = ReplaceAlphaWithStencilType();
+		if (stencilValue == STENCIL_VALUE_UNIFORM && constantAlpha == 0x00) {
+			stencilValue = STENCIL_VALUE_ZERO;
+		} else if (stencilValue == STENCIL_VALUE_UNIFORM && constantAlpha == 0xFF) {
+			stencilValue = STENCIL_VALUE_ONE;
+		}
+		switch (stencilValue) {
 		case STENCIL_VALUE_KEEP:
 			blendState.setFactors(glBlendFuncA, glBlendFuncB, BlendFactor::ZERO, BlendFactor::ONE);
 			break;
@@ -1343,7 +1349,7 @@ void ConvertStencilFuncState(GenericStencilFuncState &state) {
 		return;
 
 	// The PSP's mask is reversed (bits not to write.)
-	state.writeMask = (~gstate.pmska) & 0xFF;
+	state.writeMask = (~gstate.getStencilWriteMask()) & 0xFF;
 
 	state.sFail = gstate.getStencilOpSFail();
 	state.zFail = gstate.getStencilOpZFail();

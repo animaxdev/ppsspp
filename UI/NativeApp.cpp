@@ -401,7 +401,7 @@ static void CheckFailedGPUBackends() {
 		writeStringToFile(true, g_Config.sFailedGPUBackends, cache.c_str());
 	} else {
 		// Just save immediately, since we have storage.
-		g_Config.Save();
+		g_Config.Save("got storage permission");
 	}
 }
 
@@ -415,7 +415,7 @@ static void ClearFailedGPUBackends() {
 	if (System_GetPropertyBool(SYSPROP_SUPPORTS_PERMISSIONS)) {
 		File::Delete(GetSysDirectory(DIRECTORY_APP_CACHE) + "/FailedGraphicsBackends.txt");
 	} else {
-		g_Config.Save();
+		g_Config.Save("clearFailedGPUBackends");
 	}
 }
 
@@ -466,6 +466,15 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 	// most sense.
 	g_Config.memStickDirectory = std::string(external_dir) + "/";
 	g_Config.flash0Directory = std::string(external_dir) + "/flash0/";
+
+	std::string memstickDirFile = g_Config.internalDataDirectory + "/memstick_dir.txt";
+	if (File::Exists(memstickDirFile)) {
+		std::string memstickDir;
+		readFileToString(true, memstickDirFile.c_str(), memstickDir);
+		if (!memstickDir.empty() && File::Exists(memstickDir)) {
+			g_Config.memStickDirectory = memstickDir + "/";
+		}
+	}
 #elif defined(IOS)
 	g_Config.memStickDirectory = user_data_path;
 	g_Config.flash0Directory = std::string(external_dir) + "/flash0/";
@@ -542,8 +551,6 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 					fileToLog = argv[i] + strlen("--log=");
 				if (!strncmp(argv[i], "--state=", strlen("--state=")) && strlen(argv[i]) > strlen("--state="))
 					stateToLoad = argv[i] + strlen("--state=");
-				if (!strncmp(argv[1], "--PS3", strlen("--PS3")))
-					g_Config.bPS3Controller = true;
 #if !defined(MOBILE_DEVICE)
 				if (!strncmp(argv[i], "--escape-exit", strlen("--escape-exit")))
 					g_Config.bPauseExitsEmulator = true;
@@ -880,7 +887,6 @@ void NativeShutdownGraphics() {
 void TakeScreenshot() {
 	g_TakeScreenshot = false;
 
-#if defined(_WIN32) || (defined(USING_QT_UI) && !defined(MOBILE_DEVICE))
 	std::string path = GetSysDirectory(DIRECTORY_SCREENSHOT);
 	while (path.length() > 0 && path.back() == '/') {
 		path.resize(path.size() - 1);
@@ -913,7 +919,6 @@ void TakeScreenshot() {
 		I18NCategory *err = GetI18NCategory("Error");
 		osm.Show(err->T("Could not save screenshot file"));
 	}
-#endif
 }
 
 void RenderOverlays(UIContext *dc, void *userdata) {
@@ -1283,7 +1288,7 @@ void NativeShutdown() {
 	delete host;
 	host = nullptr;
 #endif
-	g_Config.Save();
+	g_Config.Save("NativeShutdown");
 
 	// Avoid shutting this down when restarting core.
 	if (!restarting)

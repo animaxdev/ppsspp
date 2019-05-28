@@ -574,6 +574,12 @@ static GraphicsContext *graphicsContext;
 	NativeKey(key);
 }
 
+// Enables tapping for edge area.
+-(UIRectEdge)preferredScreenEdgesDeferringSystemGestures
+{
+	return UIRectEdgeAll;
+}
+
 - (void)setupController:(GCController *)controller
 {
 	self.gameController = controller;
@@ -686,6 +692,10 @@ static GraphicsContext *graphicsContext;
 #endif
 
 @end
+
+void OpenDirectory(const char *path) {
+	// Unsupported
+}
 
 void LaunchBrowser(char const* url)
 {

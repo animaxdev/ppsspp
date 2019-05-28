@@ -180,6 +180,11 @@ void __DisplayFlip(int cyclesLate);
 static void ScheduleLagSync(int over = 0) {
 	lagSyncScheduled = g_Config.bForceLagSync;
 	if (lagSyncScheduled) {
+		// Reset over if it became too high, such as after pausing or initial loading.
+		// There's no real sense in it being more than 1/60th of a second.
+		if (over > 1000000 / 60) {
+			over = 0;
+		}
 		CoreTiming::ScheduleEvent(usToCycles(1000 + over), lagSyncEvent, 0);
 		lastLagSync = real_time_now();
 	}
@@ -1064,10 +1069,10 @@ static u32 sceDisplayGetVcount() {
 }
 
 static u32 __DisplayGetCurrentHcount() {
-	const static int ticksPerVblank333 = 333 * 1000000 / 60 / hCountPerVblank;
 	const int ticksIntoFrame = CoreTiming::GetTicks() - frameStartTicks;
+	const int ticksPerVblank = CoreTiming::GetClockFrequencyHz() / 60 / hCountPerVblank;
 	// Can't seem to produce a 0 on real hardware, offsetting by 1 makes things look right.
-	return 1 + (ticksIntoFrame / (CoreTiming::GetClockFrequencyMHz() * ticksPerVblank333 / 333));
+	return 1 + (ticksIntoFrame / ticksPerVblank);
 }
 
 static u32 __DisplayGetAccumulatedHcount() {

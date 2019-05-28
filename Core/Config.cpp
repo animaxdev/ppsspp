@@ -396,7 +396,7 @@ static ConfigSetting generalSettings[] = {
 	ConfigSetting("ShowDebuggerOnLoad", &g_Config.bShowDebuggerOnLoad, false),
 	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, true),
 	ConfigSetting("Language", &g_Config.sLanguageIni, &DefaultLangRegion),
-	ConfigSetting("ForceLagSync", &g_Config.bForceLagSync, false, true, true),
+	ConfigSetting("ForceLagSync2", &g_Config.bForceLagSync, false, true, true),
 	ConfigSetting("DiscordPresence", &g_Config.bDiscordPresence, true, true, false),  // Or maybe it makes sense to have it per-game? Race conditions abound...
 
 	ReportedConfigSetting("NumWorkerThreads", &g_Config.iNumWorkerThreads, &DefaultNumWorkers, true, true),
@@ -431,7 +431,7 @@ static ConfigSetting generalSettings[] = {
 	ConfigSetting("RemoteDebuggerOnStartup", &g_Config.bRemoteDebuggerOnStartup, false),
 
 #ifdef __ANDROID__
-	ConfigSetting("ScreenRotation", &g_Config.iScreenRotation, ROTATION_LOCKED_HORIZONTAL),
+	ConfigSetting("ScreenRotation", &g_Config.iScreenRotation, ROTATION_AUTO_HORIZONTAL),
 #endif
 	ConfigSetting("InternalScreenRotation", &g_Config.iInternalScreenRotation, ROTATION_LOCKED_HORIZONTAL),
 
@@ -505,10 +505,6 @@ static int DefaultZoomType() {
 	return (int)SmallDisplayZoom::AUTO;
 }
 
-static bool DefaultTimerHack() {
-	return false;
-}
-
 static int DefaultAndroidHwScale() {
 #ifdef __ANDROID__
 	if (System_GetPropertyInt(SYSPROP_SYSTEMVERSION) >= 19 || System_GetPropertyInt(SYSPROP_DEVICE_TYPE) == DEVICE_TYPE_TV) {
@@ -570,12 +566,12 @@ int Config::NextValidBackend() {
 			return (int)GPUBackend::DIRECT3D11;
 		}
 #endif
-#if !PPSSPP_PLATFORM(UWP)
+#if PPSSPP_API(ANY_GL)
 		if (!failed.count((int)GPUBackend::OPENGL)) {
 			return (int)GPUBackend::OPENGL;
 		}
 #endif
-#if PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(UWP)
+#if PPSSPP_API(D3D9)
 		if (!failed.count((int)GPUBackend::DIRECT3D9)) {
 			return (int)GPUBackend::DIRECT3D9;
 		}
@@ -677,7 +673,6 @@ static ConfigSetting soundSettings[] = {
 	ConfigSetting("AudioBackend", &g_Config.iAudioBackend, 0, true, true),
 	ConfigSetting("AudioLatency", &g_Config.iAudioLatency, 1, true, true),
 	ConfigSetting("ExtraAudioBuffering", &g_Config.bExtraAudioBuffering, false, true, false),
-	ConfigSetting("SoundSpeedHack", &g_Config.bSoundSpeedHack, false, true, true),
 	ConfigSetting("AudioResampler", &g_Config.bAudioResampler, true, true, true),
 	ConfigSetting("GlobalVolume", &g_Config.iGlobalVolume, VOLUME_MAX, true, true),
 
@@ -1113,7 +1108,7 @@ void Config::Load(const char *iniFileName, const char *controllerIniFilename) {
 	}
 }
 
-void Config::Save() {
+void Config::Save(const char *saveReason) {
 	if (jitForcedOff) {
 		// if JIT has been forced off, we don't want to screw up the user's ppsspp.ini
 		g_Config.iCpuCore = (int)CPUCore::JIT;
@@ -1166,11 +1161,11 @@ void Config::Save() {
 			LogManager::GetInstance()->SaveConfig(log);
 
 		if (!iniFile.Save(iniFilename_.c_str())) {
-			ERROR_LOG(LOADER, "Error saving config - can't write ini '%s'", iniFilename_.c_str());
+			ERROR_LOG(LOADER, "Error saving config (%s)- can't write ini '%s'", saveReason, iniFilename_.c_str());
 			System_SendMessage("toast", "Failed to save settings!\nCheck permissions, or try to restart the device.");
 			return;
 		}
-		INFO_LOG(LOADER, "Config saved: '%s'", iniFilename_.c_str());
+		INFO_LOG(LOADER, "Config saved (%s): '%s'", saveReason, iniFilename_.c_str());
 
 		if (!bGameSpecific) //otherwise we already did this in saveGameConfig()
 		{
@@ -1357,7 +1352,7 @@ bool Config::hasGameConfig(const std::string &pGameId) {
 }
 
 void Config::changeGameSpecific(const std::string &pGameId) {
-	Save();
+	Save("changeGameSpecific");
 	gameId_ = pGameId;
 	bGameSpecific = !pGameId.empty();
 }

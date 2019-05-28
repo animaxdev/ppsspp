@@ -762,7 +762,7 @@ std::string Shader::GetShaderString(DebugShaderStringType type, ShaderID id) con
 	case SHADER_STRING_SOURCE_CODE:
 		return source_;
 	case SHADER_STRING_SHORT_DESC:
-		return isFragment_ ? FragmentShaderDesc(id) : VertexShaderDesc(id);
+		return isFragment_ ? FragmentShaderDesc(FShaderID(id)) : VertexShaderDesc(VShaderID(id));
 	default:
 		return "N/A";
 	}
@@ -828,7 +828,7 @@ std::string ShaderManagerGLES::DebugGetShaderString(std::string id, DebugShaderT
 // as sometimes these features might have an effect on the ID bits.
 
 #define CACHE_HEADER_MAGIC 0x83277592
-#define CACHE_VERSION 13
+#define CACHE_VERSION 14
 struct CacheHeader {
 	uint32_t magic;
 	uint32_t version;

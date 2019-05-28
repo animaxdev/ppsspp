@@ -100,7 +100,7 @@ namespace MIPSComp
 			js.prefixTFlag = JitState::PREFIX_KNOWN_DIRTY;
 			break;
 		case 2:  // D
-			js.prefixD = data;
+			js.prefixD = data & 0x00000FFF;
 			js.prefixDFlag = JitState::PREFIX_KNOWN_DIRTY;
 			break;
 		default:
@@ -1333,18 +1333,21 @@ namespace MIPSComp
 		NEON_IF_AVAILABLE(CompNEON_Vmtvc);
 		CONDITIONAL_DISABLE(VFPU_XFER);
 
-		int vs = _VS;
-		int imm = op & 0xFF;
-		if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
-			fpr.MapRegV(vs);
-			if (imm - 128 == VFPU_CTRL_CC) {
+		int vd = _VD;
+		int imm = (op >> 8) & 0x7F;
+		if (imm < VFPU_CTRL_MAX) {
+			fpr.MapRegV(vd);
+			if (imm == VFPU_CTRL_CC) {
 				gpr.MapReg(MIPS_REG_VFPUCC, 0);
-				VMOV(fpr.V(vs), gpr.R(MIPS_REG_VFPUCC));
+				VMOV(fpr.V(vd), gpr.R(MIPS_REG_VFPUCC));
 			} else {
-				ADDI2R(SCRATCHREG1, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + (imm - 128) * 4, SCRATCHREG2);
-				VLDR(fpr.V(vs), SCRATCHREG1, 0);
+				ADDI2R(SCRATCHREG1, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + imm * 4, SCRATCHREG2);
+				VLDR(fpr.V(vd), SCRATCHREG1, 0);
 			}
 			fpr.ReleaseSpillLocksAndDiscardTemps();
+		} else {
+			fpr.MapRegV(vd);
+			MOVI2F(fpr.V(vd), 0.0f, SCRATCHREG1);
 		}
 	}
 
@@ -1353,23 +1356,23 @@ namespace MIPSComp
 		CONDITIONAL_DISABLE(VFPU_XFER);
 
 		int vs = _VS;
-		int imm = op & 0xFF;
-		if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
+		int imm = op & 0x7F;
+		if (imm < VFPU_CTRL_MAX) {
 			fpr.MapRegV(vs);
-			if (imm - 128 == VFPU_CTRL_CC) {
+			if (imm == VFPU_CTRL_CC) {
 				gpr.MapReg(MIPS_REG_VFPUCC, MAP_DIRTY | MAP_NOINIT);
 				VMOV(gpr.R(MIPS_REG_VFPUCC), fpr.V(vs));
 			} else {
-				ADDI2R(SCRATCHREG1, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + (imm - 128) * 4, SCRATCHREG2);
+				ADDI2R(SCRATCHREG1, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + imm * 4, SCRATCHREG2);
 				VSTR(fpr.V(vs), SCRATCHREG1, 0);
 			}
 			fpr.ReleaseSpillLocksAndDiscardTemps();
 
-			if (imm - 128 == VFPU_CTRL_SPREFIX) {
+			if (imm == VFPU_CTRL_SPREFIX) {
 				js.prefixSFlag = JitState::PREFIX_UNKNOWN;
-			} else if (imm - 128 == VFPU_CTRL_TPREFIX) {
+			} else if (imm == VFPU_CTRL_TPREFIX) {
 				js.prefixTFlag = JitState::PREFIX_UNKNOWN;
-			} else if (imm - 128 == VFPU_CTRL_DPREFIX) {
+			} else if (imm == VFPU_CTRL_DPREFIX) {
 				js.prefixDFlag = JitState::PREFIX_UNKNOWN;
 			}
 		}
@@ -2301,10 +2304,16 @@ namespace MIPSComp
 		VectorSize sz = GetVecSize(op);
 		int n = GetNumVectorElements(sz);
 
-		u8 sregs[4], dregs[4];
-		// Actually, not sure that this instruction accepts an S prefix. We don't apply it in the
-		// interpreter. But whatever.
+		// This is a hack that modifies prefixes.  We eat them later, so just overwrite.
+		// S prefix forces the negate flags.
+		js.prefixS |= 0x000F0000;
+		// T prefix forces constants on and regnum to 1.
+		// That means negate still works, and abs activates a different constant.
+		js.prefixT = (js.prefixT & ~0x000000FF) | 0x00000055 | 0x0000F000;
+
+		u8 sregs[4], tregs[4], dregs[4];
 		GetVectorRegsPrefixS(sregs, sz, _VS);
+		GetVectorRegsPrefixT(tregs, sz, _VS);
 		GetVectorRegsPrefixD(dregs, sz, _VD);
 
 		MIPSReg tempregs[4];
@@ -2316,10 +2325,9 @@ namespace MIPSComp
 			}
 		}
 
-		MOVI2F(S0, 1.0f, SCRATCHREG1);
 		for (int i = 0; i < n; ++i) {
-			fpr.MapDirtyInV(tempregs[i], sregs[i]);
-			VSUB(fpr.V(tempregs[i]), S0, fpr.V(sregs[i]));
+			fpr.MapDirtyInInV(tempregs[i], sregs[i], tregs[i]);
+			VADD(fpr.V(tempregs[i]), fpr.V(tregs[i]), fpr.V(sregs[i]));
 		}
 
 		for (int i = 0; i < n; ++i) {

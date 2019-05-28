@@ -16,11 +16,17 @@
 #include "Common/ConsoleListener.h"
 #include "Common/OSVersion.h"
 #include "Common/Vulkan/VulkanLoader.h"
+#if PPSSPP_API(ANY_GL)
 #include "GPU/GLES/TextureScalerGLES.h"
 #include "GPU/GLES/TextureCacheGLES.h"
+#include "GPU/GLES/FramebufferManagerGLES.h"
+#endif
 #include "UI/OnScreenDisplay.h"
 #include "GPU/Common/PostShader.h"
-#include "GPU/GLES/FramebufferManagerGLES.h"
+#include "GPU/Common/FramebufferCommon.h"
+#include "GPU/Common/TextureCacheCommon.h"
+#include "GPU/Common/TextureScalerCommon.h"
+
 #include "Core/Config.h"
 #include "Core/ConfigValues.h"
 #include "Core/FileSystems/MetaFileSystem.h"
@@ -50,6 +56,7 @@ namespace MainWindow {
 	static std::unordered_map<int, std::string> initialMenuKeys;
 	static std::vector<std::string> availableShaders;
 	static std::string menuLanguageID = "";
+	static int menuKeymapGeneration = -1;
 	static bool menuShaderInfoLoaded = false;
 	std::vector<ShaderInfo> menuShaderInfo;
 
@@ -92,7 +99,7 @@ namespace MainWindow {
 	static void EmptySubMenu(HMENU menu) {
 		int c = GetMenuItemCount(menu);
 		for (int i = 0; i < c; ++i) {
-			RemoveMenu(menu, i, MF_BYPOSITION);
+			RemoveMenu(menu, 0, MF_BYPOSITION);
 		}
 	}
 
@@ -209,6 +216,10 @@ namespace MainWindow {
 	}
 
 	void DoTranslateMenus(HWND hWnd, HMENU menu) {
+		auto useDefHotkey = [](int virtkey) {
+			return KeyMap::g_controllerMap[virtkey].empty();
+		};
+
 		TranslateMenuItem(menu, ID_FILE_MENU);
 		TranslateMenuItem(menu, ID_EMULATION_MENU);
 		TranslateMenuItem(menu, ID_DEBUG_MENU);
@@ -220,9 +231,9 @@ namespace MainWindow {
 		TranslateMenuItem(menu, ID_FILE_LOAD_DIR);
 		TranslateMenuItem(menu, ID_FILE_LOAD_MEMSTICK);
 		TranslateMenuItem(menu, ID_FILE_MEMSTICK);
-		TranslateMenuItem(menu, ID_FILE_SAVESTATE_SLOT_MENU, L"\tF3");
-		TranslateMenuItem(menu, ID_FILE_QUICKLOADSTATE, L"\tF4");
-		TranslateMenuItem(menu, ID_FILE_QUICKSAVESTATE, L"\tF2");
+		TranslateMenuItem(menu, ID_FILE_SAVESTATE_SLOT_MENU, useDefHotkey(VIRTKEY_NEXT_SLOT) ? L"\tF3" : L"");
+		TranslateMenuItem(menu, ID_FILE_QUICKLOADSTATE, useDefHotkey(VIRTKEY_LOAD_STATE) ? L"\tF4" : L"");
+		TranslateMenuItem(menu, ID_FILE_QUICKSAVESTATE, useDefHotkey(VIRTKEY_SAVE_STATE) ? L"\tF2" : L"");
 		TranslateMenuItem(menu, ID_FILE_LOADSTATEFILE);
 		TranslateMenuItem(menu, ID_FILE_SAVESTATEFILE);
 		TranslateMenuItem(menu, ID_FILE_RECORD_MENU);
@@ -326,7 +337,7 @@ namespace MainWindow {
 		bool changed = false;
 
 		const std::string curLanguageID = i18nrepo.LanguageID();
-		if (curLanguageID != menuLanguageID) {
+		if (curLanguageID != menuLanguageID || menuKeymapGeneration != KeyMap::g_controllerMapGeneration) {
 			DoTranslateMenus(hWnd, menu);
 			menuLanguageID = curLanguageID;
 			changed = true;
@@ -754,25 +765,25 @@ namespace MainWindow {
 
 		case ID_OPTIONS_DIRECT3D9:
 			g_Config.iGPUBackend = (int)GPUBackend::DIRECT3D9;
-			g_Config.Save();
+			g_Config.Save("gpu_choice");
 			RestartApp();
 			break;
 
 		case ID_OPTIONS_DIRECT3D11:
 			g_Config.iGPUBackend = (int)GPUBackend::DIRECT3D11;
-			g_Config.Save();
+			g_Config.Save("gpu_choice");
 			RestartApp();
 			break;
 
 		case ID_OPTIONS_OPENGL:
 			g_Config.iGPUBackend = (int)GPUBackend::OPENGL;
-			g_Config.Save();
+			g_Config.Save("gpu_choice");
 			RestartApp();
 			break;
 
 		case ID_OPTIONS_VULKAN:
 			g_Config.iGPUBackend = (int)GPUBackend::VULKAN;
-			g_Config.Save();
+			g_Config.Save("gpu_choice");
 			RestartApp();
 			break;
 
@@ -876,8 +887,10 @@ namespace MainWindow {
 			break;
 
 		case ID_DEBUG_GEDEBUGGER:
+#if PPSSPP_API(ANY_GL)
 			if (geDebuggerWindow)
 				geDebuggerWindow->Show(true);
+#endif
 			break;
 
 		case ID_DEBUG_MEMORYVIEW:
@@ -984,15 +997,15 @@ namespace MainWindow {
 			break;
 
 		case ID_HELP_OPENWEBSITE:
-			ShellExecute(NULL, L"open", L"http://www.ppsspp.org/", NULL, NULL, SW_SHOWNORMAL);
+			ShellExecute(NULL, L"open", L"https://www.ppsspp.org/", NULL, NULL, SW_SHOWNORMAL);
 			break;
 
 		case ID_HELP_BUYGOLD:
-			ShellExecute(NULL, L"open", L"http://central.ppsspp.org/buygold", NULL, NULL, SW_SHOWNORMAL);
+			ShellExecute(NULL, L"open", L"https://central.ppsspp.org/buygold", NULL, NULL, SW_SHOWNORMAL);
 			break;
 
 		case ID_HELP_OPENFORUM:
-			ShellExecute(NULL, L"open", L"http://forums.ppsspp.org/", NULL, NULL, SW_SHOWNORMAL);
+			ShellExecute(NULL, L"open", L"https://forums.ppsspp.org/", NULL, NULL, SW_SHOWNORMAL);
 			break;
 
 		case ID_HELP_GITHUB:
@@ -1274,11 +1287,16 @@ namespace MainWindow {
 		bool allowD3D11 = DoesVersionMatchWindows(6, 0, 0, 0, true);
 		bool allowVulkan = VulkanMayBeAvailable();
 
+#if PPSSPP_API(ANY_GL)
+		bool allowOpenGL = true;
+#else
+		bool allowOpenGL = false;
+#endif
 		switch (GetGPUBackend()) {
 		case GPUBackend::DIRECT3D9:
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_GRAYED);
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D11, allowD3D11 ? MF_ENABLED : MF_GRAYED);
-			EnableMenuItem(menu, ID_OPTIONS_OPENGL, MF_ENABLED);
+			EnableMenuItem(menu, ID_OPTIONS_OPENGL, allowOpenGL ? MF_ENABLED : MF_GRAYED);
 			EnableMenuItem(menu, ID_OPTIONS_VULKAN, allowVulkan ? MF_ENABLED : MF_GRAYED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_CHECKED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D11, MF_UNCHECKED);
@@ -1298,7 +1316,7 @@ namespace MainWindow {
 		case GPUBackend::VULKAN:
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_ENABLED);
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D11, allowD3D11 ? MF_ENABLED : MF_GRAYED);
-			EnableMenuItem(menu, ID_OPTIONS_OPENGL, MF_ENABLED);
+			EnableMenuItem(menu, ID_OPTIONS_OPENGL, allowOpenGL ? MF_ENABLED : MF_GRAYED);
 			EnableMenuItem(menu, ID_OPTIONS_VULKAN, MF_GRAYED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_UNCHECKED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D11, MF_UNCHECKED);
@@ -1308,7 +1326,7 @@ namespace MainWindow {
 		case GPUBackend::DIRECT3D11:
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_ENABLED);
 			EnableMenuItem(menu, ID_OPTIONS_DIRECT3D11, MF_GRAYED);
-			EnableMenuItem(menu, ID_OPTIONS_OPENGL, MF_ENABLED);
+			EnableMenuItem(menu, ID_OPTIONS_OPENGL, allowOpenGL ? MF_ENABLED : MF_GRAYED);
 			EnableMenuItem(menu, ID_OPTIONS_VULKAN, allowVulkan ? MF_ENABLED : MF_GRAYED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D9, MF_UNCHECKED);
 			CheckMenuItem(menu, ID_OPTIONS_DIRECT3D11, MF_CHECKED);
@@ -1316,6 +1334,10 @@ namespace MainWindow {
 			CheckMenuItem(menu, ID_OPTIONS_VULKAN, MF_UNCHECKED);
 			break;
 		}
+
+#if !PPSSPP_API(ANY_GL)
+		EnableMenuItem(menu, ID_DEBUG_GEDEBUGGER, MF_GRAYED);
+#endif
 
 		UpdateDynamicMenuCheckmarks(menu);
 		UpdateCommands();

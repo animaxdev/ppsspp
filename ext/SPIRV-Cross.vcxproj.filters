@@ -10,6 +10,8 @@
     <ClInclude Include="SPIRV-Cross\spirv_hlsl.hpp" />
     <ClInclude Include="SPIRV-Cross\spirv_msl.hpp" />
     <ClInclude Include="SPIRV-Cross\spirv_cross_util.hpp" />
+    <ClInclude Include="SPIRV-Cross\spirv_cross_parsed_ir.hpp" />
+    <ClInclude Include="SPIRV-Cross\spirv_parser.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SPIRV-Cross\spirv_cfg.cpp" />

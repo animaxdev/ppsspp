@@ -51,7 +51,7 @@ void D3D11Context::SwapInterval(int interval) {
 
 HRESULT D3D11Context::CreateTheDevice(IDXGIAdapter *adapter) {
 	bool windowed = true;
-#ifdef _DEBUG
+#if defined(_DEBUG) && !defined(_M_ARM) && !defined(_M_ARM64)
 	UINT createDeviceFlags = D3D11_CREATE_DEVICE_DEBUG;
 #else
 	UINT createDeviceFlags = 0;
@@ -106,30 +106,37 @@ bool D3D11Context::Init(HINSTANCE hInst, HWND wnd, std::string *error_message) {
 	if (result == LoadD3D11Error::SUCCESS) {
 		std::vector<IDXGIAdapter *> adapters;
 		int chosenAdapter = 0;
+		IDXGIFactory* pFactory = nullptr;
 
-		IDXGIFactory * pFactory = nullptr;
-		ptr_CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&pFactory);
-
-		IDXGIAdapter *pAdapter;
-		for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-			adapters.push_back(pAdapter);
-			DXGI_ADAPTER_DESC desc;
-			pAdapter->GetDesc(&desc);
-			std::string str = ConvertWStringToUTF8(desc.Description);
-			adapterNames.push_back(str);
-			if (str == g_Config.sD3D11Device) {
-				chosenAdapter = i;
+		hr = ptr_CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&pFactory);
+		if (SUCCEEDED(hr)) {
+			IDXGIAdapter* pAdapter;
+			for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
+				adapters.push_back(pAdapter);
+				DXGI_ADAPTER_DESC desc;
+				pAdapter->GetDesc(&desc);
+				std::string str = ConvertWStringToUTF8(desc.Description);
+				adapterNames.push_back(str);
+				if (str == g_Config.sD3D11Device) {
+					chosenAdapter = i;
+				}
 			}
-		}
-
-		chosenAdapterName = adapterNames[chosenAdapter];
-		hr = CreateTheDevice(adapters[chosenAdapter]);
-		for (int i = 0; i < (int)adapters.size(); i++) {
-			adapters[i]->Release();
+			if (!adapters.empty()) {
+				chosenAdapterName = adapterNames[chosenAdapter];
+				hr = CreateTheDevice(adapters[chosenAdapter]);
+				for (int i = 0; i < (int)adapters.size(); i++) {
+					adapters[i]->Release();
+				}
+			} else {
+				// No adapters found. Trip the error path below.
+				hr = E_FAIL;
+			}
+			pFactory->Release();
 		}
 	}
 
 	if (FAILED(hr)) {
+
 		const char *defaultError = "Your GPU does not appear to support Direct3D 11.\n\nWould you like to try again using Direct3D 9 instead?";
 		I18NCategory *err = GetI18NCategory("Error");
 
@@ -145,10 +152,10 @@ bool D3D11Context::Init(HINSTANCE hInst, HWND wnd, std::string *error_message) {
 		std::wstring title = ConvertUTF8ToWString(err->T("D3D11InitializationError", "Direct3D 11 initialization error"));
 		bool yes = IDYES == MessageBox(hWnd_, error.c_str(), title.c_str(), MB_ICONERROR | MB_YESNO);
 		if (yes) {
-			// Change the config to D3D and restart.
+			// Change the config to D3D9 and restart.
 			g_Config.iGPUBackend = (int)GPUBackend::DIRECT3D9;
 			g_Config.sFailedGPUBackends.clear();
-			g_Config.Save();
+			g_Config.Save("save_d3d9_fallback");
 
 			W32Util::ExitAndRestart();
 		}

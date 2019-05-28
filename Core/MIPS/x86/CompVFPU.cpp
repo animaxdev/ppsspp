@@ -87,7 +87,7 @@ void Jit::Comp_VPFX(MIPSOpcode op)
 		js.prefixTFlag = JitState::PREFIX_KNOWN_DIRTY;
 		break;
 	case 2:  // D
-		js.prefixD = data;
+		js.prefixD = data & 0x00000FFF;
 		js.prefixDFlag = JitState::PREFIX_KNOWN_DIRTY;
 		break;
 	}
@@ -2026,12 +2026,24 @@ void Jit::Comp_Vocp(MIPSOpcode op) {
 	VectorSize sz = GetVecSize(op);
 	int n = GetNumVectorElements(sz);
 
-	u8 sregs[4], dregs[4];
+	// This is a hack that modifies prefixes.  We eat them later, so just overwrite.
+	// S prefix forces the negate flags.
+	js.prefixS |= 0x000F0000;
+	// T prefix forces constants on and regnum to 1.
+	// That means negate still works, and abs activates a different constant.
+	js.prefixT = (js.prefixT & ~0x000000FF) | 0x00000055 | 0x0000F000;
+
+	u8 sregs[4], tregs[4], dregs[4];
+	// Actually uses the T prefixes (despite being VS.)
 	GetVectorRegsPrefixS(sregs, sz, _VS);
+	if (js.prefixT != 0x0000F055)
+		GetVectorRegsPrefixT(tregs, sz, _VS);
 	GetVectorRegsPrefixD(dregs, sz, _VD);
 
 	// Flush SIMD.
 	fpr.SimpleRegsV(sregs, sz, 0);
+	if (js.prefixT != 0x0000F055)
+		fpr.SimpleRegsV(tregs, sz, 0);
 	fpr.SimpleRegsV(dregs, sz, MAP_NOINIT | MAP_DIRTY);
 
 	X64Reg tempxregs[4];
@@ -2048,11 +2060,17 @@ void Jit::Comp_Vocp(MIPSOpcode op) {
 		}
 	}
 
-	MOV(PTRBITS, R(TEMPREG), ImmPtr(&one));
-	MOVSS(XMM1, MatR(TEMPREG));
+	if (js.prefixT == 0x0000F055) {
+		MOV(PTRBITS, R(TEMPREG), ImmPtr(&one));
+		MOVSS(XMM1, MatR(TEMPREG));
+	}
 	for (int i = 0; i < n; ++i) {
-		MOVSS(XMM0, R(XMM1));
-		SUBSS(XMM0, fpr.V(sregs[i]));
+		if (js.prefixT == 0x0000F055) {
+			MOVSS(XMM0, R(XMM1));
+		} else {
+			MOVSS(XMM0, fpr.V(tregs[i]));
+		}
+		ADDSS(XMM0, fpr.V(sregs[i]));
 		MOVSS(tempxregs[i], R(XMM0));
 	}
 
@@ -2510,16 +2528,20 @@ void Jit::Comp_Mftv(MIPSOpcode op) {
 
 void Jit::Comp_Vmfvc(MIPSOpcode op) {
 	CONDITIONAL_DISABLE(VFPU_XFER);
-	int vs = _VS;
-	int imm = op & 0xFF;
-	if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
-		fpr.MapRegV(vs, MAP_DIRTY | MAP_NOINIT);
-		if (imm - 128 == VFPU_CTRL_CC) {
+	int vd = _VD;
+	int imm = (op >> 8) & 0x7F;
+	if (imm < VFPU_CTRL_MAX) {
+		fpr.MapRegV(vd, MAP_DIRTY | MAP_NOINIT);
+		if (imm == VFPU_CTRL_CC) {
 			gpr.MapReg(MIPS_REG_VFPUCC, true, false);
-			MOVD_xmm(fpr.VX(vs), gpr.R(MIPS_REG_VFPUCC));
+			MOVD_xmm(fpr.VX(vd), gpr.R(MIPS_REG_VFPUCC));
 		} else {
-			MOVSS(fpr.VX(vs), MIPSSTATE_VAR_ELEM32(vfpuCtrl[0], imm - 128));
+			MOVSS(fpr.VX(vd), MIPSSTATE_VAR_ELEM32(vfpuCtrl[0], imm));
 		}
+		fpr.ReleaseSpillLocks();
+	} else {
+		fpr.MapRegV(vd, MAP_DIRTY | MAP_NOINIT);
+		XORPS(fpr.VX(vd), fpr.V(vd));
 		fpr.ReleaseSpillLocks();
 	}
 }
@@ -2527,22 +2549,22 @@ void Jit::Comp_Vmfvc(MIPSOpcode op) {
 void Jit::Comp_Vmtvc(MIPSOpcode op) {
 	CONDITIONAL_DISABLE(VFPU_XFER);
 	int vs = _VS;
-	int imm = op & 0xFF;
-	if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
+	int imm = op & 0x7F;
+	if (imm < VFPU_CTRL_MAX) {
 		fpr.MapRegV(vs, 0);
-		if (imm - 128 == VFPU_CTRL_CC) {
+		if (imm == VFPU_CTRL_CC) {
 			gpr.MapReg(MIPS_REG_VFPUCC, false, true);
 			MOVD_xmm(gpr.R(MIPS_REG_VFPUCC), fpr.VX(vs));
 		} else {
-			MOVSS(MIPSSTATE_VAR_ELEM32(vfpuCtrl[0], imm - 128), fpr.VX(vs));
+			MOVSS(MIPSSTATE_VAR_ELEM32(vfpuCtrl[0], imm), fpr.VX(vs));
 		}
 		fpr.ReleaseSpillLocks();
 
-		if (imm - 128 == VFPU_CTRL_SPREFIX) {
+		if (imm == VFPU_CTRL_SPREFIX) {
 			js.prefixSFlag = JitState::PREFIX_UNKNOWN;
-		} else if (imm - 128 == VFPU_CTRL_TPREFIX) {
+		} else if (imm == VFPU_CTRL_TPREFIX) {
 			js.prefixTFlag = JitState::PREFIX_UNKNOWN;
-		} else if (imm - 128 == VFPU_CTRL_DPREFIX) {
+		} else if (imm == VFPU_CTRL_DPREFIX) {
 			js.prefixDFlag = JitState::PREFIX_UNKNOWN;
 		}
 	}

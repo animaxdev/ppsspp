@@ -23,7 +23,6 @@
 #include "base/timeutil.h"
 #include "math/lin/matrix4x4.h"
 #include "math/dataconv.h"
-#include "i18n/i18n.h"
 #include "ext/native/file/vfs.h"
 #include "ext/native/thin3d/thin3d.h"
 
@@ -195,9 +194,9 @@ void FramebufferManagerVulkan::MakePixelTexture(const u8 *srcPixels, GEBufferFor
 	VkCommandBuffer initCmd = (VkCommandBuffer)draw_->GetNativeObject(Draw::NativeObject::INIT_COMMANDBUFFER);
 
 	// There's only ever a few of these alive, don't need to stress the allocator with these big ones.
-	drawPixelsTex_ = new VulkanTexture(vulkan_, nullptr);
+	drawPixelsTex_ = new VulkanTexture(vulkan_);
 	drawPixelsTex_->SetTag("DrawPixels");
-	if (!drawPixelsTex_->CreateDirect(initCmd, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)) {
+	if (!drawPixelsTex_->CreateDirect(initCmd, nullptr, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)) {
 		// out of memory?
 		delete drawPixelsTex_;
 		drawPixelsTex_ = nullptr;
@@ -618,7 +617,6 @@ void FramebufferManagerVulkan::CompilePostShader() {
 	} else {
 		return;
 	}
-	I18NCategory *gr = GetI18NCategory("Graphics");
 
 	// TODO: Delete the old pipeline?
 

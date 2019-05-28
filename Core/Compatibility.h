@@ -63,6 +63,7 @@ struct CompatFlags {
 	bool YugiohSaveFix;
 	bool ForceUMDDelay;
 	bool ForceMax60FPS;
+	bool JitInvalidationHack;
 };
 
 class IniFile;
@@ -83,5 +84,5 @@ private:
 	void CheckSettings(IniFile &iniFile, const std::string &gameID);
 	void CheckSetting(IniFile &iniFile, const std::string &gameID, const char *option, bool *flag);
 
-	CompatFlags flags_;
+	CompatFlags flags_{};
 };

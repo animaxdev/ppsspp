@@ -37,7 +37,7 @@
 // All functions should have CONDITIONAL_DISABLE, so we can narrow things down to a file quickly.
 // Currently known non working ones should have DISABLE.
 
-// #define CONDITIONAL_DISABLE { fpr.ReleaseSpillLocksAndDiscardTemps(); Comp_Generic(op); return; }
+// #define CONDITIONAL_DISABLE(flag) { fpr.ReleaseSpillLocksAndDiscardTemps(); Comp_Generic(op); return; }
 #define CONDITIONAL_DISABLE(flag) if (jo.Disabled(JitDisable::flag)) { Comp_Generic(op); return; }
 #define DISABLE { fpr.ReleaseSpillLocksAndDiscardTemps(); Comp_Generic(op); return; }
 
@@ -93,7 +93,7 @@ namespace MIPSComp {
 			js.prefixTFlag = JitState::PREFIX_KNOWN_DIRTY;
 			break;
 		case 2:  // D
-			js.prefixD = data;
+			js.prefixD = data & 0x00000FFF;
 			js.prefixDFlag = JitState::PREFIX_KNOWN_DIRTY;
 			break;
 		default:
@@ -222,7 +222,11 @@ namespace MIPSComp {
 			// CC might be set by slow path below, so load regs first.
 			fpr.MapRegV(vt, MAP_DIRTY | MAP_NOINIT);
 			if (gpr.IsImm(rs)) {
+#ifdef MASKED_PSP_MEMORY
+				u32 addr = (offset + gpr.GetImm(rs)) & 0x3FFFFFFF;
+#else
 				u32 addr = offset + gpr.GetImm(rs);
+#endif
 				gpr.SetRegImm(SCRATCH1, addr);
 			} else {
 				gpr.MapReg(rs);
@@ -251,7 +255,11 @@ namespace MIPSComp {
 			// CC might be set by slow path below, so load regs first.
 			fpr.MapRegV(vt);
 			if (gpr.IsImm(rs)) {
+#ifdef MASKED_PSP_MEMORY
+				u32 addr = (offset + gpr.GetImm(rs)) & 0x3FFFFFFF;
+#else
 				u32 addr = offset + gpr.GetImm(rs);
+#endif
 				gpr.SetRegImm(SCRATCH1, addr);
 			} else {
 				gpr.MapReg(rs);
@@ -293,7 +301,11 @@ namespace MIPSComp {
 				fpr.MapRegsAndSpillLockV(vregs, V_Quad, MAP_DIRTY | MAP_NOINIT);
 
 				if (gpr.IsImm(rs)) {
+#ifdef MASKED_PSP_MEMORY
+					u32 addr = (imm + gpr.GetImm(rs)) & 0x3FFFFFFF;
+#else
 					u32 addr = imm + gpr.GetImm(rs);
+#endif
 					gpr.SetRegImm(SCRATCH1_64, addr + (uintptr_t)Memory::base);
 				} else {
 					gpr.MapReg(rs);
@@ -326,7 +338,11 @@ namespace MIPSComp {
 				fpr.MapRegsAndSpillLockV(vregs, V_Quad, 0);
 
 				if (gpr.IsImm(rs)) {
+#ifdef MASKED_PSP_MEMORY
+					u32 addr = (imm + gpr.GetImm(rs)) & 0x3FFFFFFF;
+#else
 					u32 addr = imm + gpr.GetImm(rs);
+#endif
 					gpr.SetRegImm(SCRATCH1_64, addr + (uintptr_t)Memory::base);
 				} else {
 					gpr.MapReg(rs);
@@ -1066,18 +1082,21 @@ namespace MIPSComp {
 	void Arm64Jit::Comp_Vmfvc(MIPSOpcode op) {
 		CONDITIONAL_DISABLE(VFPU_XFER);
 
-		int vs = _VS;
-		int imm = op & 0xFF;
-		if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
-			fpr.MapRegV(vs);
-			if (imm - 128 == VFPU_CTRL_CC) {
+		int vd = _VD;
+		int imm = (op >> 8) & 0x7F;
+		if (imm < VFPU_CTRL_MAX) {
+			fpr.MapRegV(vd);
+			if (imm == VFPU_CTRL_CC) {
 				gpr.MapReg(MIPS_REG_VFPUCC, 0);
-				fp.FMOV(fpr.V(vs), gpr.R(MIPS_REG_VFPUCC));
+				fp.FMOV(fpr.V(vd), gpr.R(MIPS_REG_VFPUCC));
 			} else {
-				ADDI2R(SCRATCH1_64, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + (imm - 128) * 4, SCRATCH2);
-				fp.LDR(32, INDEX_UNSIGNED, fpr.V(vs), SCRATCH1_64, 0);
+				ADDI2R(SCRATCH1_64, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + imm * 4, SCRATCH2);
+				fp.LDR(32, INDEX_UNSIGNED, fpr.V(vd), SCRATCH1_64, 0);
 			}
 			fpr.ReleaseSpillLocksAndDiscardTemps();
+		} else {
+			fpr.MapRegV(vd);
+			fp.MOVI2F(fpr.V(vd), 0.0f, SCRATCH1);
 		}
 	}
 
@@ -1085,23 +1104,23 @@ namespace MIPSComp {
 		CONDITIONAL_DISABLE(VFPU_XFER);
 
 		int vs = _VS;
-		int imm = op & 0xFF;
-		if (imm >= 128 && imm < 128 + VFPU_CTRL_MAX) {
+		int imm = op & 0x7F;
+		if (imm < VFPU_CTRL_MAX) {
 			fpr.MapRegV(vs);
-			if (imm - 128 == VFPU_CTRL_CC) {
+			if (imm == VFPU_CTRL_CC) {
 				gpr.MapReg(MIPS_REG_VFPUCC, MAP_DIRTY | MAP_NOINIT);
 				fp.FMOV(gpr.R(MIPS_REG_VFPUCC), fpr.V(vs));
 			} else {
-				ADDI2R(SCRATCH1_64, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + (imm - 128) * 4, SCRATCH2);
+				ADDI2R(SCRATCH1_64, CTXREG, offsetof(MIPSState, vfpuCtrl[0]) + imm * 4, SCRATCH2);
 				fp.STR(32, INDEX_UNSIGNED, fpr.V(vs), SCRATCH1_64, 0);
 			}
 			fpr.ReleaseSpillLocksAndDiscardTemps();
 
-			if (imm - 128 == VFPU_CTRL_SPREFIX) {
+			if (imm == VFPU_CTRL_SPREFIX) {
 				js.prefixSFlag = JitState::PREFIX_UNKNOWN;
-			} else if (imm - 128 == VFPU_CTRL_TPREFIX) {
+			} else if (imm == VFPU_CTRL_TPREFIX) {
 				js.prefixTFlag = JitState::PREFIX_UNKNOWN;
-			} else if (imm - 128 == VFPU_CTRL_DPREFIX) {
+			} else if (imm == VFPU_CTRL_DPREFIX) {
 				js.prefixDFlag = JitState::PREFIX_UNKNOWN;
 			}
 		}
@@ -1952,10 +1971,16 @@ namespace MIPSComp {
 		VectorSize sz = GetVecSize(op);
 		int n = GetNumVectorElements(sz);
 
-		u8 sregs[4], dregs[4];
-		// Actually, not sure that this instruction accepts an S prefix. We don't apply it in the
-		// interpreter. But whatever.
+		// This is a hack that modifies prefixes.  We eat them later, so just overwrite.
+		// S prefix forces the negate flags.
+		js.prefixS |= 0x000F0000;
+		// T prefix forces constants on and regnum to 1.
+		// That means negate still works, and abs activates a different constant.
+		js.prefixT = (js.prefixT & ~0x000000FF) | 0x00000055 | 0x0000F000;
+
+		u8 sregs[4], tregs[4], dregs[4];
 		GetVectorRegsPrefixS(sregs, sz, _VS);
+		GetVectorRegsPrefixT(tregs, sz, _VS);
 		GetVectorRegsPrefixD(dregs, sz, _VD);
 
 		MIPSReg tempregs[4];
@@ -1969,8 +1994,8 @@ namespace MIPSComp {
 
 		fp.MOVI2F(S0, 1.0f, SCRATCH1);
 		for (int i = 0; i < n; ++i) {
-			fpr.MapDirtyInV(tempregs[i], sregs[i]);
-			fp.FSUB(fpr.V(tempregs[i]), S0, fpr.V(sregs[i]));
+			fpr.MapDirtyInInV(tempregs[i], sregs[i], tregs[i]);
+			fp.FADD(fpr.V(tempregs[i]), fpr.V(tregs[i]), fpr.V(sregs[i]));
 		}
 
 		for (int i = 0; i < n; ++i) {
